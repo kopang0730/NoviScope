@@ -1,2 +1,8 @@
 .superpowers/
 .codegraph
+.omo/
+.venv/
+.pytest_cache/
+__pycache__/
+*.egg-info/
+noviscope.db
