@@ -1,13 +1,21 @@
-# 机器视觉数字科研工作流设计
+# NoviScope 机器视觉数字科研工作流设计
 
 日期：2026-06-29  
 状态：用户评审稿  
 目标版本：MVP 设计规格  
+项目名：NoviScope  
+仓库名：NoviScope  
 默认领域：机器视觉，先以 AI+体育/羽毛球智能分析作为 reference quest
+
+Tagline:
+
+```text
+NoviScope: Scope research novelty, verify ideas, and turn evidence into papers.
+```
 
 ## 1. 背景和目标
 
-本项目要做一套面向机器视觉科研的数字科研团队工作流。用户不区分老师和学生，只要给出一个模糊方向、真实场景或初步想法，系统就应自动推进：
+NoviScope 是一套面向机器视觉科研的数字科研团队工作流。用户不区分老师和学生，只要给出一个模糊方向、真实场景或初步想法，系统就应自动推进：
 
 1. 真实需求验证
 2. 文献和代码检索
@@ -652,6 +660,7 @@ Phase 5：增强自动化
 4. 论文抓取：MVP 先接 Web 搜索、arXiv、Semantic Scholar、Crossref、OpenAlex、GitHub 和 Papers with Code 的轻量适配；找不到 API 时降级为网页检索和人工上传 PDF。
 5. PPT 生成：MVP 先生成结构化 Markdown/HTML slide package；预留 PPT Master 接口，后续转成可编辑 PPTX。
 6. IEEE 输出：MVP 先生成结构化 Markdown + BibTeX + IEEE LaTeX 源文件；PDF 编译作为可选步骤，不作为第一轮端到端演示的硬依赖。
+7. GitHub 代码管理：公开仓库名为 `NoviScope`；公开代码、文档、agent spec、模板和 toy demo，不提交 API key、私有数据、checkpoint、实验日志、未公开论文草稿或组内敏感材料。
 
 ## 20. 验收标准
 
