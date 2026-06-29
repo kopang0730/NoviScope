@@ -4,6 +4,10 @@ from pathlib import Path
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
+from noviscope.models.agent import AgentAssignment  # noqa: F401
+from noviscope.models.provider import ModelProvider  # noqa: F401
+from noviscope.models.quest import Quest, StageCard  # noqa: F401
+
 
 @pytest.fixture()
 def test_db_path(tmp_path: Path) -> Path:
