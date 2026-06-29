@@ -2,7 +2,13 @@
 .codegraph
 .omo/
 .venv/
+.env
+.env.*
+!.env.example
+.DS_Store
 .pytest_cache/
 __pycache__/
 *.egg-info/
 noviscope.db
+*.sqlite
+*.sqlite3
