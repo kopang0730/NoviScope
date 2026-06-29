@@ -1,5 +1,7 @@
 # NoviScope
 
+[中文文档](README.zh-CN.md)
+
 Evidence-driven research workflow for turning vague research directions into verified
 experiments and traceable paper drafts.
 
