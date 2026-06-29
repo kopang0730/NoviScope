@@ -1,0 +1,1 @@
+"""NoviScope agent contracts."""
