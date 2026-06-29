@@ -2,8 +2,9 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel
 
+from noviscope.db.session import create_db_engine
 from noviscope.models.agent import AgentAssignment  # noqa: F401
 from noviscope.models.provider import ModelProvider  # noqa: F401
 from noviscope.models.quest import Quest, StageCard  # noqa: F401
@@ -16,7 +17,7 @@ def test_db_path(tmp_path: Path) -> Path:
 
 @pytest.fixture()
 def test_engine(test_db_path: Path):
-    engine = create_engine(f"sqlite:///{test_db_path}")
+    engine = create_db_engine(f"sqlite:///{test_db_path}")
     SQLModel.metadata.create_all(engine)
     return engine
 
