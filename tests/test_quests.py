@@ -60,6 +60,51 @@ def test_create_quest_adds_demand_validation_stage(db_session: Session):
     assert stages[0].title == "Demand validation"
 
 
+def test_update_stage_records_payloads_and_advances_quest_after_review(db_session: Session):
+    service = QuestService(db_session)
+    quest = service.create_quest(
+        title="Handwritten Text Erasure",
+        initial_direction="擦除试卷中的手写文本",
+    )
+    stage = service.list_stage_cards(quest.id)[0]
+
+    running = service.update_stage_card(
+        stage.id,
+        status=StageStatus.RUNNING,
+        input_payload={"direction": quest.initial_direction},
+    )
+    completed = service.update_stage_card(
+        running.id,
+        status=StageStatus.COMPLETE,
+        output_payload={"confidence": 0.82},
+        evidence_payload={"sources": ["enterprise-demand-note"]},
+        human_approved=True,
+        review_notes="Demand is concrete enough for idea generation.",
+    )
+    saved_quest = db_session.get(Quest, quest.id)
+
+    assert completed.status == StageStatus.COMPLETE
+    assert completed.input_payload == {"direction": quest.initial_direction}
+    assert completed.output_payload == {"confidence": 0.82}
+    assert completed.evidence_payload == {"sources": ["enterprise-demand-note"]}
+    assert completed.human_approved is True
+    assert saved_quest is not None
+    assert saved_quest.status == QuestStatus.IDEA_SELECTION
+
+
+def test_invalid_stage_transition_is_rejected(db_session: Session):
+    service = QuestService(db_session)
+    quest = service.create_quest(title="Badminton", initial_direction="AI+体育")
+    stage = service.list_stage_cards(quest.id)[0]
+
+    try:
+        service.update_stage_card(stage.id, status=StageStatus.COMPLETE)
+    except ValueError as exc:
+        assert "pending to complete" in str(exc)
+    else:
+        raise AssertionError("pending stage should not transition directly to complete")
+
+
 def test_stage_card_requires_existing_quest(tmp_path):
     engine = create_db_engine(f"sqlite:///{tmp_path / 'foreign-keys.db'}")
     create_schema(engine)

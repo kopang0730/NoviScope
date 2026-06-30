@@ -2,6 +2,8 @@
 
 [中文文档](README.zh-CN.md)
 
+[Contributing](CONTRIBUTING.md) · [Collaboration Guide](docs/COLLABORATION.md) · [License](LICENSE)
+
 Evidence-driven research workflow for turning vague research directions into verified
 experiments and traceable paper drafts.
 
@@ -93,12 +95,16 @@ Implemented foundation slice:
 - FastAPI backend scaffold.
 - SQLModel domain models for providers, agent assignments, quests, and stage cards.
 - SQLite setup with foreign-key enforcement.
-- Model gateway abstraction with provider profiles and adapter registration.
+- Model gateway abstraction with encrypted provider configuration APIs.
 - Immutable 9-agent registry with deterministic API serialization.
-- Quest service that creates a first `demand_validator` stage.
-- HTTP API for health checks, agent listing, and quest creation.
+- Quest service that creates a first `demand_validator` stage and supports explicit
+  stage transitions, payloads, evidence, and human review records.
+- HTTP API for health checks, agent listing, provider CRUD, quest creation, stage
+  listing, and stage updates.
 - Secret redaction and private outbound upload guard helpers.
 - Test suite covering security, models, agents, gateway, quests, and API behavior.
+- GitHub Actions CI, issue templates, PR template, contributing guide, collaboration
+  guide, and MIT license.
 
 Not implemented yet:
 
@@ -131,6 +137,23 @@ List the built-in agent contracts:
 curl -s http://127.0.0.1:8000/agents
 ```
 
+Create a model provider configuration:
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/providers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name":"primary-openai",
+    "kind":"openai_compatible",
+    "base_url":"https://api.openai.com/v1",
+    "default_model":"gpt-4.1",
+    "api_key":"example-provider-key"
+  }'
+```
+
+Provider responses never include the raw API key or encrypted key. For production,
+set `NOVISCOPE_PROVIDER_SECRET_KEY` to a private value before storing real keys.
+
 Create a research quest:
 
 ```bash
@@ -141,6 +164,21 @@ curl -s -X POST http://127.0.0.1:8000/quests \
 
 The response includes a `draft` quest and a first stage assigned to
 `demand_validator`.
+
+Update a stage after manual review:
+
+```bash
+curl -s -X PATCH http://127.0.0.1:8000/stages/<stage_id> \
+  -H "Content-Type: application/json" \
+  -d '{
+    "status":"complete",
+    "summary":"Demand has concrete education scenario evidence.",
+    "output_payload":{"confidence":0.82},
+    "evidence_payload":{"sources":["enterprise-demand-note"]},
+    "human_approved":true,
+    "review_notes":"Proceed to idea generation."
+  }'
+```
 
 ## Development
 
@@ -197,6 +235,7 @@ NoviScope is being designed for research workflows where trust matters more than
 volume. The foundation already includes the following safety constraints:
 
 - API keys are represented with redaction-aware types in the gateway profile.
+- Provider API keys are encrypted before storage and excluded from API responses.
 - `.env`, SQLite databases, virtual environments, and local tool caches are ignored.
 - Private code, datasets, logs, checkpoints, and unpublished drafts are modeled as
   protected outbound data classes.

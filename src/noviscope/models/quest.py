@@ -1,5 +1,7 @@
 from enum import StrEnum
+from typing import Any
 
+from sqlalchemy import JSON, Column
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field, SQLModel
 
@@ -47,4 +49,10 @@ class StageCard(SQLModel, table=True):
         sa_type=SAEnum(StageStatus, values_callable=lambda enum: [item.value for item in enum]),
     )
     summary: str = ""
+    input_payload: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    output_payload: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    evidence_payload: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    human_approved: bool | None = None
+    review_notes: str = ""
     created_at: str = Field(default_factory=lambda: utc_now().isoformat())
+    updated_at: str = Field(default_factory=lambda: utc_now().isoformat())

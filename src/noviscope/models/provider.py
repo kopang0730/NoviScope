@@ -23,3 +23,4 @@ class ModelProvider(SQLModel, table=True):
     api_key_ciphertext: str
     is_active: bool = True
     created_at: str = Field(default_factory=lambda: utc_now().isoformat())
+    updated_at: str = Field(default_factory=lambda: utc_now().isoformat())
