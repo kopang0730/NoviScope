@@ -103,8 +103,9 @@ Implemented foundation slice:
   listing, and stage updates.
 - Secret redaction and private outbound upload guard helpers.
 - Test suite covering security, models, agents, gateway, quests, and API behavior.
-- GitHub Actions CI, issue templates, PR template, contributing guide, collaboration
-  guide, and MIT license.
+- GitHub issue templates, PR template, contributing guide, collaboration guide, and
+  MIT license. GitHub Actions CI is tracked in issue #4 and is waiting for a token
+  with `workflow` scope.
 
 Not implemented yet:
 
@@ -260,6 +261,7 @@ Near-term:
   MiniMax, GLM, and other model endpoints.
 - Research quest stage transitions and audit logs.
 - Minimal web interface for entering directions and inspecting stage cards.
+- Enable GitHub Actions CI after granting `workflow` scope to the publishing token.
 
 Mid-term:
 
