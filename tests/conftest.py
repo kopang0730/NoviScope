@@ -4,11 +4,28 @@ from pathlib import Path
 import pytest
 from sqlmodel import Session, SQLModel
 
+from noviscope.core.config import get_settings
 from noviscope.db.session import create_db_engine
 from noviscope.models.agent import AgentAssignment  # noqa: F401
 from noviscope.models.provider import ModelProvider  # noqa: F401
 from noviscope.models.quest import Quest, StageCard  # noqa: F401
 from noviscope.models.user import InviteCode, User  # noqa: F401
+
+
+@pytest.fixture(autouse=True)
+def local_http_session_cookies(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+    monkeypatch.setenv("NOVISCOPE_SESSION_COOKIE_SECURE", "false")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
+@pytest.fixture()
+def dev_admin_header_enabled(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+    monkeypatch.setenv("NOVISCOPE_DEV_ADMIN_HEADER_ENABLED", "true")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 @pytest.fixture()

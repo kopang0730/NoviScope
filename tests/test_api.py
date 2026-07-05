@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
+from noviscope.core.config import Settings
 from noviscope.db.session import create_db_engine
 from noviscope.main import create_app
 from noviscope.models.user import User, UserRole
@@ -62,7 +63,16 @@ def test_agents_endpoint_lists_nine_agents():
         ]
 
 
-def test_provider_crud_endpoints_do_not_return_api_key():
+def test_deployment_safe_auth_defaults(monkeypatch):
+    monkeypatch.delenv("NOVISCOPE_DEV_ADMIN_HEADER_ENABLED", raising=False)
+    monkeypatch.delenv("NOVISCOPE_SESSION_COOKIE_SECURE", raising=False)
+    settings = Settings(_env_file=None)
+
+    assert settings.dev_admin_header_enabled is False
+    assert settings.session_cookie_secure is True
+
+
+def test_provider_crud_endpoints_do_not_return_api_key(dev_admin_header_enabled: None):
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
         register_and_login(client, "INVITE-PROVIDER", "provider@example.com")
         create_response = client.post(
@@ -106,7 +116,7 @@ def test_provider_crud_endpoints_do_not_return_api_key():
         assert missing_response.status_code == 404
 
 
-def test_provider_routes_require_authentication():
+def test_provider_routes_require_authentication(dev_admin_header_enabled: None):
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
         register_and_login(client, "AUTH-PROVIDER", "provider@example.com")
         provider = client.post(
@@ -146,7 +156,7 @@ def test_provider_routes_require_authentication():
         assert delete_response.status_code == 401
 
 
-def test_provider_visibility_shared_and_personal():
+def test_provider_visibility_shared_and_personal(dev_admin_header_enabled: None):
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
         register_and_login(client, "INVITE-ONE", "one@example.com")
         personal = client.post(
@@ -170,7 +180,9 @@ def test_provider_visibility_shared_and_personal():
         assert personal["id"] not in provider_ids
 
 
-def test_provider_detail_update_and_delete_reject_other_users_personal_provider():
+def test_provider_detail_update_and_delete_reject_other_users_personal_provider(
+    dev_admin_header_enabled: None,
+):
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
         register_and_login(client, "PROVIDER-ONE", "one@example.com")
         personal = client.post(
@@ -199,7 +211,7 @@ def test_provider_detail_update_and_delete_reject_other_users_personal_provider(
         assert delete_response.status_code == 403
 
 
-def test_member_cannot_create_shared_provider(tmp_path):
+def test_member_cannot_create_shared_provider(tmp_path, dev_admin_header_enabled: None):
     database_url = f"sqlite:///{tmp_path / 'providers-access.db'}"
 
     with TestClient(create_app(database_url=database_url)) as client:
@@ -220,7 +232,10 @@ def test_member_cannot_create_shared_provider(tmp_path):
         assert response.json()["detail"] == "Admin access required"
 
 
-def test_member_cannot_update_or_delete_shared_provider(tmp_path):
+def test_member_cannot_update_or_delete_shared_provider(
+    tmp_path,
+    dev_admin_header_enabled: None,
+):
     database_url = f"sqlite:///{tmp_path / 'shared-provider.db'}"
 
     with TestClient(create_app(database_url=database_url)) as client:
@@ -252,7 +267,7 @@ def test_member_cannot_update_or_delete_shared_provider(tmp_path):
         assert delete_response.status_code == 403
 
 
-def test_create_quest_endpoint():
+def test_create_quest_endpoint(dev_admin_header_enabled: None):
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
         register_and_login(client, "QUEST-INVITE", "quest@example.com")
         response = client.post(
@@ -269,7 +284,7 @@ def test_create_quest_endpoint():
         assert body["first_stage"]["status"] == "pending"
 
 
-def test_quest_list_returns_only_current_user_quests():
+def test_quest_list_returns_only_current_user_quests(dev_admin_header_enabled: None):
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
         register_and_login(client, "INVITE-ONE", "one@example.com")
         first = client.post(
@@ -293,7 +308,7 @@ def test_quest_list_returns_only_current_user_quests():
         assert first["id"] not in [quest["id"] for quest in quests]
 
 
-def test_quest_detail_rejects_other_users():
+def test_quest_detail_rejects_other_users(dev_admin_header_enabled: None):
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
         register_and_login(client, "DETAIL-ONE", "owner@example.com")
         quest = client.post(
@@ -314,7 +329,7 @@ def test_quest_detail_rejects_other_users():
         assert "not accessible" in response.json()["detail"]
 
 
-def test_stage_routes_reject_cross_user_access():
+def test_stage_routes_reject_cross_user_access(dev_admin_header_enabled: None):
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
         register_and_login(client, "OWNER-INVITE", "owner@example.com")
         quest = client.post(
@@ -338,7 +353,7 @@ def test_stage_routes_reject_cross_user_access():
         assert "not accessible" in update_response.json()["detail"]
 
 
-def test_stage_flow_endpoints_record_review_payloads():
+def test_stage_flow_endpoints_record_review_payloads(dev_admin_header_enabled: None):
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
         register_and_login(client, "STAGE-INVITE", "stage@example.com")
         quest_response = client.post(
@@ -381,7 +396,7 @@ def test_stage_flow_endpoints_record_review_payloads():
         assert body["human_approved"] is True
 
 
-def test_stage_endpoint_rejects_invalid_transition():
+def test_stage_endpoint_rejects_invalid_transition(dev_admin_header_enabled: None):
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
         register_and_login(client, "TRANSITION-INVITE", "transition@example.com")
         quest_response = client.post(
@@ -396,7 +411,7 @@ def test_stage_endpoint_rejects_invalid_transition():
         assert "pending to complete" in response.json()["detail"]
 
 
-def test_create_quest_endpoint_rejects_missing_direction():
+def test_create_quest_endpoint_rejects_missing_direction(dev_admin_header_enabled: None):
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
         register_and_login(client, "MISSING-DIRECTION-INVITE", "missing-direction@example.com")
         response = client.post("/quests", json={"title": "AI+Sports Badminton"})
@@ -404,7 +419,65 @@ def test_create_quest_endpoint_rejects_missing_direction():
         assert response.status_code == 422
 
 
-def test_invite_registration_login_and_me_flow():
+def test_dev_admin_header_rejected_by_default():
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        response = client.post(
+            "/admin/invites",
+            json={"code": "DEFAULT-DISABLED", "max_uses": 1},
+            headers={"X-NoviScope-Dev-Admin": "true"},
+        )
+
+        assert response.status_code == 403
+
+
+def test_dev_admin_header_explicit_opt_in_permits_bootstrap(
+    dev_admin_header_enabled: None,
+):
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        response = client.post(
+            "/admin/invites",
+            json={"code": "OPT-IN-BOOTSTRAP", "max_uses": 1},
+            headers={"X-NoviScope-Dev-Admin": "true"},
+        )
+
+        assert response.status_code == 201
+        assert response.json()["code"] == "OPT-IN-BOOTSTRAP"
+
+
+def test_register_rejects_weak_password(dev_admin_header_enabled: None):
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        invite_response = client.post(
+            "/admin/invites",
+            json={"code": "WEAK-PASSWORD", "max_uses": 1},
+            headers={"X-NoviScope-Dev-Admin": "true"},
+        )
+        assert invite_response.status_code == 201
+
+        response = client.post(
+            "/auth/register",
+            json={
+                "invite_code": "WEAK-PASSWORD",
+                "email": "student@example.com",
+                "display_name": "Student",
+                "password": "short",
+            },
+        )
+
+        assert response.status_code == 422
+
+
+def test_create_invite_rejects_invalid_max_uses(dev_admin_header_enabled: None):
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        response = client.post(
+            "/admin/invites",
+            json={"code": "BAD-MAX-USES", "max_uses": 0},
+            headers={"X-NoviScope-Dev-Admin": "true"},
+        )
+
+        assert response.status_code == 422
+
+
+def test_invite_registration_login_and_me_flow(dev_admin_header_enabled: None):
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
         invite_response = client.post(
             "/admin/invites",
@@ -442,7 +515,9 @@ def test_invite_registration_login_and_me_flow():
         assert client.get("/auth/me").status_code == 401
 
 
-def test_logged_in_member_cannot_use_dev_admin_header_for_invites():
+def test_logged_in_member_cannot_use_dev_admin_header_for_invites(
+    dev_admin_header_enabled: None,
+):
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
         register_and_login(client, "MEMBER-INVITE", "member@example.com")
 

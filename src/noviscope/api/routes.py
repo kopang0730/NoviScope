@@ -1,7 +1,9 @@
+from datetime import UTC, datetime
+from email.utils import parseaddr
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, Field, SecretStr, StringConstraints, field_validator
 from sqlmodel import Session
 
 from noviscope.agents.registry import AGENT_REGISTRY, AgentSpec
@@ -24,6 +26,20 @@ from noviscope.quests.service import QuestService
 
 router = APIRouter()
 
+NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+PasswordStr = Annotated[str, StringConstraints(min_length=8)]
+
+
+def normalize_email(value: str) -> str:
+    email = value.strip()
+    parsed_name, parsed_email = parseaddr(email)
+    if parsed_name or parsed_email != email or "@" not in email:
+        raise ValueError("Invalid email")
+    local_part, domain = email.rsplit("@", 1)
+    if not local_part or "." not in domain or domain.startswith(".") or domain.endswith("."):
+        raise ValueError("Invalid email")
+    return email.lower()
+
 
 class QuestCreateRequest(BaseModel):
     title: str
@@ -41,21 +57,40 @@ class UserResponse(BaseModel):
 
 
 class RegisterRequest(BaseModel):
-    invite_code: str
-    email: str
-    display_name: str
-    password: str
+    invite_code: NonEmptyStr
+    email: NonEmptyStr
+    display_name: NonEmptyStr
+    password: PasswordStr
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        return normalize_email(value)
 
 
 class LoginRequest(BaseModel):
-    email: str
-    password: str
+    email: NonEmptyStr
+    password: NonEmptyStr
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        return normalize_email(value)
 
 
 class InviteCreateRequest(BaseModel):
-    code: str
-    max_uses: int = 1
-    expires_at: str | None = None
+    code: NonEmptyStr
+    max_uses: int = Field(default=1, ge=1)
+    expires_at: datetime | None = None
+
+    @field_validator("expires_at")
+    @classmethod
+    def validate_expires_at(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            raise ValueError("expires_at must include a timezone")
+        return value.astimezone(UTC)
 
 
 class InviteResponse(BaseModel):
@@ -254,7 +289,7 @@ def create_invite(
         code=request.code,
         created_by_user_id=admin_id,
         max_uses=request.max_uses,
-        expires_at=request.expires_at,
+        expires_at=request.expires_at.isoformat() if request.expires_at is not None else None,
     )
     return invite_response(invite)
 

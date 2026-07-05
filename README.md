@@ -145,13 +145,16 @@ Shared deployment should set:
 - `NOVISCOPE_DATABASE_URL` to a PostgreSQL database
 - `NOVISCOPE_PROVIDER_SECRET_KEY` to a long random secret for provider-key encryption
 - `NOVISCOPE_SESSION_SECRET_KEY` to a different long random secret for session cookies
+- `NOVISCOPE_SESSION_COOKIE_SECURE=true` when serving the app over HTTPS
 - `NOVISCOPE_ARTIFACT_ROOT` to a persistent artifact directory
 - `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=false` by default
 
 Development can still use SQLite:
 
 ```bash
-NOVISCOPE_DATABASE_URL=sqlite:///./noviscope-dev.db uvicorn noviscope.main:app --reload
+NOVISCOPE_DATABASE_URL=sqlite:///./noviscope-dev.db \
+NOVISCOPE_SESSION_COOKIE_SECURE=false \
+uvicorn noviscope.main:app --reload
 ```
 
 Lab deployment should use PostgreSQL:

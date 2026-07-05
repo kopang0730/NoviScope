@@ -32,8 +32,10 @@ def create_db_engine(database_url: str) -> Engine:
 def create_schema(engine: Engine) -> None:
     SQLModel.metadata.create_all(engine)
     _upgrade_modelprovider_schema(engine)
+    _upgrade_quest_schema(engine)
     SQLModel.metadata.create_all(engine)
     _ensure_modelprovider_name_index(engine)
+    _ensure_quest_owner_user_id_index(engine)
 
 
 def _upgrade_modelprovider_schema(engine: Engine) -> None:
@@ -197,12 +199,44 @@ def _drop_legacy_unique_name_constraints(
         connection.execute(text(f'DROP INDEX IF EXISTS "{index_name}"'))
 
 
+def _upgrade_quest_schema(engine: Engine) -> None:
+    with engine.connect() as connection:
+        inspector = inspect(connection)
+        if not inspector.has_table("quest"):
+            return
+
+        columns = {column["name"] for column in inspector.get_columns("quest")}
+
+    if "owner_user_id" in columns:
+        return
+
+    with engine.begin() as connection:
+        if engine.dialect.name == "sqlite":
+            connection.execute(
+                text("ALTER TABLE quest ADD COLUMN owner_user_id VARCHAR REFERENCES user (id)")
+            )
+        else:
+            connection.execute(
+                text('ALTER TABLE quest ADD COLUMN owner_user_id VARCHAR REFERENCES "user" (id)')
+            )
+
+
 def _ensure_modelprovider_name_index(engine: Engine) -> None:
     with engine.begin() as connection:
         connection.execute(
             text(
                 "CREATE INDEX IF NOT EXISTS ix_modelprovider_name "
                 "ON modelprovider (name)"
+            )
+        )
+
+
+def _ensure_quest_owner_user_id_index(engine: Engine) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_quest_owner_user_id "
+                "ON quest (owner_user_id)"
             )
         )
 

@@ -27,12 +27,18 @@ def set_session_cookie(response: Response, token: str) -> None:
         token,
         httponly=True,
         samesite="lax",
-        secure=False,
+        secure=settings.session_cookie_secure,
     )
 
 
 def clear_session_cookie(response: Response) -> None:
-    response.delete_cookie(get_settings().session_cookie_name)
+    settings = get_settings()
+    response.delete_cookie(
+        settings.session_cookie_name,
+        httponly=True,
+        samesite="lax",
+        secure=settings.session_cookie_secure,
+    )
 
 
 def _get_user_from_request(session: Session, request: Request) -> User | None:

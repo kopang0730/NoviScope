@@ -121,13 +121,16 @@ cp .env.example .env
 - `NOVISCOPE_DATABASE_URL`：指向 PostgreSQL
 - `NOVISCOPE_PROVIDER_SECRET_KEY`：用于 provider key 加密的长随机密钥
 - `NOVISCOPE_SESSION_SECRET_KEY`：与上面不同、用于 session cookie 的长随机密钥
+- `NOVISCOPE_SESSION_COOKIE_SECURE=true`：通过 HTTPS 提供服务时保持开启
 - `NOVISCOPE_ARTIFACT_ROOT`：持久化 artifact 目录
 - `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=false`：共享部署默认应关闭
 
 开发环境仍然可以继续使用 SQLite：
 
 ```bash
-NOVISCOPE_DATABASE_URL=sqlite:///./noviscope-dev.db uvicorn noviscope.main:app --reload
+NOVISCOPE_DATABASE_URL=sqlite:///./noviscope-dev.db \
+NOVISCOPE_SESSION_COOKIE_SECURE=false \
+uvicorn noviscope.main:app --reload
 ```
 
 实验室部署应使用 PostgreSQL：

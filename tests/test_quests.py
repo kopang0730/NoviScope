@@ -60,6 +60,73 @@ def test_create_quest_adds_demand_validation_stage(db_session: Session):
     assert stages[0].title == "Demand validation"
 
 
+def test_create_schema_upgrades_legacy_quest_table_with_owner_index(tmp_path):
+    engine = create_db_engine(f"sqlite:///{tmp_path / 'legacy-quest-schema.db'}")
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                CREATE TABLE quest (
+                    id VARCHAR NOT NULL PRIMARY KEY,
+                    title VARCHAR NOT NULL,
+                    initial_direction VARCHAR NOT NULL,
+                    status VARCHAR NOT NULL,
+                    created_at VARCHAR NOT NULL,
+                    updated_at VARCHAR NOT NULL
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO quest (
+                    id,
+                    title,
+                    initial_direction,
+                    status,
+                    created_at,
+                    updated_at
+                ) VALUES (
+                    'quest_legacy_1',
+                    'Legacy Quest',
+                    'AI+Sports',
+                    'draft',
+                    '2026-07-05T00:00:00+00:00',
+                    '2026-07-05T00:00:00+00:00'
+                )
+                """
+            )
+        )
+
+    create_schema(engine)
+    create_schema(engine)
+
+    with engine.begin() as connection:
+        columns = {
+            row[1]: row
+            for row in connection.execute(text("PRAGMA table_info('quest')")).fetchall()
+        }
+        assert "owner_user_id" in columns
+        assert columns["owner_user_id"][3] == 0
+        assert connection.execute(
+            text("SELECT owner_user_id FROM quest WHERE id = 'quest_legacy_1'")
+        ).scalar_one() is None
+
+        index_rows = connection.execute(text("PRAGMA index_list('quest')")).mappings().all()
+        owner_indexes = []
+        for index_row in index_rows:
+            columns_for_index = connection.execute(
+                text(f"PRAGMA index_info('{index_row['name']}')")
+            ).mappings().all()
+            if [column["name"] for column in columns_for_index] == ["owner_user_id"]:
+                owner_indexes.append(index_row)
+
+        assert owner_indexes
+        assert any(index_row["unique"] == 0 for index_row in owner_indexes)
+
+
 def test_list_stage_cards_returns_deterministic_workflow_order(db_session: Session):
     quest = Quest(title="Ordered workflow", initial_direction="Deterministic stage ordering")
     db_session.add(quest)

@@ -68,6 +68,40 @@ def test_register_member_consumes_invite(db_session: Session):
     assert saved_invite.status == InviteStatus.EXHAUSTED
 
 
+def test_one_use_invite_cannot_register_twice(db_session: Session):
+    admin = User(
+        email="admin@example.com",
+        display_name="Admin",
+        password_hash="hash",
+        role=UserRole.ADMIN,
+    )
+    invite = InviteCode(code="LAB-ONCE", created_by_user_id=admin.id, max_uses=1)
+    db_session.add(admin)
+    db_session.add(invite)
+    db_session.commit()
+
+    service = AuthService(db_session)
+    service.register_member(
+        invite_code="LAB-ONCE",
+        email="first@example.com",
+        display_name="First",
+        password="student-password",
+    )
+
+    with pytest.raises(ValueError, match="Invalid invite code"):
+        service.register_member(
+            invite_code="LAB-ONCE",
+            email="second@example.com",
+            display_name="Second",
+            password="student-password",
+        )
+
+    saved_invite = db_session.get(InviteCode, invite.id)
+    assert saved_invite is not None
+    assert saved_invite.used_count == 1
+    assert saved_invite.status == InviteStatus.EXHAUSTED
+
+
 def test_register_member_rejects_invalid_invite(db_session: Session):
     service = AuthService(db_session)
 
