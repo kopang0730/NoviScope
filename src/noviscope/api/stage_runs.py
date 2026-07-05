@@ -2,35 +2,32 @@ from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, SecretStr
 from sqlmodel import Session
 
 from noviscope.agents.demand_validation import (
-    DemandValidationOutput,
-    DemandValidationRequest,
     DemandValidationRunError,
     DemandValidationRunner,
+    DemandValidationStageRunner,
     get_demand_validation_runner,
+)
+from noviscope.agents.stage_runner import (
+    ModelProviderCredentials,
+    StageRunContext,
+    StageRunner,
+    StageRunnerRegistry,
 )
 from noviscope.api.dependencies import get_session
 from noviscope.api.routes import StageCardResponse, get_provider_service, stage_response
 from noviscope.auth.dependencies import get_current_user
-from noviscope.models.provider import ModelProvider, ProviderKind
-from noviscope.models.quest import Quest, StageCard, StageStatus
+from noviscope.core.json_types import JsonObject
+from noviscope.models.provider import ModelProvider
+from noviscope.models.quest import StageCard, StageStatus
 from noviscope.models.user import User
 from noviscope.providers.service import ProviderService
 from noviscope.quests.service import QuestService
 
 router = APIRouter()
-
-DEMAND_VALIDATOR_AGENT_ID = "demand_validator"
-
-
-@dataclass(frozen=True, slots=True)
-class DemandValidationRunContext:
-    stage: StageCard
-    quest: Quest
-    provider: ModelProvider
 
 
 class StageRunRequest(BaseModel):
@@ -39,74 +36,115 @@ class StageRunRequest(BaseModel):
     provider_id: str | None = None
 
 
-def is_supported_demand_validation_provider(provider: ModelProvider) -> bool:
-    return provider.kind in {ProviderKind.OPENAI_COMPATIBLE, ProviderKind.CUSTOM}
+@dataclass(frozen=True, slots=True)
+class ProviderSelectionContext:
+    provider_service: ProviderService
+    current_user: User
+    provider_id: str | None
+    runner: StageRunner
 
 
-def select_provider(
-    provider_service: ProviderService,
-    current_user: User,
-    provider_id: str | None,
-) -> ModelProvider | None:
-    if provider_id is not None:
-        provider = provider_service.get_provider_for_user(provider_id, current_user)
-        if provider.is_active:
-            return provider
-        return None
-
-    for provider in provider_service.list_providers_for_user(current_user):
-        if provider.is_active and is_supported_demand_validation_provider(provider):
-            return provider
-    return None
+@dataclass(frozen=True, slots=True)
+class ProviderSelection:
+    provider: ModelProvider | None
+    blocking_reason: str
+    blocking_detail: str
 
 
-def build_runner_request(
-    context: DemandValidationRunContext,
-    provider_service: ProviderService,
-) -> DemandValidationRequest:
-    return DemandValidationRequest(
-        api_key=provider_service.decrypt_api_key(context.provider),
-        base_url=context.provider.base_url,
-        initial_direction=context.quest.initial_direction,
-        model=context.provider.default_model,
-        provider_id=context.provider.id,
-        provider_kind=context.provider.kind,
-        provider_name=context.provider.name,
-        quest_title=context.quest.title,
-        stage_id=context.stage.id,
+@dataclass(frozen=True, slots=True)
+class StageBlock:
+    summary: str
+    evidence_payload: JsonObject
+
+
+def get_stage_runner_registry(
+    demand_runner: Annotated[DemandValidationRunner, Depends(get_demand_validation_runner)],
+) -> StageRunnerRegistry:
+    demand_stage_runner = DemandValidationStageRunner(demand_runner)
+    return StageRunnerRegistry(runners={demand_stage_runner.agent_id: demand_stage_runner})
+
+
+def select_provider(context: ProviderSelectionContext) -> ProviderSelection:
+    if context.provider_id is not None:
+        provider = context.provider_service.get_provider_for_user(
+            context.provider_id,
+            context.current_user,
+        )
+        if not provider.is_active:
+            return ProviderSelection(
+                blocking_detail="Activate this provider before running the stage.",
+                blocking_reason="inactive_provider",
+                provider=None,
+            )
+        if provider.kind not in context.runner.supported_provider_kinds:
+            return ProviderSelection(
+                blocking_detail="Choose an OpenAI-compatible or custom provider for this stage.",
+                blocking_reason="unsupported_provider",
+                provider=None,
+            )
+        return ProviderSelection(blocking_detail="", blocking_reason="", provider=provider)
+
+    for provider in context.provider_service.list_providers_for_user(context.current_user):
+        if provider.is_active and provider.kind in context.runner.supported_provider_kinds:
+            return ProviderSelection(blocking_detail="", blocking_reason="", provider=provider)
+
+    return ProviderSelection(
+        blocking_detail=(
+            "Configure an active OpenAI-compatible or custom provider before running this stage."
+        ),
+        blocking_reason="missing_provider",
+        provider=None,
     )
 
 
-def build_input_payload(stage: StageCard, provider: ModelProvider) -> dict[str, object]:
-    return {
-        "agent_id": stage.agent_id,
-        "provider_id": provider.id,
-        "provider_name": provider.name,
-        "provider_model": provider.default_model,
-    }
-
-
-def build_output_payload(output: DemandValidationOutput) -> dict[str, object]:
-    return {
-        "confidence": output.confidence,
-        "demand_assessment": output.demand_assessment,
-        "evidence": output.evidence,
-        "next_step": output.next_step,
-        "raw_response": output.raw_response,
-        "risks": output.risks,
-    }
-
-
-def build_evidence_payload(
+def build_provider_credentials(
     provider: ModelProvider,
-    output: DemandValidationOutput,
-) -> dict[str, object]:
-    return {
-        "provider_id": provider.id,
-        "provider_name": provider.name,
-        "provider_model": provider.default_model,
-        "risk_count": len(output.risks),
-    }
+    provider_service: ProviderService,
+) -> ModelProviderCredentials:
+    return ModelProviderCredentials(
+        api_key=SecretStr(provider_service.decrypt_api_key(provider)),
+        base_url=provider.base_url,
+        id=provider.id,
+        kind=provider.kind,
+        model=provider.default_model,
+        name=provider.name,
+    )
+
+
+def build_provider_block(selection: ProviderSelection) -> StageBlock:
+    return StageBlock(
+        evidence_payload={
+            "blocking_detail": selection.blocking_detail,
+            "blocking_reason": selection.blocking_reason,
+            "can_run": False,
+        },
+        summary="No active model provider is available for this user.",
+    )
+
+
+def build_runner_block(stage: StageCard) -> StageBlock:
+    return StageBlock(
+        evidence_payload={
+            "blocking_detail": "No runner has been implemented for this workflow stage yet.",
+            "blocking_reason": "runner_not_implemented",
+            "can_run": False,
+        },
+        summary=f"{stage.title} is not automated in this MVP yet.",
+    )
+
+
+def apply_stage_block(
+    quest_service: QuestService,
+    stage_id: str,
+    block: StageBlock,
+) -> StageCardResponse:
+    blocked_stage = quest_service.update_stage_card(
+        stage_id,
+        evidence_payload=block.evidence_payload,
+        summary=block.summary,
+        status=StageStatus.BLOCKED,
+    )
+    return stage_response(blocked_stage)
 
 
 @router.post("/stages/{stage_id}/run", response_model=StageCardResponse)
@@ -115,44 +153,46 @@ def run_stage(
     request: StageRunRequest,
     session: Annotated[Session, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_user)],
-    runner: Annotated[DemandValidationRunner, Depends(get_demand_validation_runner)],
+    registry: Annotated[StageRunnerRegistry, Depends(get_stage_runner_registry)],
 ) -> StageCardResponse:
     quest_service = QuestService(session)
     provider_service = get_provider_service(session)
     try:
         stage = quest_service.get_stage_card_for_user(stage_id, current_user)
-        if stage.agent_id != DEMAND_VALIDATOR_AGENT_ID:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Only demand validation stages can be run in this MVP.",
-            )
-        quest = quest_service.get_quest_for_user(stage.quest_id, current_user)
-        provider = select_provider(provider_service, current_user, request.provider_id)
-        if provider is None:
-            blocked_stage = quest_service.update_stage_card(
-                stage_id,
-                evidence_payload={"blocking_reason": "missing_provider"},
-                summary="No active model provider is available for this user.",
-                status=StageStatus.BLOCKED,
-            )
-            return stage_response(blocked_stage)
+        runner = registry.get_runner(stage.agent_id)
+        if runner is None:
+            return apply_stage_block(quest_service, stage_id, build_runner_block(stage))
 
+        quest = quest_service.get_quest_for_user(stage.quest_id, current_user)
+        selection = select_provider(
+            ProviderSelectionContext(
+                current_user=current_user,
+                provider_id=request.provider_id,
+                provider_service=provider_service,
+                runner=runner,
+            )
+        )
+        if selection.provider is None:
+            return apply_stage_block(quest_service, stage_id, build_provider_block(selection))
+
+        provider = build_provider_credentials(selection.provider, provider_service)
+        queued_context = StageRunContext(provider=provider, quest=quest, stage=stage)
         running_stage = quest_service.update_stage_card(
             stage_id,
-            input_payload=build_input_payload(stage, provider),
+            input_payload=runner.build_input_payload(queued_context),
             status=StageStatus.RUNNING,
         )
-        run_context = DemandValidationRunContext(
+        running_context = StageRunContext(
             provider=provider,
             quest=quest,
             stage=running_stage,
         )
-        output = runner.run(build_runner_request(run_context, provider_service))
+        result = runner.run(running_context)
         completed_stage = quest_service.update_stage_card(
             stage_id,
-            evidence_payload=build_evidence_payload(provider, output),
-            output_payload=build_output_payload(output),
-            summary=output.summary,
+            evidence_payload=result.evidence_payload,
+            output_payload=result.output_payload,
+            summary=result.summary,
             status=StageStatus.COMPLETE,
         )
         return stage_response(completed_stage)
@@ -161,12 +201,17 @@ def run_stage(
     except PermissionError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except DemandValidationRunError as exc:
-        blocked_stage = quest_service.update_stage_card(
+        return apply_stage_block(
+            quest_service,
             stage_id,
-            evidence_payload={"blocking_reason": "runner_error", "message": str(exc)},
-            summary=str(exc),
-            status=StageStatus.BLOCKED,
+            StageBlock(
+                evidence_payload={
+                    "blocking_detail": str(exc),
+                    "blocking_reason": "runner_error",
+                    "can_run": False,
+                },
+                summary=str(exc),
+            ),
         )
-        return stage_response(blocked_stage)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

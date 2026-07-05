@@ -19,12 +19,24 @@ class FakeDemandValidationRunner:
             evidence=[
                 "The direction names a concrete sports-training user and measurable outputs.",
             ],
+            evidence_for_demand=[
+                "Coach feedback workflows create a real user-facing need.",
+            ],
+            go_or_no_go_recommendation="go_with_human_review",
+            missing_evidence=[
+                "Confirm whether annotated badminton video data is already available.",
+            ],
             next_step="Ask the user to confirm data availability before experiment planning.",
             raw_response="fake response",
+            real_world_scenario="Badminton training sessions with coach feedback.",
             risks=[
                 "The current evidence is self-reported and still needs source validation.",
             ],
+            suggested_human_checklist=[
+                "Confirm data ownership and annotation availability.",
+            ],
             summary="Demand appears plausible but requires user confirmation.",
+            target_user_or_customer="Badminton coaches and athletes.",
         )
 
 
@@ -102,10 +114,28 @@ def test_run_demand_validation_stage_completes_with_provider(
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "complete"
+    assert body["confidence"] == "medium"
     assert body["summary"] == "Demand appears plausible but requires user confirmation."
     assert body["output_payload"]["demand_assessment"] == "plausible"
     assert body["output_payload"]["confidence"] == "medium"
+    assert body["output_payload"]["real_world_scenario"] == (
+        "Badminton training sessions with coach feedback."
+    )
+    assert body["output_payload"]["target_user_or_customer"] == (
+        "Badminton coaches and athletes."
+    )
+    assert body["output_payload"]["evidence_for_demand"] == [
+        "Coach feedback workflows create a real user-facing need.",
+    ]
+    assert body["output_payload"]["missing_evidence"] == [
+        "Confirm whether annotated badminton video data is already available.",
+    ]
+    assert body["output_payload"]["suggested_human_checklist"] == [
+        "Confirm data ownership and annotation availability.",
+    ]
+    assert body["output_payload"]["go_or_no_go_recommendation"] == "go_with_human_review"
     assert body["evidence_payload"]["provider_name"] == "Example Provider"
+    assert body["evidence_payload"]["can_run"] is True
     assert body["input_payload"]["agent_id"] == "demand_validator"
 
 
@@ -124,5 +154,10 @@ def test_run_demand_validation_stage_blocks_without_provider(
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "blocked"
+    assert body["confidence"] == "unknown"
     assert body["summary"] == "No active model provider is available for this user."
+    assert body["evidence_payload"]["can_run"] is False
     assert body["evidence_payload"]["blocking_reason"] == "missing_provider"
+    assert body["evidence_payload"]["blocking_detail"] == (
+        "Configure an active OpenAI-compatible or custom provider before running this stage."
+    )

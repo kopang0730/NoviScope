@@ -1,6 +1,7 @@
 export type UserRole = "admin" | "member";
 export type ProviderKind = "openai_compatible" | "anthropic" | "custom";
 export type ProviderScope = "personal" | "shared";
+export type StageConfidence = "high" | "medium" | "low" | "unknown";
 export type QuestStatus =
   | "draft"
   | "demand_review"
@@ -51,6 +52,7 @@ export interface StageCard {
   agent_id: string;
   title: string;
   status: StageStatus;
+  confidence: StageConfidence;
   summary: string;
   input_payload: Record<string, unknown>;
   output_payload: Record<string, unknown>;
