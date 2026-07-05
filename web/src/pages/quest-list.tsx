@@ -155,7 +155,7 @@ export function QuestListPage() {
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[240px_minmax(320px,1fr)_380px] 2xl:grid-cols-[280px_minmax(0,1fr)_420px]">
+    <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)]">
       <Card className="h-fit xl:sticky xl:top-4">
         <CardHeading
           action={
@@ -221,24 +221,26 @@ export function QuestListPage() {
         ) : null}
       </Card>
 
-      <QuestOverviewPanel
-        detailError={detailError}
-        detailLoading={detailLoading}
-        selectedQuest={selectedQuest}
-        selectedQuestId={selectedQuestId}
-        stages={stages}
-      />
+      <div className="grid gap-4">
+        <QuestWorkflowPanel
+          detailError={detailError}
+          detailLoading={detailLoading}
+          onRunStage={(stageId) => void handleRunStage(stageId)}
+          runningStageId={runningStageId}
+          selectedQuest={selectedQuest}
+          selectedQuestId={selectedQuestId}
+          stageRunError={stageRunError}
+          stages={stages}
+        />
 
-      <QuestWorkflowPanel
-        detailError={detailError}
-        detailLoading={detailLoading}
-        onRunStage={(stageId) => void handleRunStage(stageId)}
-        runningStageId={runningStageId}
-        selectedQuest={selectedQuest}
-        selectedQuestId={selectedQuestId}
-        stageRunError={stageRunError}
-        stages={stages}
-      />
+        <QuestOverviewPanel
+          detailError={detailError}
+          detailLoading={detailLoading}
+          selectedQuest={selectedQuest}
+          selectedQuestId={selectedQuestId}
+          stages={stages}
+        />
+      </div>
     </div>
   );
 }

@@ -31,7 +31,7 @@ export function QuestWorkflowPanel({
   readonly stages: readonly StageCard[];
 }) {
   const { t } = useI18n();
-  const [viewMode, setViewMode] = useState<"canvas" | "list">("list");
+  const [viewMode, setViewMode] = useState<"canvas" | "list">("canvas");
 
   return (
     <Card>
