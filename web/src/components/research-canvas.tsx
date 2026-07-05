@@ -91,9 +91,9 @@ export function ResearchCanvas({
         </div>
       </div>
 
-      <div className="mt-4 grid gap-4 2xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-4">
-          <div className="mb-4 flex min-w-[980px] flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="mt-4 grid gap-4 2xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <div className="flex flex-col gap-2 border-b border-slate-200 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-sm font-semibold text-slate-900">{t("canvasMapTitle")}</p>
               <p className="mt-1 text-sm text-slate-500">{t("canvasMapDescription")}</p>
@@ -102,24 +102,26 @@ export function ResearchCanvas({
               {nextActionStage ? t("canvasNextAction") : t("canvasNoNextAction")}
             </Badge>
           </div>
-          <div className="grid min-w-[980px] grid-cols-5 gap-3">
-            {stages.map((stage, index) => (
-              <CanvasStageNode
-                details={buildStageDetails(stage, t)}
-                index={index}
-                isNextAction={nextActionStage?.id === stage.id}
-                isSelected={selectedStage?.id === stage.id}
-                key={stage.id}
-                onRunStage={onRunStage}
-                onSelectStage={setSelectedStageId}
-                phaseLabel={t(phaseKeyForAgent(stage.agent_id))}
-                runningStageId={runningStageId}
-                selectedQuest={selectedQuest}
-                stage={stage}
-                stageRunGate={getStageRunGate({ providerReadinessData, stage, stages })}
-                total={stages.length}
-              />
-            ))}
+          <div className="overflow-x-auto px-4 py-4">
+            <div className="grid w-max min-w-full auto-cols-[minmax(240px,1fr)] grid-flow-col gap-4">
+              {stages.map((stage, index) => (
+                <CanvasStageNode
+                  details={buildStageDetails(stage, t)}
+                  index={index}
+                  isNextAction={nextActionStage?.id === stage.id}
+                  isSelected={selectedStage?.id === stage.id}
+                  key={stage.id}
+                  onRunStage={onRunStage}
+                  onSelectStage={setSelectedStageId}
+                  phaseLabel={t(phaseKeyForAgent(stage.agent_id))}
+                  runningStageId={runningStageId}
+                  selectedQuest={selectedQuest}
+                  stage={stage}
+                  stageRunGate={getStageRunGate({ providerReadinessData, stage, stages })}
+                  total={stages.length}
+                />
+              ))}
+            </div>
           </div>
         </div>
 
