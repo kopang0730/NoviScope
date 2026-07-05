@@ -6,6 +6,12 @@ from noviscope.agents.demand_validation import (
     DemandValidationRunner,
     get_demand_validation_runner,
 )
+from noviscope.agents.experiment_planner import (
+    ExperimentPlannerRequest,
+    ExperimentPlannerRunner,
+    ExperimentPlanOutput,
+    get_experiment_planner_runner,
+)
 from noviscope.agents.gap_hypothesis import (
     GapHypothesisOutput,
     GapHypothesisRequest,
@@ -22,7 +28,11 @@ from noviscope.agents.openalex_client import (
     OpenAlexSource,
     OpenAlexWork,
 )
-from noviscope.core.stage_policy import NO_EXTERNAL_VERIFICATION_RISK
+from noviscope.core.stage_policy import (
+    EXPERIMENT_PLANNER_AGENT_ID,
+    NO_EXPERIMENT_VERIFICATION_RISK,
+    NO_EXTERNAL_VERIFICATION_RISK,
+)
 from noviscope.main import create_app
 
 DEV_ADMIN_HEADERS = {"X-NoviScope-Dev-Admin": "test-dev-admin-token-0123456789abcdef"}
@@ -115,6 +125,42 @@ class FakeGapHypothesisRunner:
         )
 
 
+class FakeExperimentPlannerRunner:
+    def run(self, request: ExperimentPlannerRequest) -> ExperimentPlanOutput:
+        return ExperimentPlanOutput(
+            ablation_variables=[
+                "Temporal consistency window size",
+                "Detection confidence threshold",
+            ],
+            baselines_to_reproduce=[
+                "Reproduce the selected paper baseline on the provided badminton clips.",
+            ],
+            compute_requirements="One A800 GPU is enough for the first reproducibility run.",
+            confidence="medium",
+            data_availability_status="ready",
+            datasets_needed=[request.data_path],
+            expected_figures=[
+                "Failure case grid for fast rallies.",
+            ],
+            expected_tables=[
+                "Baseline versus temporal consistency ablation table.",
+            ],
+            failure_risks=[
+                "Annotation quality may limit action classification accuracy.",
+            ],
+            first_runnable_script_plan=[
+                "Create a dataset manifest from the provided data path.",
+                "Run baseline inference from the provided code repository.",
+                "Log metrics and failure cases without claiming paper-level results yet.",
+            ],
+            metrics=["Action classification accuracy", "Frame-level temporal consistency"],
+            raw_response="fake experiment plan response",
+            source_stage_ids=request.source_stage_ids,
+            summary="Generated a plan-only experiment design for the selected idea.",
+            warnings=[],
+        )
+
+
 def get_fake_runner() -> DemandValidationRunner:
     return FakeDemandValidationRunner()
 
@@ -125,6 +171,10 @@ def get_fake_literature_runner() -> LiteratureScoutStageRunner:
 
 def get_fake_gap_runner() -> GapHypothesisRunner:
     return FakeGapHypothesisRunner()
+
+
+def get_fake_experiment_runner() -> ExperimentPlannerRunner:
+    return FakeExperimentPlannerRunner()
 
 
 def register_and_login(client: TestClient, invite_code: str, email: str) -> None:
@@ -180,7 +230,7 @@ def create_quest(client: TestClient) -> str:
     return response.json()["first_stage"]["id"]
 
 
-def create_quest_with_stages(client: TestClient) -> tuple[str, str, str, str]:
+def create_quest_with_stages(client: TestClient) -> tuple[str, str, str, str, str]:
     response = client.post(
         "/quests",
         json={
@@ -201,7 +251,16 @@ def create_quest_with_stages(client: TestClient) -> tuple[str, str, str, str]:
         stage for stage in stages if stage["agent_id"] == LITERATURE_SCOUT_AGENT_ID
     )
     idea_stage = next(stage for stage in stages if stage["agent_id"] == "idea_generator")
-    return quest_id, demand_stage["id"], literature_stage["id"], idea_stage["id"]
+    experiment_stage = next(
+        stage for stage in stages if stage["agent_id"] == EXPERIMENT_PLANNER_AGENT_ID
+    )
+    return (
+        quest_id,
+        demand_stage["id"],
+        literature_stage["id"],
+        idea_stage["id"],
+        experiment_stage["id"],
+    )
 
 
 def test_run_demand_validation_stage_completes_with_provider(
@@ -279,7 +338,7 @@ def test_run_literature_scout_blocks_until_demand_validation_completes(
 
     with TestClient(app) as client:
         register_and_login(client, "RUN-LIT-BLOCK", "lit-blocked@example.com")
-        _, _, literature_stage_id, _ = create_quest_with_stages(client)
+        _, _, literature_stage_id, _, _ = create_quest_with_stages(client)
 
         response = client.post(f"/stages/{literature_stage_id}/run", json={})
 
@@ -302,7 +361,7 @@ def test_run_literature_scout_completes_without_model_provider(
 
     with TestClient(app) as client:
         register_and_login(client, "RUN-LIT", "lit-runner@example.com")
-        _, demand_stage_id, literature_stage_id, _ = create_quest_with_stages(client)
+        _, demand_stage_id, literature_stage_id, _, _ = create_quest_with_stages(client)
         running_response = client.patch(
             f"/stages/{demand_stage_id}",
             json={"status": "running"},
@@ -341,7 +400,7 @@ def test_run_gap_hypothesis_blocks_until_literature_scout_completes(
 
     with TestClient(app) as client:
         register_and_login(client, "RUN-GAP-BLOCK", "gap-blocked@example.com")
-        _, demand_stage_id, _, idea_stage_id = create_quest_with_stages(client)
+        _, demand_stage_id, _, idea_stage_id, _ = create_quest_with_stages(client)
         running_response = client.patch(
             f"/stages/{demand_stage_id}",
             json={"status": "running"},
@@ -376,7 +435,7 @@ def test_run_gap_hypothesis_completes_and_selection_advances_quest(
     with TestClient(app) as client:
         register_and_login(client, "RUN-GAP", "gap-runner@example.com")
         create_personal_provider(client)
-        quest_id, demand_stage_id, literature_stage_id, idea_stage_id = create_quest_with_stages(
+        quest_id, demand_stage_id, literature_stage_id, idea_stage_id, _ = create_quest_with_stages(
             client
         )
         demand_running_response = client.patch(
@@ -459,6 +518,154 @@ def test_run_gap_hypothesis_completes_and_selection_advances_quest(
     assert quest_response.json()["status"] == "lightweight_experiment"
 
 
+def test_run_experiment_planner_blocks_until_idea_selection(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'experiment-prereq-block.db'}")
+
+    with TestClient(app) as client:
+        register_and_login(client, "RUN-EXP-BLOCK", "exp-blocked@example.com")
+        _, _, _, _, experiment_stage_id = create_quest_with_stages(client)
+
+        response = client.post(f"/stages/{experiment_stage_id}/run", json={})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "blocked"
+    assert body["summary"] == "Experiment Planner is blocked until a generated idea is selected."
+    assert body["evidence_payload"]["blocking_reason"] == (
+        "experiment_prerequisites_incomplete"
+    )
+
+
+def test_run_experiment_planner_blocks_without_setup_inputs(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'experiment-input-block.db'}")
+
+    with TestClient(app) as client:
+        register_and_login(client, "RUN-EXP-INPUT-BLOCK", "exp-input@example.com")
+        _, _, _, idea_stage_id, experiment_stage_id = create_quest_with_stages(client)
+        running_response = client.patch(
+            f"/stages/{idea_stage_id}",
+            json={"status": "running"},
+        )
+        assert running_response.status_code == 200
+        complete_response = client.patch(
+            f"/stages/{idea_stage_id}",
+            json={
+                "human_approved": True,
+                "output_payload": {
+                    "confidence": "medium",
+                    "ideas": [{"idea_id": "idea_1", "idea_title": "Temporal idea"}],
+                    "selected_idea_ids": ["idea_1"],
+                    "selection_status": "selected_for_experiment_design",
+                },
+                "status": "complete",
+                "summary": "Idea selected.",
+            },
+        )
+        assert complete_response.status_code == 200
+
+        response = client.post(f"/stages/{experiment_stage_id}/run", json={})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "blocked"
+    assert body["summary"] == "Experiment Planner needs experiment setup inputs before it can run."
+    assert body["evidence_payload"]["blocking_reason"] == "missing_experiment_inputs"
+    assert body["evidence_payload"]["missing_inputs"] == [
+        "data_path",
+        "code_repository",
+        "environment_notes",
+    ]
+
+
+def test_run_experiment_planner_completes_with_setup_inputs_and_advances_after_review(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'experiment-run.db'}")
+    app.dependency_overrides[get_experiment_planner_runner] = get_fake_experiment_runner
+
+    with TestClient(app) as client:
+        register_and_login(client, "RUN-EXP", "exp-runner@example.com")
+        create_personal_provider(client)
+        quest_id, _, _, idea_stage_id, experiment_stage_id = create_quest_with_stages(client)
+        idea_running_response = client.patch(
+            f"/stages/{idea_stage_id}",
+            json={"status": "running"},
+        )
+        assert idea_running_response.status_code == 200
+        idea_complete_response = client.patch(
+            f"/stages/{idea_stage_id}",
+            json={
+                "human_approved": True,
+                "output_payload": {
+                    "confidence": "medium",
+                    "ideas": [
+                        {
+                            "application_value": "high",
+                            "based_on_which_papers": ["https://openalex.org/W123"],
+                            "confidence": "medium",
+                            "core_hypothesis": (
+                                "Temporal consistency can reduce missed badminton actions."
+                            ),
+                            "expected_improvement": "Better action labels.",
+                            "experiment_feasibility": "medium",
+                            "idea_id": "idea_1",
+                            "idea_title": "Temporal consistency for fast rallies",
+                            "novelty_risk": "medium",
+                            "required_baseline": "Badminton benchmark.",
+                            "required_data": "Annotated badminton clips.",
+                        }
+                    ],
+                    "selected_idea_ids": ["idea_1"],
+                    "selection_status": "selected_for_experiment_design",
+                },
+                "status": "complete",
+                "summary": "Idea selected.",
+            },
+        )
+        assert idea_complete_response.status_code == 200
+        setup_response = client.patch(
+            f"/stages/{experiment_stage_id}",
+            json={
+                "input_payload": {
+                    "code_repository": "https://github.com/example/badminton-baseline",
+                    "data_path": "/data/badminton/train",
+                    "environment_notes": "Python 3.11, CUDA 12.1, two A800 GPUs available.",
+                }
+            },
+        )
+        assert setup_response.status_code == 200
+
+        run_response = client.post(f"/stages/{experiment_stage_id}/run", json={})
+        assert run_response.status_code == 200
+        run_body = run_response.json()
+        review_response = client.patch(
+            f"/stages/{experiment_stage_id}",
+            json={
+                "human_approved": True,
+                "review_notes": "Plan is ready for the first baseline reproduction.",
+            },
+        )
+        quest_response = client.get(f"/quests/{quest_id}")
+
+    assert run_body["status"] == "complete"
+    assert run_body["confidence"] == "medium"
+    assert run_body["output_payload"]["data_availability_status"] == "ready"
+    assert run_body["output_payload"]["datasets_needed"] == ["/data/badminton/train"]
+    assert run_body["output_payload"]["first_runnable_script_plan"]
+    assert run_body["evidence_payload"]["plan_only"] is True
+    assert run_body["evidence_payload"]["no_experiment_results"] is True
+    assert review_response.status_code == 200
+    assert quest_response.status_code == 200
+    assert quest_response.json()["status"] == "full_experiment"
+
+
 def test_update_idea_stage_downgrades_manual_high_confidence(
     tmp_path,
     dev_admin_header_enabled: None,
@@ -467,7 +674,7 @@ def test_update_idea_stage_downgrades_manual_high_confidence(
 
     with TestClient(app) as client:
         register_and_login(client, "PATCH-IDEA-HIGH", "idea-patcher@example.com")
-        _, _, _, idea_stage_id = create_quest_with_stages(client)
+        _, _, _, idea_stage_id, _ = create_quest_with_stages(client)
 
         response = client.patch(
             f"/stages/{idea_stage_id}",
@@ -488,6 +695,38 @@ def test_update_idea_stage_downgrades_manual_high_confidence(
     assert body["output_payload"]["warnings"] == [
         "Existing warning.",
         "High confidence was downgraded because hypotheses have not been experimentally verified.",
+    ]
+
+
+def test_update_experiment_planner_stage_downgrades_manual_high_confidence(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'experiment-update-confidence.db'}")
+
+    with TestClient(app) as client:
+        register_and_login(client, "PATCH-EXP-HIGH", "experiment-patcher@example.com")
+        _, _, _, _, experiment_stage_id = create_quest_with_stages(client)
+
+        response = client.patch(
+            f"/stages/{experiment_stage_id}",
+            json={
+                "output_payload": {
+                    "confidence": "high",
+                    "summary": "Manual edit attempted high confidence.",
+                    "warnings": ["Existing warning."],
+                },
+                "summary": "Manual edit attempted high confidence.",
+            },
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["confidence"] == "medium"
+    assert body["output_payload"]["confidence"] == "medium"
+    assert body["output_payload"]["warnings"] == [
+        "Existing warning.",
+        NO_EXPERIMENT_VERIFICATION_RISK,
     ]
 
 

@@ -24,7 +24,6 @@ export function GapHypothesisOutput({
     setCurrentStage(stage);
     setPendingIdeaId(null);
     setSubmitError(null);
-    setSuccessMessage(null);
   }, [stage]);
 
   const ideaGenerator = useMemo(() => buildIdeaGeneratorView(currentStage), [currentStage]);

@@ -59,11 +59,13 @@ def test_create_quest_adds_core_research_workflow_stages(db_session: Session):
         "demand_validator",
         "literature_scout",
         "idea_generator",
+        "experiment_planner",
     ]
     assert [stage.title for stage in stages] == [
         "Demand validation",
         "Literature scout",
         "Gap & hypothesis generator",
+        "Experiment planner",
     ]
 
 
@@ -233,6 +235,43 @@ def test_approving_selected_idea_advances_quest_to_lightweight_experiment(
     assert completed.human_approved is True
     assert saved_quest is not None
     assert saved_quest.status == QuestStatus.LIGHTWEIGHT_EXPERIMENT
+
+
+def test_approving_experiment_plan_advances_quest_to_full_experiment(
+    db_session: Session,
+) -> None:
+    service = QuestService(db_session)
+    quest = service.create_quest(
+        title="Handwritten Text Erasure",
+        initial_direction="擦除试卷中的手写文本",
+    )
+    experiment_stage = service.list_stage_cards(quest.id)[3]
+
+    running = service.update_stage_card(
+        experiment_stage.id,
+        status=StageStatus.RUNNING,
+        input_payload={
+            "code_repository": "https://github.com/example/baseline",
+            "data_path": "/data/erasure",
+            "environment_notes": "Python 3.11 and one A800.",
+        },
+    )
+    completed = service.update_stage_card(
+        running.id,
+        status=StageStatus.COMPLETE,
+        output_payload={
+            "confidence": "medium",
+            "data_availability_status": "ready",
+            "first_runnable_script_plan": ["Run baseline inference."],
+        },
+        human_approved=True,
+        review_notes="Approved for full experiment execution.",
+    )
+    saved_quest = db_session.get(Quest, quest.id)
+
+    assert completed.human_approved is True
+    assert saved_quest is not None
+    assert saved_quest.status == QuestStatus.FULL_EXPERIMENT
 
 
 def test_invalid_stage_transition_is_rejected(db_session: Session):

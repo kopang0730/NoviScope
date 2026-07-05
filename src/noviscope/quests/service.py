@@ -4,7 +4,11 @@ from sqlmodel import Session, select
 
 from noviscope.agents.literature_scout import LITERATURE_SCOUT_AGENT_ID
 from noviscope.core.json_types import JsonObject
-from noviscope.core.stage_policy import DEMAND_VALIDATOR_AGENT_ID, IDEA_GENERATOR_AGENT_ID
+from noviscope.core.stage_policy import (
+    DEMAND_VALIDATOR_AGENT_ID,
+    EXPERIMENT_PLANNER_AGENT_ID,
+    IDEA_GENERATOR_AGENT_ID,
+)
 from noviscope.models.common import utc_now
 from noviscope.models.quest import Quest, QuestStatus, StageCard, StageStatus
 from noviscope.models.user import User, UserRole
@@ -61,10 +65,22 @@ class QuestService:
                 "scouting."
             ),
         )
+        experiment_stage = StageCard(
+            quest_id=quest.id,
+            agent_id=EXPERIMENT_PLANNER_AGENT_ID,
+            created_at=(stage_created_at + timedelta(microseconds=3)).isoformat(),
+            title="Experiment planner",
+            status=StageStatus.PENDING,
+            summary=(
+                "Design datasets, baselines, metrics, ablations, and the first runnable "
+                "script plan after an idea is selected."
+            ),
+        )
         self.session.add(quest)
         self.session.add(demand_stage)
         self.session.add(literature_stage)
         self.session.add(idea_stage)
+        self.session.add(experiment_stage)
         self.session.commit()
         self.session.refresh(quest)
         return quest
@@ -159,6 +175,12 @@ class QuestService:
                 QuestStatus.LIGHTWEIGHT_EXPERIMENT
                 if stage.human_approved
                 else QuestStatus.IDEA_SELECTION
+            )
+        elif stage.agent_id == EXPERIMENT_PLANNER_AGENT_ID:
+            quest.status = (
+                QuestStatus.FULL_EXPERIMENT
+                if stage.human_approved
+                else QuestStatus.LIGHTWEIGHT_EXPERIMENT
             )
         else:
             return
