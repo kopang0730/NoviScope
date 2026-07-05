@@ -96,26 +96,30 @@ export function ResearchCanvas({
   onRunStage,
   runningStageId,
   selectedQuest,
+  showHeading = true,
   stages,
 }: {
   readonly onRunStage: (stageId: string) => void;
   readonly runningStageId: string | null;
   readonly selectedQuest: Quest;
+  readonly showHeading?: boolean;
   readonly stages: readonly StageCard[];
 }) {
   const { t } = useI18n();
 
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-      <div className="flex flex-col gap-2 px-1 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-sm font-semibold text-slate-900">{t("researchCanvasTitle")}</p>
-          <p className="mt-1 text-sm text-slate-500">{t("researchCanvasDescription")}</p>
+      {showHeading ? (
+        <div className="flex flex-col gap-2 px-1 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">{t("researchCanvasTitle")}</p>
+            <p className="mt-1 text-sm text-slate-500">{t("researchCanvasDescription")}</p>
+          </div>
+          <Badge tone="gray">
+            {t("updated")} {formatDateTime(selectedQuest.updated_at)}
+          </Badge>
         </div>
-        <Badge tone="gray">
-          {t("updated")} {formatDateTime(selectedQuest.updated_at)}
-        </Badge>
-      </div>
+      ) : null}
 
       <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white p-4">
         <div className="grid min-w-[800px] grid-cols-5 gap-2">
