@@ -117,6 +117,20 @@ def test_create_schema_upgrades_legacy_provider_table_and_allows_duplicate_names
             text("SELECT scope FROM modelprovider WHERE id = 'provider_legacy_1'")
         ).scalar_one() == "personal"
 
+        index_rows = connection.execute(
+            text("PRAGMA index_list('modelprovider')")
+        ).mappings().all()
+        provider_name_indexes = []
+        for index_row in index_rows:
+            columns_for_index = connection.execute(
+                text(f"PRAGMA index_info('{index_row['name']}')")
+            ).mappings().all()
+            if [column["name"] for column in columns_for_index] == ["name"]:
+                provider_name_indexes.append(index_row)
+
+        assert provider_name_indexes
+        assert any(index_row["unique"] == 0 for index_row in provider_name_indexes)
+
         connection.execute(
             text(
                 """

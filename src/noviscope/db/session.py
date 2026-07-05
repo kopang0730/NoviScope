@@ -33,6 +33,7 @@ def create_schema(engine: Engine) -> None:
     SQLModel.metadata.create_all(engine)
     _upgrade_modelprovider_schema(engine)
     SQLModel.metadata.create_all(engine)
+    _ensure_modelprovider_name_index(engine)
 
 
 def _upgrade_modelprovider_schema(engine: Engine) -> None:
@@ -194,6 +195,16 @@ def _drop_legacy_unique_name_constraints(
 
     for index_name in index_names:
         connection.execute(text(f'DROP INDEX IF EXISTS "{index_name}"'))
+
+
+def _ensure_modelprovider_name_index(engine: Engine) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_modelprovider_name "
+                "ON modelprovider (name)"
+            )
+        )
 
 
 def session_generator(engine: Engine) -> Generator[Session, None, None]:
