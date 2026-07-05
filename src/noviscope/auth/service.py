@@ -40,6 +40,10 @@ class AuthService:
         self.session.refresh(invite)
         return invite
 
+    def list_invites(self) -> list[InviteCode]:
+        statement = select(InviteCode).order_by(InviteCode.created_at.desc(), InviteCode.id.desc())
+        return list(self.session.exec(statement).all())
+
     def register_member(
         self,
         *,

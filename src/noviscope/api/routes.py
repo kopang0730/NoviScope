@@ -12,6 +12,7 @@ from noviscope.auth.dependencies import (
     clear_session_cookie,
     create_session_token,
     get_admin_or_dev_header,
+    get_current_admin,
     get_current_user,
     set_session_cookie,
 )
@@ -319,6 +320,15 @@ def create_invite(
     except DuplicateResourceError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return invite_response(invite)
+
+
+@router.get("/admin/invites", response_model=InvitesResponse)
+def list_invites(
+    session: Annotated[Session, Depends(get_session)],
+    _: Annotated[User, Depends(get_current_admin)],
+) -> InvitesResponse:
+    invites = AuthService(session).list_invites()
+    return InvitesResponse(invites=[invite_response(invite) for invite in invites])
 
 
 @router.post("/providers", status_code=status.HTTP_201_CREATED, response_model=ProviderResponse)

@@ -5,6 +5,7 @@ import { buttonClassName } from "./components/button";
 import { Card } from "./components/card";
 import { LanguageToggle } from "./components/language-toggle";
 import { useI18n } from "./i18n/i18n-context";
+import { AdminInvitesPage } from "./pages/admin-invites";
 import { CanvasWorkspacePage } from "./pages/canvas-workspace";
 import { CreateQuestPage } from "./pages/create-quest";
 import { LoginPage } from "./pages/login";
@@ -82,6 +83,11 @@ function WorkspaceLayout() {
             <NavLink className={({ isActive }) => navLinkClassName(isActive)} to="/providers">
               {t("navProviders")}
             </NavLink>
+            {currentUser?.role === "admin" ? (
+              <NavLink className={({ isActive }) => navLinkClassName(isActive)} to="/admin/invites">
+                {t("navInvites")}
+              </NavLink>
+            ) : null}
           </nav>
           <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-600">
             <p className="font-medium text-slate-800">{t("labAlphaTitle")}</p>
@@ -197,6 +203,7 @@ export function App() {
         <Route path="/canvas" element={<CanvasWorkspacePage />} />
         <Route path="/quests/new" element={<CreateQuestPage />} />
         <Route path="/providers" element={<ProviderSettingsPage />} />
+        <Route path="/admin/invites" element={<AdminInvitesPage />} />
         <Route path="/stages/:stageId" element={<StageDetailPage />} />
         <Route path="*" element={<Navigate replace to="/" />} />
       </Route>
