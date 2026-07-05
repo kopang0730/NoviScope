@@ -612,6 +612,7 @@ def update_stage(
             output_payload=output_payload,
             evidence_payload=request.evidence_payload,
             human_approved=request.human_approved,
+            human_approved_set="human_approved" in request.model_fields_set,
             review_notes=request.review_notes,
         )
         return stage_response(stage)

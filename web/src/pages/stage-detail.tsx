@@ -26,6 +26,16 @@ function stageTone(status: StageStatus) {
   return "gray";
 }
 
+function reviewTone(humanApproved: boolean | null) {
+  if (humanApproved === true) {
+    return "green";
+  }
+  if (humanApproved === false) {
+    return "red";
+  }
+  return "amber";
+}
+
 export function StageDetailPage() {
   const { stageId } = useParams();
   const [searchParams] = useSearchParams();
@@ -117,8 +127,8 @@ export function StageDetailPage() {
   if (!questId) {
     return (
       <Card>
-        <CardHeading description="Open this view from a quest workflow so the page knows which quest owns the stage." title="Stage Detail" />
-        <p className="mt-4 text-sm text-slate-600">Missing `quest` query parameter.</p>
+        <CardHeading description={t("stageDetailMissingQuestDescription")} title={t("stageDetailTitle")} />
+        <p className="mt-4 text-sm text-slate-600">{t("stageDetailMissingQuestBody")}</p>
       </Card>
     );
   }
@@ -126,9 +136,9 @@ export function StageDetailPage() {
   if (!currentUser && authReady) {
     return (
       <Card>
-        <CardHeading description="Sign in to edit a workflow stage." title="Stage Detail" />
+        <CardHeading description={t("stageDetailSignInDescription")} title={t("stageDetailTitle")} />
         <Link className={buttonClassName({ variant: "primary" })} to="/login">
-          Go to login
+          {t("stageDetailGoToLogin")}
         </Link>
       </Card>
     );
@@ -139,8 +149,8 @@ export function StageDetailPage() {
       <Card>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-sm text-slate-500">Stage Editor</p>
-            <h1 className="mt-1 text-xl font-semibold text-slate-900">{stage?.title ?? "Workflow stage"}</h1>
+            <p className="text-sm text-slate-500">{t("stageEditorEyebrow")}</p>
+            <h1 className="mt-1 text-xl font-semibold text-slate-900">{stage?.title ?? t("stageDetailFallbackTitle")}</h1>
             {quest ? <p className="mt-2 text-sm text-slate-600">{quest.title}</p> : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -151,22 +161,58 @@ export function StageDetailPage() {
               </Button>
             ) : null}
             <Link className={buttonClassName({ variant: "secondary", size: "sm" })} to={workflowBackLink}>
-              Back to Workflow
+              {t("stageDetailBackToWorkflow")}
             </Link>
           </div>
         </div>
         {loadError ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{loadError}</p> : null}
-        {loading ? <p className="mt-4 text-sm text-slate-500">Loading stage data...</p> : null}
+        {loading ? <p className="mt-4 text-sm text-slate-500">{t("stageDetailLoading")}</p> : null}
         {stage ? (
           <div className="mt-4 grid gap-2 text-xs text-slate-500 sm:grid-cols-2">
-            <p>Agent ID: {stage.agent_id}</p>
-            <p>Updated: {formatDateTime(stage.updated_at)}</p>
+            <p>
+              {t("stageDetailAgentId")}: {stage.agent_id}
+            </p>
+            <p>
+              {t("updated")}: {formatDateTime(stage.updated_at)}
+            </p>
           </div>
         ) : null}
       </Card>
 
       {stage ? (
         <>
+          <Card>
+            <CardHeading description={t("stageReviewGateDescription")} title={t("stageReviewGateTitle")} />
+            <div className="mt-4 flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-900">{t("stageReviewDecision")}</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {stage.human_approved === true
+                    ? t("stageReviewApprovedDescription")
+                    : stage.human_approved === false
+                      ? t("stageReviewRejectedDescription")
+                      : t("stageReviewPendingDescription")}
+                </p>
+              </div>
+              <Badge tone={reviewTone(stage.human_approved)}>
+                {stage.human_approved === true
+                  ? t("stageReviewApproved")
+                  : stage.human_approved === false
+                    ? t("stageReviewRejected")
+                    : t("stageReviewPending")}
+              </Badge>
+            </div>
+            {stage.review_notes ? (
+              <p className="mt-3 whitespace-pre-wrap rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                {stage.review_notes}
+              </p>
+            ) : (
+              <p className="mt-3 rounded-lg border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-500">
+                {t("stageReviewNoNotes")}
+              </p>
+            )}
+          </Card>
+
           <StageOutputPanel onStageChange={setStage} stage={stage} />
 
           {runError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{runError}</p> : null}

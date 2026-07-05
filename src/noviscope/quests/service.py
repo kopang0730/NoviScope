@@ -142,6 +142,7 @@ class QuestService:
         output_payload: JsonObject | None = None,
         evidence_payload: JsonObject | None = None,
         human_approved: bool | None = None,
+        human_approved_set: bool = False,
         review_notes: str | None = None,
     ) -> StageCard:
         stage = self.get_stage_card(stage_id)
@@ -156,7 +157,7 @@ class QuestService:
             stage.output_payload = output_payload
         if evidence_payload is not None:
             stage.evidence_payload = evidence_payload
-        if human_approved is not None:
+        if human_approved is not None or human_approved_set:
             stage.human_approved = human_approved
         if review_notes is not None:
             stage.review_notes = review_notes
