@@ -101,7 +101,7 @@ export function StageOutputPanel({
   return (
     <Card>
       <CardHeading description={t("demandValidationDescription")} title={t("demandValidationResult")} />
-      <DemandValidationOutput stage={stage} />
+      <DemandValidationOutput onStageChange={onStageChange} stage={stage} />
     </Card>
   );
 }

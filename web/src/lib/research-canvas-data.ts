@@ -98,6 +98,14 @@ export function buildStageDetails(stage: StageCard, t: Translate): CanvasDetail[
 
   if (stage.agent_id === demandValidatorAgentId) {
     const scenario = readString(stage.output_payload, "real_world_scenario");
+    const demandVerdict = readString(stage.evidence_payload, "human_demand_verdict");
+    const demandSources = readStringArray(stage.evidence_payload, "human_demand_sources");
+    if (demandVerdict) {
+      details.push({ label: t("demandSourceVerdict"), value: labelFromEnum(demandVerdict) });
+    }
+    if (demandSources[0]) {
+      details.push({ label: t("demandSourceRecordedEvidence"), value: demandSources[0] });
+    }
     if (scenario) {
       details.push({ label: t("canvasEvidence"), value: scenario });
     }
