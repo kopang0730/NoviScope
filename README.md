@@ -9,7 +9,7 @@ experiments and traceable paper drafts.
 
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](#development)
 [![FastAPI](https://img.shields.io/badge/FastAPI-foundation-green)](#api)
-[![Status](https://img.shields.io/badge/status-foundation%20slice-orange)](#current-status)
+[![Status](https://img.shields.io/badge/status-lab%20alpha-orange)](#current-status)
 
 NoviScope is designed for computer-vision research groups that need to move from
 an imprecise topic to a defensible research idea, experiment plan, evidence trail,
@@ -17,8 +17,9 @@ and paper draft. The long-term target is a digital research team that can search
 papers, map existing work, propose novelty, reproduce baselines, run ablations,
 audit claims, and produce paper and meeting materials with provenance.
 
-This repository currently contains the first backend foundation slice. It does not
-yet implement full literature retrieval, GPU experiment execution, or paper/PPT
+This repository currently contains the first admin-managed lab alpha: a FastAPI
+backend plus a React web MVP for invitation-based group usage. It does not yet
+implement full literature retrieval, GPU experiment execution, or paper/PPT
 generation.
 
 ## Why NoviScope
@@ -90,25 +91,33 @@ Only `code_runner` has the `run_code` permission in the registry.
 
 ## Current Status
 
-Implemented foundation slice:
+Implemented lab alpha slice:
 
-- FastAPI backend scaffold.
-- SQLModel domain models for providers, agent assignments, quests, and stage cards.
-- SQLite setup with foreign-key enforcement.
-- Model gateway abstraction with encrypted provider configuration APIs.
+- FastAPI backend scaffold with SQLModel models for users, invitation codes,
+  providers, quests, and stage cards.
+- Invitation-code registration, session-cookie login/logout, and authenticated
+  `/auth/me`.
+- Admin invite creation through `/admin/invites`, with a bootstrap/test-only
+  `X-NoviScope-Dev-Admin` path when explicitly enabled.
+- Model gateway abstraction with encrypted provider configuration APIs and
+  shared/personal provider scopes.
 - Immutable 9-agent registry with deterministic API serialization.
-- Quest service that creates a first `demand_validator` stage and supports explicit
-  stage transitions, payloads, evidence, and human review records.
-- HTTP API for health checks, agent listing, provider CRUD, quest creation, stage
-  listing, and stage updates.
+- Quest ownership plus protected quest and stage APIs; members only access their
+  own quests by default and admins can view all quests.
+- React + TypeScript + Vite + Tailwind web app in `web/` for registration, login,
+  quest list/detail, quest creation, stage updates, and provider settings.
 - Secret redaction and private outbound upload guard helpers.
-- Test suite covering security, models, agents, gateway, quests, and API behavior.
-- GitHub issue templates, PR template, contributing guide, collaboration guide, and
-  MIT license. GitHub Actions CI is tracked in issue #4 and is waiting for a token
-  with `workflow` scope.
+- Test suite covering security, auth, models, agents, gateway, quests, and API
+  behavior.
+- GitHub issue templates, PR template, contributing guide, collaboration guide,
+  and MIT license. GitHub Actions CI is tracked in issue #4 and is waiting for a
+  token with `workflow` scope.
 
 Not implemented yet:
 
+- dedicated first-admin bootstrap CLI/route
+- admin invite-management page in the web UI
+- agent assignment UI
 - real literature retrieval from arXiv, Semantic Scholar, Google Scholar, IEEE, ACM, or CVF
 - demand-source crawling and poisoning-risk scoring
 - GPU job scheduling on the lab A800 server
@@ -116,7 +125,112 @@ Not implemented yet:
 - experiment artifact registry
 - evidence auditor execution logic
 - paper and PPT generation
-- web frontend
+
+## Admin-Managed Lab Alpha
+
+NoviScope is intended to be deployed once by a server administrator for a shared
+lab URL. Group members then register with invitation codes, log in through the web
+app, and use the same deployment for quests, stage review, and provider settings.
+
+### Environment and backend
+
+Copy the example environment file and edit it for your lab:
+
+```bash
+cp .env.example .env
+```
+
+Shared deployment should set:
+
+- `NOVISCOPE_DATABASE_URL` to a PostgreSQL database
+- `NOVISCOPE_PROVIDER_SECRET_KEY` to a long random secret for provider-key encryption
+- `NOVISCOPE_SESSION_SECRET_KEY` to a different long random secret for session cookies
+- `NOVISCOPE_ARTIFACT_ROOT` to a persistent artifact directory
+- `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=false` by default
+
+Development can still use SQLite:
+
+```bash
+NOVISCOPE_DATABASE_URL=sqlite:///./noviscope-dev.db uvicorn noviscope.main:app --reload
+```
+
+Lab deployment should use PostgreSQL:
+
+```bash
+uvicorn noviscope.main:app --host 127.0.0.1 --port 8000
+```
+
+### Bootstrap/test header
+
+`POST /admin/invites` accepts `X-NoviScope-Dev-Admin: true` only when
+`NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=true` and there is no authenticated admin
+session. Use this header only for bootstrap/testing, not as a normal admin path.
+
+The current alpha does not yet include a dedicated first-admin creation route. A
+practical initial setup is:
+
+1. Temporarily set `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=true`.
+2. Create a bootstrap invite with the dev header.
+3. Register the bootstrap account through `/auth/register`.
+4. Promote that account to `admin` directly in PostgreSQL.
+5. Log in as that admin, create ongoing invites/shared providers, then set
+   `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=false` and restart the API.
+
+Example promotion SQL:
+
+```sql
+UPDATE "user" SET role = 'admin' WHERE email = 'admin@example.com';
+```
+
+### Web app build and reverse proxy
+
+For local frontend development:
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+The Vite dev server proxies `/api` to `http://127.0.0.1:8000`.
+
+For deployment:
+
+```bash
+cd web
+npm install
+npm run build
+```
+
+Serve `web/dist` from your lab URL through Nginx or Caddy and proxy `/api/` to
+the FastAPI backend:
+
+```nginx
+server {
+  listen 80;
+  server_name noviscope.example.internal;
+
+  location /api/ {
+    proxy_pass http://127.0.0.1:8000/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
+  location / {
+    root /srv/noviscope/web/dist;
+    try_files $uri /index.html;
+  }
+}
+```
+
+Once deployed, the normal lab flow is:
+
+1. The server admin creates invitation codes and shared providers.
+2. Group members open the lab URL and register with invitation codes.
+3. Users log in and receive an HTTP-only session cookie.
+4. Members create and review their own quests; admins can also manage shared
+   provider configuration and additional invites.
 
 ## API
 
@@ -138,27 +252,67 @@ List the built-in agent contracts:
 curl -s http://127.0.0.1:8000/agents
 ```
 
-Create a model provider configuration:
+Create a bootstrap invite for testing or initial setup only:
 
 ```bash
-curl -s -X POST http://127.0.0.1:8000/providers \
+curl -s -X POST http://127.0.0.1:8000/admin/invites \
+  -H "Content-Type: application/json" \
+  -H "X-NoviScope-Dev-Admin: true" \
+  -d '{"code":"BOOTSTRAP-INVITE","max_uses":1}'
+```
+
+Register a user with an invitation code:
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "invite_code":"BOOTSTRAP-INVITE",
+    "email":"member@example.com",
+    "display_name":"Member",
+    "password":"replace-with-a-password"
+  }'
+```
+
+Log in and store the session cookie:
+
+```bash
+curl -i -c /tmp/noviscope-cookies.txt -s -X POST http://127.0.0.1:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email":"member@example.com",
+    "password":"replace-with-a-password"
+  }'
+```
+
+Check the authenticated session:
+
+```bash
+curl -s -b /tmp/noviscope-cookies.txt http://127.0.0.1:8000/auth/me
+```
+
+Create a shared provider as an authenticated admin:
+
+```bash
+curl -s -b /tmp/noviscope-cookies.txt -X POST http://127.0.0.1:8000/providers \
   -H "Content-Type: application/json" \
   -d '{
     "name":"primary-openai",
     "kind":"openai_compatible",
     "base_url":"https://api.openai.com/v1",
     "default_model":"gpt-4.1",
-    "api_key":"example-provider-key"
+    "api_key":"example-provider-key",
+    "scope":"shared"
   }'
 ```
 
-Provider responses never include the raw API key or encrypted key. For production,
-set `NOVISCOPE_PROVIDER_SECRET_KEY` to a private value before storing real keys.
+Provider responses never include the raw API key or encrypted key. For shared
+deployment, set `NOVISCOPE_PROVIDER_SECRET_KEY` before storing real keys.
 
-Create a research quest:
+Create a research quest as an authenticated user:
 
 ```bash
-curl -s -X POST http://127.0.0.1:8000/quests \
+curl -s -b /tmp/noviscope-cookies.txt -X POST http://127.0.0.1:8000/quests \
   -H "Content-Type: application/json" \
   -d '{"title":"AI+Sports Badminton","initial_direction":"AI+体育，羽毛球"}'
 ```
@@ -169,7 +323,7 @@ The response includes a `draft` quest and a first stage assigned to
 Update a stage after manual review:
 
 ```bash
-curl -s -X PATCH http://127.0.0.1:8000/stages/<stage_id> \
+curl -s -b /tmp/noviscope-cookies.txt -X PATCH http://127.0.0.1:8000/stages/<stage_id> \
   -H "Content-Type: application/json" \
   -d '{
     "status":"complete",
@@ -189,18 +343,19 @@ Install dependencies:
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
+cd web && npm install
 ```
 
 Run tests:
 
 ```bash
-pytest
+python -m pytest
 ```
 
 Run lint:
 
 ```bash
-ruff check .
+python -m ruff check .
 ```
 
 Run API locally:
@@ -215,6 +370,20 @@ Use a custom SQLite database path:
 NOVISCOPE_DATABASE_URL=sqlite:///./noviscope.db uvicorn noviscope.main:app --reload
 ```
 
+Run the web app locally:
+
+```bash
+cd web
+npm run dev
+```
+
+Build the web app:
+
+```bash
+cd web
+npm run build
+```
+
 ## Repository Layout
 
 ```text
@@ -227,6 +396,7 @@ src/noviscope/
   models/          SQLModel domain models.
   quests/          Research quest workflow service.
 tests/             Unit and API tests.
+web/               React + TypeScript + Vite lab web app.
 docs/superpowers/  Design specs and implementation plans.
 ```
 
@@ -255,12 +425,12 @@ Future versions should extend this into a full evidence and provenance layer:
 
 Near-term:
 
+- Dedicated first-admin bootstrap CLI or deployment command.
+- Admin invite-management UI in the web app.
+- Agent assignment and admin lab settings UI.
 - Literature retrieval module with venue/year/source filters.
 - Demand validation workflow with trusted source allowlists.
-- Provider configuration UI/API for OpenAI-compatible, Anthropic, DeepSeek, Kimi,
-  MiniMax, GLM, and other model endpoints.
-- Research quest stage transitions and audit logs.
-- Minimal web interface for entering directions and inspecting stage cards.
+- Research quest audit logs and provider connection smoke tests.
 - Enable GitHub Actions CI after granting `workflow` scope to the publishing token.
 
 Mid-term:
