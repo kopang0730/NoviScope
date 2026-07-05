@@ -71,7 +71,11 @@ export function StageDetailPage() {
         if (!active) {
           return;
         }
-        setLoadError(getErrorMessage(error));
+        if (error instanceof Error) {
+          setLoadError(getErrorMessage(error));
+          return;
+        }
+        throw error;
       })
       .finally(() => {
         if (active) {
@@ -100,7 +104,11 @@ export function StageDetailPage() {
       setStage(updatedStage);
       setSuccessMessage(updatedStage.status === "blocked" ? t("stageRunBlocked") : t("stageRunComplete"));
     } catch (error) {
-      setRunError(getErrorMessage(error));
+      if (error instanceof Error) {
+        setRunError(getErrorMessage(error));
+      } else {
+        throw error;
+      }
     } finally {
       setRunningStage(false);
     }
@@ -159,7 +167,7 @@ export function StageDetailPage() {
 
       {stage ? (
         <>
-          <StageOutputPanel stage={stage} />
+          <StageOutputPanel onStageChange={setStage} stage={stage} />
 
           {runError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{runError}</p> : null}
           {successMessage ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{successMessage}</p> : null}

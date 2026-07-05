@@ -24,6 +24,7 @@ class StageRunContext:
     stage: StageCard
     quest: Quest
     provider: ModelProviderCredentials
+    workflow_stages: tuple[StageCard, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

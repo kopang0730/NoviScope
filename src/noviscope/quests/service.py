@@ -4,7 +4,7 @@ from sqlmodel import Session, select
 
 from noviscope.agents.literature_scout import LITERATURE_SCOUT_AGENT_ID
 from noviscope.core.json_types import JsonObject
-from noviscope.core.stage_policy import DEMAND_VALIDATOR_AGENT_ID
+from noviscope.core.stage_policy import DEMAND_VALIDATOR_AGENT_ID, IDEA_GENERATOR_AGENT_ID
 from noviscope.models.common import utc_now
 from noviscope.models.quest import Quest, QuestStatus, StageCard, StageStatus
 from noviscope.models.user import User, UserRole
@@ -50,9 +50,21 @@ class QuestService:
             status=StageStatus.PENDING,
             summary="Find recent papers from OpenAlex after demand validation is complete.",
         )
+        idea_stage = StageCard(
+            quest_id=quest.id,
+            agent_id=IDEA_GENERATOR_AGENT_ID,
+            created_at=(stage_created_at + timedelta(microseconds=2)).isoformat(),
+            title="Gap & hypothesis generator",
+            status=StageStatus.PENDING,
+            summary=(
+                "Generate evidence-linked research gaps and hypotheses after literature "
+                "scouting."
+            ),
+        )
         self.session.add(quest)
         self.session.add(demand_stage)
         self.session.add(literature_stage)
+        self.session.add(idea_stage)
         self.session.commit()
         self.session.refresh(quest)
         return quest
@@ -133,13 +145,22 @@ class QuestService:
             raise ValueError(f"Cannot transition stage from {current.value} to {target.value}")
 
     def _sync_quest_after_stage_update(self, stage: StageCard) -> None:
-        if stage.agent_id != DEMAND_VALIDATOR_AGENT_ID or stage.status != StageStatus.COMPLETE:
+        if stage.status != StageStatus.COMPLETE:
             return
         quest = self.session.get(Quest, stage.quest_id)
         if quest is None:
             return
-        quest.status = (
-            QuestStatus.IDEA_SELECTION if stage.human_approved else QuestStatus.DEMAND_REVIEW
-        )
+        if stage.agent_id == DEMAND_VALIDATOR_AGENT_ID:
+            quest.status = (
+                QuestStatus.IDEA_SELECTION if stage.human_approved else QuestStatus.DEMAND_REVIEW
+            )
+        elif stage.agent_id == IDEA_GENERATOR_AGENT_ID:
+            quest.status = (
+                QuestStatus.LIGHTWEIGHT_EXPERIMENT
+                if stage.human_approved
+                else QuestStatus.IDEA_SELECTION
+            )
+        else:
+            return
         quest.updated_at = utc_now().isoformat()
         self.session.add(quest)

@@ -44,7 +44,7 @@ def test_provider_and_quest_persist(db_session: Session):
     assert db_session.execute(text("SELECT status FROM stagecard")).scalar_one() == "pending"
 
 
-def test_create_quest_adds_demand_validation_and_literature_scout_stages(db_session: Session):
+def test_create_quest_adds_core_research_workflow_stages(db_session: Session):
     service = QuestService(db_session)
 
     quest = service.create_quest(
@@ -55,8 +55,16 @@ def test_create_quest_adds_demand_validation_and_literature_scout_stages(db_sess
     stages = service.list_stage_cards(quest.id)
 
     assert quest.status == QuestStatus.DRAFT
-    assert [stage.agent_id for stage in stages] == ["demand_validator", "literature_scout"]
-    assert [stage.title for stage in stages] == ["Demand validation", "Literature scout"]
+    assert [stage.agent_id for stage in stages] == [
+        "demand_validator",
+        "literature_scout",
+        "idea_generator",
+    ]
+    assert [stage.title for stage in stages] == [
+        "Demand validation",
+        "Literature scout",
+        "Gap & hypothesis generator",
+    ]
 
 
 def test_create_schema_upgrades_legacy_quest_table_with_owner_index(tmp_path):
@@ -192,6 +200,39 @@ def test_update_stage_records_payloads_and_advances_quest_after_review(db_sessio
     assert completed.human_approved is True
     assert saved_quest is not None
     assert saved_quest.status == QuestStatus.IDEA_SELECTION
+
+
+def test_approving_selected_idea_advances_quest_to_lightweight_experiment(
+    db_session: Session,
+) -> None:
+    service = QuestService(db_session)
+    quest = service.create_quest(
+        title="Handwritten Text Erasure",
+        initial_direction="擦除试卷中的手写文本",
+    )
+    idea_stage = service.list_stage_cards(quest.id)[2]
+
+    running = service.update_stage_card(
+        idea_stage.id,
+        status=StageStatus.RUNNING,
+        input_payload={"source_stage_ids": {"literature_scout": "stage_lit"}},
+    )
+    completed = service.update_stage_card(
+        running.id,
+        status=StageStatus.COMPLETE,
+        output_payload={
+            "confidence": "medium",
+            "selected_idea_ids": ["idea_1"],
+            "selection_status": "selected_for_experiment_design",
+        },
+        human_approved=True,
+        review_notes="Selected idea_1 for experiment planning.",
+    )
+    saved_quest = db_session.get(Quest, quest.id)
+
+    assert completed.human_approved is True
+    assert saved_quest is not None
+    assert saved_quest.status == QuestStatus.LIGHTWEIGHT_EXPERIMENT
 
 
 def test_invalid_stage_transition_is_rejected(db_session: Session):

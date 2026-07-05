@@ -2,9 +2,14 @@ import type { ReactNode } from "react";
 import type { StageCard } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
 import { labelFromEnum } from "../lib/format";
-import { demandValidatorAgentId, getStageRunAvailability } from "../lib/stages";
+import {
+  demandValidatorAgentId,
+  getStageRunAvailability,
+  ideaGeneratorAgentId,
+} from "../lib/stages";
 import { Badge } from "./badge";
 import { Card, CardHeading } from "./card";
+import { GapHypothesisOutput } from "./gap-hypothesis-output";
 import { LiteratureScoutOutput } from "./literature-scout-output";
 
 type DemandValidationView = {
@@ -106,7 +111,13 @@ export function StageRunSummary({ stage }: { readonly stage: StageCard }) {
   );
 }
 
-export function StageOutputPanel({ stage }: { readonly stage: StageCard }) {
+export function StageOutputPanel({
+  onStageChange,
+  stage,
+}: {
+  readonly onStageChange?: (stage: StageCard) => void;
+  readonly stage: StageCard;
+}) {
   const { t } = useI18n();
   const demandValidation = buildDemandValidationView(stage);
 
@@ -119,6 +130,20 @@ export function StageOutputPanel({ stage }: { readonly stage: StageCard }) {
         </div>
         <div className="mt-5">
           <LiteratureScoutOutput stage={stage} />
+        </div>
+      </Card>
+    );
+  }
+
+  if (stage.agent_id === ideaGeneratorAgentId && stage.status === "complete") {
+    return (
+      <Card>
+        <CardHeading description={t("ideaGeneratorDescription")} title={t("ideaGeneratorResult")} />
+        <div className="mt-5">
+          <StageRunSummary stage={stage} />
+        </div>
+        <div className="mt-5">
+          <GapHypothesisOutput onStageChange={onStageChange} stage={stage} />
         </div>
       </Card>
     );
