@@ -120,6 +120,14 @@ All spacing derives from 4px.
 - Accessibility: quest rows are buttons with readable selected state; stages keep open links and run buttons separate.
 - Motion: only transition color/background on interactive controls.
 
+### Research Canvas
+
+- Structure: compact summary counters, horizontally scrollable stage map, and a selected-stage inspector.
+- States: selected stage, next action, pending review, runnable, blocked, complete.
+- Evidence: every stage node may show up to four traceable facts; the inspector expands those facts with run state and review notes.
+- Accessibility: stage selection is a real button, while run/open actions remain separate controls.
+- Layout: map stacks above the inspector on narrow screens and uses a fixed-width scroll region for the five-stage workflow.
+
 ## 6. Motion & Interaction
 
 | Type | Duration | Easing | Usage |
