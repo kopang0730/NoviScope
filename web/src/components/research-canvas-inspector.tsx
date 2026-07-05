@@ -31,6 +31,20 @@ function reviewLabel(stage: StageCard, t: ReturnType<typeof useI18n>["t"]) {
   return t("stageReviewPending");
 }
 
+function readString(payload: Readonly<Record<string, unknown>>, key: string) {
+  const value = payload[key];
+  return typeof value === "string" ? value : "";
+}
+
+function providerLabel(stage: StageCard) {
+  const providerName = readString(stage.evidence_payload, "provider_name");
+  const providerModel = readString(stage.evidence_payload, "provider_model");
+  if (!providerName) {
+    return "";
+  }
+  return providerModel ? `${providerName} · ${providerModel}` : providerName;
+}
+
 export function ResearchCanvasInspector({
   details,
   onRunStage,
@@ -48,6 +62,7 @@ export function ResearchCanvasInspector({
 }) {
   const { t } = useI18n();
   const runReason = getLocalizedStageRunGateReason(stageRunGate, t);
+  const provider = providerLabel(stage);
 
   return (
     <aside className="rounded-lg border border-slate-200 bg-white p-4">
@@ -61,6 +76,11 @@ export function ResearchCanvasInspector({
           <Badge tone={stageTone(stage.status)}>{labelFromEnum(stage.status)}</Badge>
           <Badge tone={reviewTone(stage)}>{reviewLabel(stage, t)}</Badge>
           <Badge tone="gray">{labelFromEnum(stage.confidence)}</Badge>
+          {provider ? (
+            <Badge tone="blue">
+              {t("providerReadinessProvider")}: {provider}
+            </Badge>
+          ) : null}
         </div>
       </div>
 

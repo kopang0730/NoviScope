@@ -18,6 +18,14 @@ class ModelProviderCredentials:
     model: str
     api_key: SecretStr
 
+    def provenance_payload(self) -> JsonObject:
+        return {
+            "provider_id": self.id,
+            "provider_kind": self.kind.value,
+            "provider_model": self.model,
+            "provider_name": self.name,
+        }
+
 
 @dataclass(frozen=True, slots=True)
 class StageRunContext:
