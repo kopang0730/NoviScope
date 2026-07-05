@@ -2,9 +2,11 @@ import { Link } from "react-router-dom";
 import type { Quest, StageCard, StageStatus } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
 import { labelFromEnum } from "../lib/format";
-import { getLocalizedStageRunReason } from "../lib/stage-run-text";
-import { canRunStage } from "../lib/stages";
 import { stageTone } from "../lib/status-tones";
+import {
+  getLocalizedWorkflowReadinessReason,
+  type WorkflowStageReadiness,
+} from "../lib/workflow-readiness";
 import { Badge } from "./badge";
 import { Button, buttonClassName } from "./button";
 
@@ -36,7 +38,11 @@ function connectorClassName(status: StageStatus) {
   return "bg-slate-300 text-slate-400";
 }
 
-function buildStageSignal(stage: StageCard, t: ReturnType<typeof useI18n>["t"]) {
+function buildStageSignal(
+  stage: StageCard,
+  t: ReturnType<typeof useI18n>["t"],
+  workflowReadiness: WorkflowStageReadiness,
+) {
   if (stage.human_approved === true) {
     return t("canvasGateApproved");
   }
@@ -46,7 +52,7 @@ function buildStageSignal(stage: StageCard, t: ReturnType<typeof useI18n>["t"]) 
   if (stage.status === "complete" && (stage.agent_id === "demand_validator" || stage.agent_id === "idea_generator")) {
     return t("humanReviewRequired");
   }
-  if (canRunStage(stage)) {
+  if (workflowReadiness.canRun) {
     return t("canvasReadyToRun");
   }
   if (stage.status === "complete") {
@@ -68,6 +74,7 @@ type CanvasStageNodeProps = {
   readonly selectedQuest: Quest;
   readonly stage: StageCard;
   readonly total: number;
+  readonly workflowReadiness: WorkflowStageReadiness;
 };
 
 export function CanvasStageNode({
@@ -80,11 +87,12 @@ export function CanvasStageNode({
   selectedQuest,
   stage,
   total,
+  workflowReadiness,
 }: CanvasStageNodeProps) {
   const { t } = useI18n();
   const connectorClass = connectorClassName(stage.status);
-  const signal = buildStageSignal(stage, t);
-  const runReason = getLocalizedStageRunReason(stage, t);
+  const signal = buildStageSignal(stage, t, workflowReadiness);
+  const runReason = getLocalizedWorkflowReadinessReason(workflowReadiness, t);
 
   return (
     <div className="relative">
@@ -160,7 +168,7 @@ export function CanvasStageNode({
         </div>
 
         <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
-          {canRunStage(stage) ? (
+          {workflowReadiness.canRun ? (
             <Button loading={runningStageId === stage.id} onClick={() => onRunStage(stage.id)} size="sm">
               {t("runStage")}
             </Button>

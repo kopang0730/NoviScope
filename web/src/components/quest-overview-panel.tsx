@@ -4,9 +4,12 @@ import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
 import { buildPreviewData, findNextStage, parseIntakeBrief, summarizeProgress } from "../lib/quest-overview";
 import { buildQuestReviewPacket } from "../lib/quest-review-export";
-import { getLocalizedStageRunReason } from "../lib/stage-run-text";
 import { paperMeetingWriterAgentId } from "../lib/stages";
 import { questTone, stageTone } from "../lib/status-tones";
+import {
+  getLocalizedWorkflowReadinessReason,
+  getWorkflowStageReadiness,
+} from "../lib/workflow-readiness";
 import { Badge } from "./badge";
 import { Button, buttonClassName } from "./button";
 import { Card, CardHeading } from "./card";
@@ -92,6 +95,7 @@ export function QuestOverviewPanel({
   const previews = usePreviewItems(stages);
   const lastStage = stages.length > 0 ? stages[stages.length - 1] ?? null : null;
   const reviewStage = nextStage ?? stages.find((stage) => stage.agent_id === paperMeetingWriterAgentId) ?? lastStage;
+  const nextStageReadiness = nextStage ? getWorkflowStageReadiness(nextStage, stages) : null;
 
   return (
     <Card>
@@ -144,7 +148,7 @@ export function QuestOverviewPanel({
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t("overviewNextAction")}</p>
                 <p className="mt-1 font-medium text-slate-900">{nextStage ? nextStage.title : t("overviewAllStagesComplete")}</p>
-                {nextStage ? <p className="mt-2 text-sm text-slate-600">{getLocalizedStageRunReason(nextStage, t)}</p> : null}
+                {nextStageReadiness ? <p className="mt-2 text-sm text-slate-600">{getLocalizedWorkflowReadinessReason(nextStageReadiness, t)}</p> : null}
               </div>
               {nextStage ? <Badge tone={stageTone(nextStage.status)}>{labelFromEnum(nextStage.status)}</Badge> : null}
             </div>
