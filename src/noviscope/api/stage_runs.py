@@ -457,7 +457,7 @@ def run_stage(
         )
         completed_stage = quest_service.update_stage_card(
             stage_id,
-            evidence_payload=result.evidence_payload,
+            evidence_payload=result.evidence_payload | provider.provenance_payload(),
             output_payload=output_payload,
             summary=result.summary,
             status=StageStatus.COMPLETE,

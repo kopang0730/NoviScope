@@ -18,6 +18,13 @@ function readString(payload: Readonly<Record<string, unknown>>, key: string) {
   return typeof value === "string" ? value : "";
 }
 
+function providerLabel(providerName: string, providerModel: string) {
+  if (!providerName) {
+    return "";
+  }
+  return providerModel ? `${providerName} · ${providerModel}` : providerName;
+}
+
 export function StageRunSummary({
   stage,
   stageRunGate,
@@ -30,6 +37,8 @@ export function StageRunSummary({
   const { t } = useI18n();
   const availability = getStageRunAvailability(stage);
   const providerName = readString(stage.evidence_payload, "provider_name");
+  const providerModel = readString(stage.evidence_payload, "provider_model");
+  const provider = providerLabel(providerName, providerModel);
   const availabilityReason = stageRunGate
     ? getLocalizedStageRunGateReason(stageRunGate, t)
     : workflowReadiness
@@ -43,7 +52,11 @@ export function StageRunSummary({
         <Badge tone={stage.confidence === "unknown" ? "gray" : "teal"}>
           {t("stageConfidence")}: {labelFromEnum(stage.confidence)}
         </Badge>
-        {providerName ? <Badge tone="blue">{providerName}</Badge> : null}
+        {provider ? (
+          <Badge tone="blue">
+            {t("providerReadinessProvider")}: {provider}
+          </Badge>
+        ) : null}
       </div>
       <p className="text-sm text-slate-600">{stage.summary || t("noSummaryYet")}</p>
       <p className="text-xs text-slate-500">

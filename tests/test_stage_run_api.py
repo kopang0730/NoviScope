@@ -534,6 +534,9 @@ def test_run_literature_scout_completes_without_model_provider(
     assert body["output_payload"]["source"] == "openalex_works_api"
     assert body["output_payload"]["papers"][0]["openalex_id"] == "https://openalex.org/W123"
     assert body["evidence_payload"]["can_run"] is True
+    assert body["evidence_payload"]["provider_id"] == "server_openalex"
+    assert body["evidence_payload"]["provider_model"] == "openalex-works"
+    assert body["evidence_payload"]["provider_name"] == "OpenAlex"
 
 
 def test_run_gap_hypothesis_blocks_until_literature_scout_completes(
