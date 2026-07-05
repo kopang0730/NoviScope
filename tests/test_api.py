@@ -3,6 +3,29 @@ from fastapi.testclient import TestClient
 from noviscope.main import create_app
 
 
+def register_and_login(client: TestClient, invite_code: str, email: str) -> None:
+    invite_response = client.post(
+        "/admin/invites",
+        json={"code": invite_code, "max_uses": 1},
+        headers={"X-NoviScope-Dev-Admin": "true"},
+    )
+    assert invite_response.status_code == 201
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "invite_code": invite_code,
+            "email": email,
+            "display_name": email.split("@")[0],
+            "password": "password",
+        },
+    )
+    assert register_response.status_code == 201
+
+    login_response = client.post("/auth/login", json={"email": email, "password": "password"})
+    assert login_response.status_code == 200
+
+
 def test_health_endpoint():
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
         response = client.get("/health")
@@ -72,6 +95,7 @@ def test_provider_crud_endpoints_do_not_return_api_key():
 
 def test_create_quest_endpoint():
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        register_and_login(client, "QUEST-INVITE", "quest@example.com")
         response = client.post(
             "/quests",
             json={"title": "AI+Sports Badminton", "initial_direction": "AI+体育，羽毛球"},
@@ -87,6 +111,7 @@ def test_create_quest_endpoint():
 
 def test_stage_flow_endpoints_record_review_payloads():
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        register_and_login(client, "STAGE-INVITE", "stage@example.com")
         quest_response = client.post(
             "/quests",
             json={"title": "Handwritten Text Erasure", "initial_direction": "手写文本擦除"},
@@ -129,6 +154,7 @@ def test_stage_flow_endpoints_record_review_payloads():
 
 def test_stage_endpoint_rejects_invalid_transition():
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        register_and_login(client, "TRANSITION-INVITE", "transition@example.com")
         quest_response = client.post(
             "/quests",
             json={"title": "Badminton", "initial_direction": "AI+体育"},
@@ -143,9 +169,58 @@ def test_stage_endpoint_rejects_invalid_transition():
 
 def test_create_quest_endpoint_rejects_missing_direction():
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        register_and_login(client, "MISSING-DIRECTION-INVITE", "missing-direction@example.com")
         response = client.post("/quests", json={"title": "AI+Sports Badminton"})
 
         assert response.status_code == 422
+
+
+def test_invite_registration_login_and_me_flow():
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        invite_response = client.post(
+            "/admin/invites",
+            json={"code": "LAB-INVITE", "max_uses": 1},
+            headers={"X-NoviScope-Dev-Admin": "true"},
+        )
+        assert invite_response.status_code == 201
+
+        register_response = client.post(
+            "/auth/register",
+            json={
+                "invite_code": "LAB-INVITE",
+                "email": "student@example.com",
+                "display_name": "Student",
+                "password": "student-password",
+            },
+        )
+        assert register_response.status_code == 201
+        assert register_response.json()["email"] == "student@example.com"
+        assert "password_hash" not in register_response.json()
+
+        login_response = client.post(
+            "/auth/login",
+            json={"email": "student@example.com", "password": "student-password"},
+        )
+        assert login_response.status_code == 200
+        assert login_response.cookies.get("noviscope_session")
+
+        me_response = client.get("/auth/me")
+        assert me_response.status_code == 200
+        assert me_response.json()["email"] == "student@example.com"
+
+        logout_response = client.post("/auth/logout")
+        assert logout_response.status_code == 204
+        assert client.get("/auth/me").status_code == 401
+
+
+def test_protected_quest_create_requires_login():
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        response = client.post(
+            "/quests",
+            json={"title": "Badminton", "initial_direction": "AI+体育"},
+        )
+
+        assert response.status_code == 401
 
 
 def test_openapi_has_quest_response_schema():

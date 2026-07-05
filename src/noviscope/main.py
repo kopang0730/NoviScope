@@ -4,7 +4,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlmodel import Session
 
-from noviscope.api.routes import get_session, router
+from noviscope.api.dependencies import get_session
+from noviscope.api.routes import router
 from noviscope.core.config import get_settings
 from noviscope.db.session import create_db_engine, create_schema, session_generator
 
