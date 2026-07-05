@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -70,6 +71,76 @@ def test_deployment_safe_auth_defaults(monkeypatch):
 
     assert settings.dev_admin_header_enabled is False
     assert settings.session_cookie_secure is True
+
+
+def test_sqlite_startup_allows_placeholder_secrets(monkeypatch):
+    settings = Settings(_env_file=None)
+    seen_database_urls: list[str] = []
+
+    def fake_create_db_engine(database_url: str) -> object:
+        seen_database_urls.append(database_url)
+        return object()
+
+    monkeypatch.setattr("noviscope.main.get_settings", lambda: settings)
+    monkeypatch.setattr("noviscope.main.create_db_engine", fake_create_db_engine)
+
+    create_app(database_url="sqlite:///:memory:")
+
+    assert seen_database_urls == ["sqlite:///:memory:"]
+
+
+@pytest.mark.parametrize(
+    ("settings_kwargs", "expected_env_var"),
+    [
+        (
+            {"session_secret_key": "production-session-secret"},
+            "NOVISCOPE_PROVIDER_SECRET_KEY",
+        ),
+        (
+            {"provider_secret_key": "production-provider-secret"},
+            "NOVISCOPE_SESSION_SECRET_KEY",
+        ),
+    ],
+)
+def test_shared_deployment_rejects_placeholder_secrets_before_engine_creation(
+    monkeypatch,
+    settings_kwargs: dict[str, str],
+    expected_env_var: str,
+):
+    settings = Settings(_env_file=None, **settings_kwargs)
+    engine_calls: list[str] = []
+
+    def fake_create_db_engine(database_url: str) -> object:
+        engine_calls.append(database_url)
+        return object()
+
+    monkeypatch.setattr("noviscope.main.get_settings", lambda: settings)
+    monkeypatch.setattr("noviscope.main.create_db_engine", fake_create_db_engine)
+
+    with pytest.raises(ValueError, match=expected_env_var):
+        create_app(database_url="postgresql://user:pass@localhost:5432/noviscope")
+
+    assert engine_calls == []
+
+
+def test_shared_deployment_accepts_non_placeholder_secrets(monkeypatch):
+    settings = Settings(
+        _env_file=None,
+        provider_secret_key="production-provider-secret",
+        session_secret_key="production-session-secret",
+    )
+    seen_database_urls: list[str] = []
+
+    def fake_create_db_engine(database_url: str) -> object:
+        seen_database_urls.append(database_url)
+        return object()
+
+    monkeypatch.setattr("noviscope.main.get_settings", lambda: settings)
+    monkeypatch.setattr("noviscope.main.create_db_engine", fake_create_db_engine)
+
+    create_app(database_url="postgresql://user:pass@localhost:5432/noviscope")
+
+    assert seen_database_urls == ["postgresql://user:pass@localhost:5432/noviscope"]
 
 
 def test_provider_crud_endpoints_do_not_return_api_key(dev_admin_header_enabled: None):

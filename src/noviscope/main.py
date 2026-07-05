@@ -6,13 +6,15 @@ from sqlmodel import Session
 
 from noviscope.api.dependencies import get_session
 from noviscope.api.routes import router
-from noviscope.core.config import get_settings
+from noviscope.core.config import get_settings, validate_deployment_settings
 from noviscope.db.session import create_db_engine, create_schema, session_generator
 
 
 def create_app(database_url: str | None = None) -> FastAPI:
     settings = get_settings()
-    engine = create_db_engine(database_url or settings.database_url)
+    effective_database_url = database_url or settings.database_url
+    validate_deployment_settings(settings, effective_database_url)
+    engine = create_db_engine(effective_database_url)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:

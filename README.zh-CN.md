@@ -125,6 +125,9 @@ cp .env.example .env
 - `NOVISCOPE_ARTIFACT_ROOT`：持久化 artifact 目录
 - `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=false`：共享部署默认应关闭
 
+如果 `NOVISCOPE_DATABASE_URL` 不是 SQLite，且任一 secret 仍然保留开发占位值，
+NoviScope 现在会在启动阶段直接拒绝运行。
+
 开发环境仍然可以继续使用 SQLite：
 
 ```bash

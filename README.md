@@ -149,6 +149,9 @@ Shared deployment should set:
 - `NOVISCOPE_ARTIFACT_ROOT` to a persistent artifact directory
 - `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=false` by default
 
+If `NOVISCOPE_DATABASE_URL` is non-SQLite, NoviScope now refuses to start while
+either secret is still set to the development placeholder.
+
 Development can still use SQLite:
 
 ```bash
