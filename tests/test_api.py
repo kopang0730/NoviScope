@@ -861,6 +861,46 @@ def test_create_invite_rejects_duplicate_code_with_conflict(
         assert recovery_response.status_code == 201
 
 
+def test_logged_in_admin_can_list_invites(dev_admin_header_enabled: None, tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'admin-invite-list.db'}"
+    with TestClient(create_app(database_url=database_url)) as client:
+        register_and_login(client, "ADMIN-LIST-BOOTSTRAP", "admin@example.com")
+        promote_user_to_admin(database_url, "admin@example.com")
+
+        first_response = client.post(
+            "/admin/invites",
+            json={"code": "FIRST-LISTED-INVITE", "max_uses": 1},
+        )
+        second_response = client.post(
+            "/admin/invites",
+            json={"code": "SECOND-LISTED-INVITE", "max_uses": 2},
+        )
+        list_response = client.get("/admin/invites")
+
+        assert first_response.status_code == 201
+        assert second_response.status_code == 201
+        assert list_response.status_code == 200
+        body = list_response.json()
+        codes = [invite["code"] for invite in body["invites"]]
+        assert "FIRST-LISTED-INVITE" in codes
+        assert "SECOND-LISTED-INVITE" in codes
+        second_invite = next(
+            invite for invite in body["invites"] if invite["code"] == "SECOND-LISTED-INVITE"
+        )
+        assert second_invite["max_uses"] == 2
+        assert second_invite["used_count"] == 0
+        assert second_invite["status"] == "active"
+
+
+def test_logged_in_member_cannot_list_invites(dev_admin_header_enabled: None):
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        register_and_login(client, "MEMBER-LIST-INVITE", "member-list@example.com")
+
+        response = client.get("/admin/invites")
+
+        assert response.status_code == 403
+
+
 def test_register_rejects_duplicate_email_with_conflict_and_rolls_back_invite(
     dev_admin_header_enabled: None,
 ):

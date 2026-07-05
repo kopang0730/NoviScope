@@ -1,6 +1,7 @@
 export type UserRole = "admin" | "member";
 export type ProviderKind = "openai_compatible" | "anthropic" | "custom";
 export type ProviderScope = "personal" | "shared";
+export type InviteStatus = "active" | "disabled" | "exhausted";
 export type StageConfidence = "high" | "medium" | "low" | "unknown";
 export type QuestStatus =
   | "draft"
@@ -32,6 +33,17 @@ export interface Provider {
   base_url: string;
   default_model: string;
   is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InviteCode {
+  id: string;
+  code: string;
+  status: InviteStatus;
+  max_uses: number;
+  used_count: number;
+  expires_at: string | null;
   created_at: string;
   updated_at: string;
 }
