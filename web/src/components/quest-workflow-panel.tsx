@@ -6,7 +6,7 @@ import { Card, CardHeading } from "./card";
 import { StageRunSummary } from "./stage-output-summary";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
-import { canRunDemandValidationStage } from "../lib/stages";
+import { canRunStage } from "../lib/stages";
 import { questTone, stageTone } from "../lib/status-tones";
 
 export function QuestWorkflowPanel({
@@ -77,7 +77,7 @@ export function QuestWorkflowPanel({
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge tone={stageTone(stage.status)}>{labelFromEnum(stage.status)}</Badge>
-                          {canRunDemandValidationStage(stage) ? (
+                          {canRunStage(stage) ? (
                             <Button loading={runningStageId === stage.id} onClick={() => onRunStage(stage.id)} size="sm">
                               {t("runStage")}
                             </Button>

@@ -44,7 +44,7 @@ def test_provider_and_quest_persist(db_session: Session):
     assert db_session.execute(text("SELECT status FROM stagecard")).scalar_one() == "pending"
 
 
-def test_create_quest_adds_demand_validation_stage(db_session: Session):
+def test_create_quest_adds_demand_validation_and_literature_scout_stages(db_session: Session):
     service = QuestService(db_session)
 
     quest = service.create_quest(
@@ -55,9 +55,8 @@ def test_create_quest_adds_demand_validation_stage(db_session: Session):
     stages = service.list_stage_cards(quest.id)
 
     assert quest.status == QuestStatus.DRAFT
-    assert len(stages) == 1
-    assert stages[0].agent_id == "demand_validator"
-    assert stages[0].title == "Demand validation"
+    assert [stage.agent_id for stage in stages] == ["demand_validator", "literature_scout"]
+    assert [stage.title for stage in stages] == ["Demand validation", "Literature scout"]
 
 
 def test_create_schema_upgrades_legacy_quest_table_with_owner_index(tmp_path):
