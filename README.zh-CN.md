@@ -261,7 +261,7 @@ curl -i -c /tmp/noviscope-cookies.txt -s -X POST http://127.0.0.1:8000/auth/logi
 curl -s -b /tmp/noviscope-cookies.txt http://127.0.0.1:8000/auth/me
 ```
 
-以已登录 admin 身份创建 shared provider：
+以已登录 member 身份创建 personal provider：
 
 ```bash
 curl -s -b /tmp/noviscope-cookies.txt -X POST http://127.0.0.1:8000/providers \
@@ -272,7 +272,7 @@ curl -s -b /tmp/noviscope-cookies.txt -X POST http://127.0.0.1:8000/providers \
     "base_url":"https://api.openai.com/v1",
     "default_model":"gpt-4.1",
     "api_key":"example-provider-key",
-    "scope":"shared"
+    "scope":"personal"
   }'
 ```
 
