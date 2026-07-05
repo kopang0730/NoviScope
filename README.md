@@ -240,11 +240,16 @@ Once deployed, the normal lab flow is:
 
 ## API
 
-Run the service:
+Run the service for local bootstrap smoke only:
 
 ```bash
+NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=true \
+NOVISCOPE_SESSION_COOKIE_SECURE=false \
 uvicorn noviscope.main:app --reload
 ```
+
+Use this only for local/bootstrap smoke. Shared deployments should keep the
+deployment-safe defaults above.
 
 Health check:
 

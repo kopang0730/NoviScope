@@ -210,11 +210,16 @@ server {
 
 ## API
 
-启动服务：
+仅用于本地 bootstrap smoke 的启动服务：
 
 ```bash
+NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=true \
+NOVISCOPE_SESSION_COOKIE_SECURE=false \
 uvicorn noviscope.main:app --reload
 ```
+
+仅将此命令用于本地/bootstrap smoke。共享部署应继续使用上面的
+部署安全默认值。
 
 健康检查：
 
