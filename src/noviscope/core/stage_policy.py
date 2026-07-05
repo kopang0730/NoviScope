@@ -3,15 +3,30 @@ from typing import Literal, TypeAlias
 from noviscope.core.json_types import JsonObject
 
 DEMAND_VALIDATOR_AGENT_ID = "demand_validator"
+IDEA_GENERATOR_AGENT_ID = "idea_generator"
 NO_EXTERNAL_VERIFICATION_RISK = (
     "High confidence was downgraded because no external source verification ran in this MVP stage."
+)
+NO_EXPERIMENT_VERIFICATION_RISK = (
+    "High confidence was downgraded because hypotheses have not been experimentally verified."
 )
 
 StageConfidence: TypeAlias = Literal["high", "medium", "low", "unknown"]
 
 
 def normalize_stage_output_payload(agent_id: str, output_payload: JsonObject) -> JsonObject:
-    if agent_id != DEMAND_VALIDATOR_AGENT_ID or output_payload.get("confidence") != "high":
+    if output_payload.get("confidence") != "high":
+        return output_payload
+
+    if agent_id == IDEA_GENERATOR_AGENT_ID:
+        warnings_value = output_payload.get("warnings")
+        warnings = [*warnings_value] if isinstance(warnings_value, list) else []
+        string_warnings = {warning for warning in warnings if isinstance(warning, str)}
+        if NO_EXPERIMENT_VERIFICATION_RISK not in string_warnings:
+            warnings.append(NO_EXPERIMENT_VERIFICATION_RISK)
+        return {**output_payload, "confidence": "medium", "warnings": warnings}
+
+    if agent_id != DEMAND_VALIDATOR_AGENT_ID:
         return output_payload
 
     risks_value = output_payload.get("risks")

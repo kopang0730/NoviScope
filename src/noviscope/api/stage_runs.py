@@ -11,6 +11,12 @@ from noviscope.agents.demand_validation import (
     DemandValidationStageRunner,
     get_demand_validation_runner,
 )
+from noviscope.agents.gap_hypothesis import (
+    GapHypothesisRunError,
+    GapHypothesisRunner,
+    GapHypothesisStageRunner,
+    get_gap_hypothesis_runner,
+)
 from noviscope.agents.literature_scout import (
     LITERATURE_SCOUT_AGENT_ID,
     LiteratureScoutStageRunner,
@@ -27,7 +33,11 @@ from noviscope.api.dependencies import get_session
 from noviscope.api.routes import StageCardResponse, get_provider_service, stage_response
 from noviscope.auth.dependencies import get_current_user
 from noviscope.core.json_types import JsonObject
-from noviscope.core.stage_policy import DEMAND_VALIDATOR_AGENT_ID, normalize_stage_output_payload
+from noviscope.core.stage_policy import (
+    DEMAND_VALIDATOR_AGENT_ID,
+    IDEA_GENERATOR_AGENT_ID,
+    normalize_stage_output_payload,
+)
 from noviscope.models.provider import ModelProvider, ProviderKind
 from noviscope.models.quest import StageCard, StageStatus
 from noviscope.models.user import User
@@ -66,12 +76,15 @@ class StageBlock:
 
 def get_stage_runner_registry(
     demand_runner: Annotated[DemandValidationRunner, Depends(get_demand_validation_runner)],
+    gap_runner: Annotated[GapHypothesisRunner, Depends(get_gap_hypothesis_runner)],
     literature_runner: Annotated[LiteratureScoutStageRunner, Depends(get_literature_scout_runner)],
 ) -> StageRunnerRegistry:
     demand_stage_runner = DemandValidationStageRunner(demand_runner)
+    gap_stage_runner = GapHypothesisStageRunner(gap_runner)
     return StageRunnerRegistry(
         runners={
             demand_stage_runner.agent_id: demand_stage_runner,
+            gap_stage_runner.agent_id: gap_stage_runner,
             literature_runner.agent_id: literature_runner,
         }
     )
@@ -157,6 +170,21 @@ def build_literature_dependency_block() -> StageBlock:
     )
 
 
+def build_gap_dependency_block(missing_stage_names: list[str]) -> StageBlock:
+    missing = ", ".join(missing_stage_names)
+    return StageBlock(
+        evidence_payload={
+            "blocking_detail": (
+                f"Complete {missing} before running Gap & hypothesis generator."
+            ),
+            "blocking_reason": "gap_prerequisites_incomplete",
+            "can_run": False,
+            "missing_prerequisites": missing_stage_names,
+        },
+        summary="Gap & hypothesis generator is blocked until prerequisite stages complete.",
+    )
+
+
 def build_runner_block(stage: StageCard) -> StageBlock:
     return StageBlock(
         evidence_payload={
@@ -182,20 +210,29 @@ def apply_stage_block(
     return stage_response(blocked_stage)
 
 
-def build_literature_dependency_block_if_needed(
+def build_dependency_block_if_needed(
     stage: StageCard,
     stages: list[StageCard],
 ) -> StageBlock | None:
-    if stage.agent_id != LITERATURE_SCOUT_AGENT_ID:
-        return None
-    demand_complete = any(
-        workflow_stage.agent_id == DEMAND_VALIDATOR_AGENT_ID
-        and workflow_stage.status == StageStatus.COMPLETE
+    completed_agent_ids = {
+        workflow_stage.agent_id
         for workflow_stage in stages
-    )
-    if demand_complete:
-        return None
-    return build_literature_dependency_block()
+        if workflow_stage.status == StageStatus.COMPLETE
+    }
+    if (
+        stage.agent_id == LITERATURE_SCOUT_AGENT_ID
+        and DEMAND_VALIDATOR_AGENT_ID not in completed_agent_ids
+    ):
+        return build_literature_dependency_block()
+    if stage.agent_id == IDEA_GENERATOR_AGENT_ID:
+        missing_stage_names: list[str] = []
+        if DEMAND_VALIDATOR_AGENT_ID not in completed_agent_ids:
+            missing_stage_names.append("Demand validation")
+        if LITERATURE_SCOUT_AGENT_ID not in completed_agent_ids:
+            missing_stage_names.append("Literature Scout")
+        if missing_stage_names:
+            return build_gap_dependency_block(missing_stage_names)
+    return None
 
 
 def build_runner_provider(
@@ -227,10 +264,8 @@ def run_stage(
             return apply_stage_block(quest_service, stage_id, build_runner_block(stage))
 
         quest = quest_service.get_quest_for_user(stage.quest_id, current_user)
-        dependency_block = build_literature_dependency_block_if_needed(
-            stage,
-            quest_service.list_stage_cards(quest.id),
-        )
+        workflow_stages = quest_service.list_stage_cards(quest.id)
+        dependency_block = build_dependency_block_if_needed(stage, workflow_stages)
         if dependency_block is not None:
             return apply_stage_block(quest_service, stage_id, dependency_block)
 
@@ -247,13 +282,23 @@ def run_stage(
             return apply_stage_block(quest_service, stage_id, provider_or_block)
 
         provider = provider_or_block
-        queued_context = StageRunContext(provider=provider, quest=quest, stage=stage)
+        queued_context = StageRunContext(
+            provider=provider,
+            quest=quest,
+            stage=stage,
+            workflow_stages=tuple(workflow_stages),
+        )
         running_stage = quest_service.update_stage_card(
             stage_id,
             input_payload=runner.build_input_payload(queued_context),
             status=StageStatus.RUNNING,
         )
-        running_context = StageRunContext(provider=provider, quest=quest, stage=running_stage)
+        running_context = StageRunContext(
+            provider=provider,
+            quest=quest,
+            stage=running_stage,
+            workflow_stages=tuple(workflow_stages),
+        )
         result = runner.run(running_context)
         output_payload = normalize_stage_output_payload(
             stage.agent_id,
@@ -271,7 +316,7 @@ def run_stage(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except PermissionError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-    except (DemandValidationRunError, LiteratureScoutRunError) as exc:
+    except (DemandValidationRunError, GapHypothesisRunError, LiteratureScoutRunError) as exc:
         return apply_stage_block(
             quest_service,
             stage_id,

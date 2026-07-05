@@ -2,6 +2,7 @@ import type { StageCard } from "../api/types";
 
 export const demandValidatorAgentId = "demand_validator";
 export const literatureScoutAgentId = "literature_scout";
+export const ideaGeneratorAgentId = "idea_generator";
 
 export type StageRunAvailability = {
   readonly canRun: boolean;
@@ -22,8 +23,19 @@ export function canRunLiteratureScoutStage(stage: StageCard) {
   );
 }
 
+export function canRunIdeaGeneratorStage(stage: StageCard) {
+  return (
+    stage.agent_id === ideaGeneratorAgentId &&
+    (stage.status === "pending" || stage.status === "blocked")
+  );
+}
+
 export function canRunStage(stage: StageCard) {
-  return canRunDemandValidationStage(stage) || canRunLiteratureScoutStage(stage);
+  return (
+    canRunDemandValidationStage(stage) ||
+    canRunLiteratureScoutStage(stage) ||
+    canRunIdeaGeneratorStage(stage)
+  );
 }
 
 function readPayloadString(payload: Record<string, unknown>, key: string) {
@@ -43,6 +55,16 @@ export function getStageRunAvailability(stage: StageCard): StageRunAvailability 
     return {
       canRun: true,
       reason: "Ready after demand validation completes; backend blocks if the prerequisite is missing.",
+    };
+  }
+
+  if (canRunIdeaGeneratorStage(stage)) {
+    return {
+      canRun: true,
+      reason: (
+        "Ready after demand validation and literature scouting complete; human selection is "
+        + "required before experiment design."
+      ),
     };
   }
 
