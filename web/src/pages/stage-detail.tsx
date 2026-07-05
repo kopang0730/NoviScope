@@ -12,10 +12,11 @@ import { StageEditor } from "../components/stage-editor";
 import { StageOutputPanel } from "../components/stage-output-summary";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
+import { useProviderReadinessData } from "../lib/provider-readiness-data";
 import {
-  getLocalizedWorkflowReadinessReason,
-  getWorkflowStageReadiness,
-} from "../lib/workflow-readiness";
+  getLocalizedStageRunGateReason,
+  getStageRunGate,
+} from "../lib/stage-run-gate";
 
 function stageTone(status: StageStatus) {
   if (status === "complete") {
@@ -55,6 +56,7 @@ export function StageDetailPage() {
   const [runError, setRunError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [runningStage, setRunningStage] = useState(false);
+  const providerReadinessData = useProviderReadinessData();
 
   useEffect(() => {
     if (!stageId || !questId || !currentUser) {
@@ -106,7 +108,9 @@ export function StageDetailPage() {
   }, [currentUser, questId, stageId]);
 
   const workflowBackLink = useMemo(() => (questId ? `/?quest=${questId}` : "/"), [questId]);
-  const stageWorkflowReadiness = stage ? getWorkflowStageReadiness(stage, workflowStages) : null;
+  const stageRunGate = stage
+    ? getStageRunGate({ providerReadinessData, stage, stages: workflowStages })
+    : null;
 
   function handleStageChange(nextStage: StageCard) {
     setStage(nextStage);
@@ -170,7 +174,7 @@ export function StageDetailPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {stage ? <Badge tone={stageTone(stage.status)}>{labelFromEnum(stage.status)}</Badge> : null}
-            {stage && stageWorkflowReadiness?.canRun ? (
+            {stage && stageRunGate?.canRun ? (
               <Button loading={runningStage} onClick={() => void handleRunStage()} size="sm">
                 {t("runStage")}
               </Button>
@@ -182,9 +186,9 @@ export function StageDetailPage() {
         </div>
         {loadError ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{loadError}</p> : null}
         {loading ? <p className="mt-4 text-sm text-slate-500">{t("stageDetailLoading")}</p> : null}
-        {stageWorkflowReadiness && !stageWorkflowReadiness.canRun ? (
+        {stageRunGate && !stageRunGate.canRun ? (
           <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            {getLocalizedWorkflowReadinessReason(stageWorkflowReadiness, t)}
+            {getLocalizedStageRunGateReason(stageRunGate, t)}
           </p>
         ) : null}
         {stage ? (
@@ -233,12 +237,12 @@ export function StageDetailPage() {
             )}
           </Card>
 
-          <StageProviderReadinessCard stage={stage} />
+          <StageProviderReadinessCard readinessData={providerReadinessData} stage={stage} />
 
           <StageOutputPanel
             onStageChange={handleStageChange}
             stage={stage}
-            workflowReadiness={stageWorkflowReadiness ?? undefined}
+            stageRunGate={stageRunGate ?? undefined}
           />
 
           {runError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{runError}</p> : null}

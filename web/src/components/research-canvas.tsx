@@ -1,6 +1,8 @@
 import type { Quest, StageCard } from "../api/types";
 import { useI18n, type TranslationKey } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
+import type { ProviderReadinessData } from "../lib/provider-readiness-data";
+import { getStageRunGate } from "../lib/stage-run-gate";
 import { stageTone } from "../lib/status-tones";
 import { getWorkflowStageReadiness } from "../lib/workflow-readiness";
 import { Badge } from "./badge";
@@ -41,10 +43,14 @@ function needsHumanReview(stage: StageCard) {
   return stage.status === "complete" && isHumanGateStage(stage) && stage.human_approved === null;
 }
 
-function findNextActionStage(stages: readonly StageCard[]) {
+function findNextActionStage(
+  stages: readonly StageCard[],
+  providerReadinessData: ProviderReadinessData,
+) {
   return (
     stages.find((stage) => stage.status === "running")
     ?? stages.find(needsHumanReview)
+    ?? stages.find((stage) => getStageRunGate({ providerReadinessData, stage, stages }).canRun)
     ?? stages.find((stage) => getWorkflowStageReadiness(stage, stages).canRun)
     ?? stages.find((stage) => stage.status === "blocked")
     ?? stages.find((stage) => stage.status !== "complete")
@@ -134,19 +140,21 @@ function buildStageDetails(stage: StageCard, t: ReturnType<typeof useI18n>["t"])
 
 export function ResearchCanvas({
   onRunStage,
+  providerReadinessData,
   runningStageId,
   selectedQuest,
   showHeading = true,
   stages,
 }: {
   readonly onRunStage: (stageId: string) => void;
+  readonly providerReadinessData: ProviderReadinessData;
   readonly runningStageId: string | null;
   readonly selectedQuest: Quest;
   readonly showHeading?: boolean;
   readonly stages: readonly StageCard[];
 }) {
   const { t } = useI18n();
-  const nextActionStage = findNextActionStage(stages);
+  const nextActionStage = findNextActionStage(stages, providerReadinessData);
   const completeCount = stages.filter((stage) => stage.status === "complete").length;
   const blockedCount = stages.filter((stage) => stage.status === "blocked").length;
   const reviewCount = stages.filter(needsHumanReview).length;
@@ -219,8 +227,8 @@ export function ResearchCanvas({
               runningStageId={runningStageId}
               selectedQuest={selectedQuest}
               stage={stage}
+              stageRunGate={getStageRunGate({ providerReadinessData, stage, stages })}
               total={stages.length}
-              workflowReadiness={getWorkflowStageReadiness(stage, stages)}
             />
           ))}
         </div>
