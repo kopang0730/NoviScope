@@ -21,6 +21,7 @@ from noviscope.api.dependencies import get_session
 from noviscope.api.routes import StageCardResponse, get_provider_service, stage_response
 from noviscope.auth.dependencies import get_current_user
 from noviscope.core.json_types import JsonObject
+from noviscope.core.stage_policy import normalize_stage_output_payload
 from noviscope.models.provider import ModelProvider
 from noviscope.models.quest import StageCard, StageStatus
 from noviscope.models.user import User
@@ -191,7 +192,7 @@ def run_stage(
         completed_stage = quest_service.update_stage_card(
             stage_id,
             evidence_payload=result.evidence_payload,
-            output_payload=result.output_payload,
+            output_payload=normalize_stage_output_payload(stage.agent_id, result.output_payload),
             summary=result.summary,
             status=StageStatus.COMPLETE,
         )

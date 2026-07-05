@@ -80,12 +80,14 @@ export function StageEditor({
   readonly stage: StageCard;
 }) {
   const [formState, setFormState] = useState<FormState>(() => buildFormState(stage));
+  const [showPayloads, setShowPayloads] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     setFormState(buildFormState(stage));
+    setShowPayloads(false);
     setSubmitError(null);
     setSuccessMessage(null);
   }, [stage]);
@@ -120,7 +122,7 @@ export function StageEditor({
 
   return (
     <Card>
-      <CardHeading description="Update stage status, summary, approval, and payloads." title="Edit Stage" />
+      <CardHeading description="Update stage status, summary, and human review decision." title="Edit Stage" />
       <form className="mt-6 space-y-4" onSubmit={(event) => void handleSubmit(event)}>
         <div className="grid gap-4 lg:grid-cols-2">
           <Select
@@ -166,25 +168,32 @@ export function StageEditor({
           rows={4}
           value={formState.reviewNotes}
         />
-        <div className="grid gap-4 xl:grid-cols-3">
-          <TextArea
-            label="Input Payload"
-            onChange={(event) => setFormState((current) => ({ ...current, inputPayload: event.target.value }))}
-            rows={10}
-            value={formState.inputPayload}
-          />
-          <TextArea
-            label="Output Payload"
-            onChange={(event) => setFormState((current) => ({ ...current, outputPayload: event.target.value }))}
-            rows={10}
-            value={formState.outputPayload}
-          />
-          <TextArea
-            label="Evidence Payload"
-            onChange={(event) => setFormState((current) => ({ ...current, evidencePayload: event.target.value }))}
-            rows={10}
-            value={formState.evidencePayload}
-          />
+        <div>
+          <Button onClick={() => setShowPayloads((current) => !current)} size="sm" type="button" variant="secondary">
+            {showPayloads ? "Hide advanced JSON payloads" : "Show advanced JSON payloads"}
+          </Button>
+          {showPayloads ? (
+            <div className="mt-4 grid gap-4 xl:grid-cols-3">
+              <TextArea
+                label="Input Payload"
+                onChange={(event) => setFormState((current) => ({ ...current, inputPayload: event.target.value }))}
+                rows={10}
+                value={formState.inputPayload}
+              />
+              <TextArea
+                label="Output Payload"
+                onChange={(event) => setFormState((current) => ({ ...current, outputPayload: event.target.value }))}
+                rows={10}
+                value={formState.outputPayload}
+              />
+              <TextArea
+                label="Evidence Payload"
+                onChange={(event) => setFormState((current) => ({ ...current, evidencePayload: event.target.value }))}
+                rows={10}
+                value={formState.evidencePayload}
+              />
+            </div>
+          ) : null}
         </div>
         {submitError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{submitError}</p> : null}
         {successMessage ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{successMessage}</p> : null}

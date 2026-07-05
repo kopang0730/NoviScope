@@ -6,6 +6,7 @@ from noviscope.agents.demand_validation import (
     DemandValidationRunner,
     get_demand_validation_runner,
 )
+from noviscope.core.stage_policy import NO_EXTERNAL_VERIFICATION_RISK
 from noviscope.main import create_app
 
 DEV_ADMIN_HEADERS = {"X-NoviScope-Dev-Admin": "test-dev-admin-token-0123456789abcdef"}
@@ -161,3 +162,33 @@ def test_run_demand_validation_stage_blocks_without_provider(
     assert body["evidence_payload"]["blocking_detail"] == (
         "Configure an active OpenAI-compatible or custom provider before running this stage."
     )
+
+
+def test_update_demand_validation_stage_downgrades_manual_high_confidence(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'stage-update-confidence.db'}")
+
+    with TestClient(app) as client:
+        register_and_login(client, "PATCH-STAGE-HIGH", "patcher@example.com")
+        stage_id = create_quest(client)
+
+        response = client.patch(
+            f"/stages/{stage_id}",
+            json={
+                "output_payload": {
+                    "confidence": "high",
+                    "demand_assessment": "strong",
+                    "raw_response": "model-only response",
+                    "risks": ["Existing risk."],
+                },
+                "summary": "Manual edit attempted high confidence.",
+            },
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["confidence"] == "medium"
+    assert body["output_payload"]["confidence"] == "medium"
+    assert body["output_payload"]["risks"] == ["Existing risk.", NO_EXTERNAL_VERIFICATION_RISK]

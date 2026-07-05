@@ -19,6 +19,11 @@ from noviscope.auth.service import AuthService, DuplicateResourceError
 from noviscope.core.config import get_settings
 from noviscope.core.crypto import SecretBox
 from noviscope.core.json_types import JsonObject
+from noviscope.core.stage_policy import (
+    StageConfidence,
+    normalize_stage_output_payload,
+    stage_confidence,
+)
 from noviscope.models.provider import ModelProvider, ProviderKind, ProviderScope
 from noviscope.models.quest import Quest, QuestStatus, StageCard, StageStatus
 from noviscope.models.user import InviteCode, InviteStatus, User, UserRole
@@ -123,7 +128,7 @@ class StageCardResponse(BaseModel):
     agent_id: str
     title: str
     status: StageStatus
-    confidence: str
+    confidence: StageConfidence
     summary: str
     input_payload: JsonObject
     output_payload: JsonObject
@@ -223,10 +228,13 @@ def provider_response(provider: ModelProvider) -> ProviderResponse:
 
 
 def stage_response(stage: StageCard) -> StageCardResponse:
-    confidence = stage.output_payload.get("confidence")
-    confidence_label = confidence if isinstance(confidence, str) else "unknown"
+    output_payload = normalize_stage_output_payload(stage.agent_id, stage.output_payload)
     return StageCardResponse.model_validate(
-        {**stage.model_dump(), "confidence": confidence_label}
+        {
+            **stage.model_dump(),
+            "confidence": stage_confidence(stage.agent_id, output_payload),
+            "output_payload": output_payload,
+        }
     )
 
 
@@ -478,13 +486,18 @@ def update_stage(
 ) -> StageCardResponse:
     service = QuestService(session)
     try:
-        service.get_stage_card_for_user(stage_id, current_user)
+        existing_stage = service.get_stage_card_for_user(stage_id, current_user)
+        output_payload = (
+            normalize_stage_output_payload(existing_stage.agent_id, request.output_payload)
+            if request.output_payload is not None
+            else None
+        )
         stage = service.update_stage_card(
             stage_id,
             status=request.status,
             summary=request.summary,
             input_payload=request.input_payload,
-            output_payload=request.output_payload,
+            output_payload=output_payload,
             evidence_payload=request.evidence_payload,
             human_approved=request.human_approved,
             review_notes=request.review_notes,

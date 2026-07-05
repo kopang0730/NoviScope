@@ -7,9 +7,8 @@ from pydantic import BaseModel, ConfigDict, SecretStr, ValidationError
 
 from noviscope.agents.stage_runner import StageRunContext, StageRunner, StageRunResult
 from noviscope.core.json_types import JsonObject
+from noviscope.core.stage_policy import DEMAND_VALIDATOR_AGENT_ID, NO_EXTERNAL_VERIFICATION_RISK
 from noviscope.models.provider import ProviderKind
-
-DEMAND_VALIDATOR_AGENT_ID = "demand_validator"
 
 
 class DemandValidationRequest(BaseModel):
@@ -214,11 +213,7 @@ def parse_demand_validation_output(raw_content: str) -> DemandValidationOutput:
             return output.model_copy(
                 update={
                     "confidence": "medium",
-                    "risks": [
-                        *output.risks,
-                        "High confidence was downgraded because no external source "
-                        "verification ran in this MVP stage.",
-                    ],
+                    "risks": [*output.risks, NO_EXTERNAL_VERIFICATION_RISK],
                 }
             )
         return output
