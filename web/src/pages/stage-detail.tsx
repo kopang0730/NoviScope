@@ -10,6 +10,7 @@ import { Card, CardHeading } from "../components/card";
 import { StageProviderReadinessCard } from "../components/stage-provider-readiness";
 import { StageEditor } from "../components/stage-editor";
 import { StageOutputPanel } from "../components/stage-output-summary";
+import { StageReviewGateCard } from "../components/stage-review-gate-card";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
 import { useProviderReadinessData } from "../lib/provider-readiness-data";
@@ -29,16 +30,6 @@ function stageTone(status: StageStatus) {
     return "red";
   }
   return "gray";
-}
-
-function reviewTone(humanApproved: boolean | null) {
-  if (humanApproved === true) {
-    return "green";
-  }
-  if (humanApproved === false) {
-    return "red";
-  }
-  return "amber";
 }
 
 export function StageDetailPage() {
@@ -205,37 +196,7 @@ export function StageDetailPage() {
 
       {stage ? (
         <>
-          <Card>
-            <CardHeading description={t("stageReviewGateDescription")} title={t("stageReviewGateTitle")} />
-            <div className="mt-4 flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-900">{t("stageReviewDecision")}</p>
-                <p className="mt-1 text-sm text-slate-600">
-                  {stage.human_approved === true
-                    ? t("stageReviewApprovedDescription")
-                    : stage.human_approved === false
-                      ? t("stageReviewRejectedDescription")
-                      : t("stageReviewPendingDescription")}
-                </p>
-              </div>
-              <Badge tone={reviewTone(stage.human_approved)}>
-                {stage.human_approved === true
-                  ? t("stageReviewApproved")
-                  : stage.human_approved === false
-                    ? t("stageReviewRejected")
-                    : t("stageReviewPending")}
-              </Badge>
-            </div>
-            {stage.review_notes ? (
-              <p className="mt-3 whitespace-pre-wrap rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                {stage.review_notes}
-              </p>
-            ) : (
-              <p className="mt-3 rounded-lg border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-500">
-                {t("stageReviewNoNotes")}
-              </p>
-            )}
-          </Card>
+          <StageReviewGateCard onStageChange={handleStageChange} stage={stage} />
 
           <StageProviderReadinessCard readinessData={providerReadinessData} stage={stage} />
 

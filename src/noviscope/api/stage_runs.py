@@ -209,6 +209,20 @@ def build_literature_dependency_block() -> StageBlock:
     )
 
 
+def build_demand_review_block(stage_title: str) -> StageBlock:
+    return StageBlock(
+        evidence_payload={
+            "blocking_detail": (
+                f"Approve Demand validation before running {stage_title}. If the demand was "
+                "rejected, revise or rerun Demand validation first."
+            ),
+            "blocking_reason": "demand_validation_review_required",
+            "can_run": False,
+        },
+        summary=f"{stage_title} is blocked until Demand validation is human-approved.",
+    )
+
+
 def build_gap_dependency_block(missing_stage_names: list[str]) -> StageBlock:
     missing = ", ".join(missing_stage_names)
     return StageBlock(
@@ -293,6 +307,7 @@ def build_dependency_block_if_needed(
     stage: StageCard,
     stages: list[StageCard],
 ) -> StageBlock | None:
+    demand_stage = find_workflow_stage(stages, DEMAND_VALIDATOR_AGENT_ID)
     completed_agent_ids = {
         workflow_stage.agent_id
         for workflow_stage in stages
@@ -303,6 +318,9 @@ def build_dependency_block_if_needed(
         and DEMAND_VALIDATOR_AGENT_ID not in completed_agent_ids
     ):
         return build_literature_dependency_block()
+    if stage.agent_id != DEMAND_VALIDATOR_AGENT_ID and demand_stage is not None:
+        if demand_stage.status == StageStatus.COMPLETE and demand_stage.human_approved is not True:
+            return build_demand_review_block(stage.title)
     if stage.agent_id == IDEA_GENERATOR_AGENT_ID:
         missing_stage_names: list[str] = []
         if DEMAND_VALIDATOR_AGENT_ID not in completed_agent_ids:

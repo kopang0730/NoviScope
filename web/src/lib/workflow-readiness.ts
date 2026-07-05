@@ -14,6 +14,7 @@ export type WorkflowReadinessReason =
   | "status_running"
   | "runner_not_implemented"
   | "demand_validation_required"
+  | "demand_review_required"
   | "gap_prerequisites_required"
   | "idea_selection_required"
   | "experiment_setup_required"
@@ -32,6 +33,7 @@ const experimentSetupInputKeys = ["data_path", "code_repository", "environment_n
 
 const readinessReasonKeys: Record<WorkflowReadinessReason, TranslationKey> = {
   demand_validation_required: "workflowReadinessDemandRequired",
+  demand_review_required: "workflowReadinessDemandReviewRequired",
   experiment_planner_required: "workflowReadinessExperimentPlannerRequired",
   experiment_setup_required: "workflowReadinessExperimentSetupRequired",
   gap_prerequisites_required: "workflowReadinessGapRequired",
@@ -68,6 +70,10 @@ function findStage(stages: readonly StageCard[], agentId: string) {
 
 function isComplete(stage: StageCard | undefined) {
   return stage?.status === "complete";
+}
+
+function isHumanApproved(stage: StageCard | undefined) {
+  return stage?.human_approved === true;
 }
 
 function isRunnableStatus(stage: StageCard) {
@@ -159,11 +165,19 @@ export function getWorkflowStageReadiness(
     return readyReadiness();
   }
 
+  const demandStage = findStage(stages, demandValidatorAgentId);
+
   if (stage.agent_id === literatureScoutAgentId) {
-    const demandStage = findStage(stages, demandValidatorAgentId);
-    return isComplete(demandStage)
+    if (!demandStage || !isComplete(demandStage)) {
+      return blockedReadiness("demand_validation_required", demandStage ? [demandStage.title] : []);
+    }
+    return isHumanApproved(demandStage)
       ? readyReadiness()
-      : blockedReadiness("demand_validation_required", demandStage ? [demandStage.title] : []);
+      : blockedReadiness("demand_review_required", [demandStage.title]);
+  }
+
+  if (demandStage && isComplete(demandStage) && !isHumanApproved(demandStage)) {
+    return blockedReadiness("demand_review_required", [demandStage.title]);
   }
 
   if (stage.agent_id === ideaGeneratorAgentId) {

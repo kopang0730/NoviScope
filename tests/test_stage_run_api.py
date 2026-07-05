@@ -466,6 +466,37 @@ def test_run_literature_scout_blocks_until_demand_validation_completes(
     )
 
 
+def test_run_literature_scout_blocks_until_demand_validation_is_approved(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'literature-review-blocked.db'}")
+    app.dependency_overrides[get_demand_validation_runner] = get_fake_runner
+    app.dependency_overrides[get_literature_scout_runner] = get_fake_literature_runner
+
+    with TestClient(app) as client:
+        register_and_login(client, "RUN-LIT-REVIEW-BLOCK", "lit-review@example.com")
+        create_personal_provider(client)
+        _, demand_stage_id, literature_stage_id, _, _, _ = create_quest_with_stages(client)
+        complete_response = client.post(f"/stages/{demand_stage_id}/run", json={})
+        assert complete_response.status_code == 200
+        assert complete_response.json()["status"] == "complete"
+        assert complete_response.json()["human_approved"] is None
+
+        response = client.post(f"/stages/{literature_stage_id}/run", json={})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "blocked"
+    assert body["summary"] == (
+        "Literature scout is blocked until Demand validation is human-approved."
+    )
+    assert body["evidence_payload"]["blocking_reason"] == "demand_validation_review_required"
+    assert body["evidence_payload"]["blocking_detail"] == (
+        "Approve Demand validation before running Literature scout. If the demand was rejected, revise or rerun Demand validation first."
+    )
+
+
 def test_run_literature_scout_completes_without_model_provider(
     tmp_path,
     dev_admin_header_enabled: None,
@@ -523,6 +554,7 @@ def test_run_gap_hypothesis_blocks_until_literature_scout_completes(
         complete_response = client.patch(
             f"/stages/{demand_stage_id}",
             json={
+                "human_approved": True,
                 "output_payload": {"confidence": "medium"},
                 "status": "complete",
                 "summary": "Demand validation complete.",
@@ -565,6 +597,7 @@ def test_run_gap_hypothesis_completes_and_selection_advances_quest(
         demand_complete_response = client.patch(
             f"/stages/{demand_stage_id}",
             json={
+                "human_approved": True,
                 "output_payload": {"confidence": "medium"},
                 "status": "complete",
                 "summary": "Demand validation complete.",

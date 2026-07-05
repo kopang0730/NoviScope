@@ -72,7 +72,7 @@ export function getStageRunAvailability(stage: StageCard): StageRunAvailability 
   if (canRunLiteratureScoutStage(stage)) {
     return {
       canRun: true,
-      reason: "Ready after demand validation completes; backend blocks if the prerequisite is missing.",
+      reason: "Ready after Demand validation completes and is human-approved.",
     };
   }
 
