@@ -64,6 +64,9 @@ class ProviderService:
             return provider
         raise PermissionError(f"Provider {provider_id} is not accessible")
 
+    def decrypt_api_key(self, provider: ModelProvider) -> str:
+        return self.secret_box.decrypt(provider.api_key_ciphertext)
+
     def update_provider(
         self,
         provider_id: str,

@@ -1,7 +1,7 @@
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { getQuest, getQuestStages, updateStage } from "../api/quests";
+import { getQuest, getQuestStages, runStage, updateStage } from "../api/quests";
 import { getErrorMessage } from "../api/client";
 import type { Quest, StageCard, StageStatus } from "../api/types";
 import { useAuth } from "../auth/auth-context";
@@ -10,7 +10,9 @@ import { Button, buttonClassName } from "../components/button";
 import { Card, CardHeading } from "../components/card";
 import { Select, TextArea } from "../components/input";
 import { JsonView } from "../components/json-view";
+import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum, stringifyJson } from "../lib/format";
+import { canRunDemandValidationStage } from "../lib/stages";
 
 const stageStatuses: StageStatus[] = ["pending", "running", "blocked", "complete"];
 
@@ -53,6 +55,7 @@ export function StageDetailPage() {
   const { stageId } = useParams();
   const [searchParams] = useSearchParams();
   const { authReady, currentUser } = useAuth();
+  const { t } = useI18n();
   const questId = searchParams.get("quest");
 
   const [quest, setQuest] = useState<Quest | null>(null);
@@ -62,6 +65,7 @@ export function StageDetailPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [runningStage, setRunningStage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -148,6 +152,27 @@ export function StageDetailPage() {
     }
   }
 
+  async function handleRunStage() {
+    if (!stageId) {
+      return;
+    }
+
+    setRunningStage(true);
+    setSubmitError(null);
+    setSuccessMessage(null);
+
+    try {
+      const updatedStage = await runStage(stageId);
+      setStage(updatedStage);
+      setFormState(buildFormState(updatedStage));
+      setSuccessMessage(updatedStage.status === "blocked" ? t("stageRunBlocked") : t("stageRunComplete"));
+    } catch (error) {
+      setSubmitError(getErrorMessage(error));
+    } finally {
+      setRunningStage(false);
+    }
+  }
+
   if (!questId) {
     return (
       <Card>
@@ -179,6 +204,11 @@ export function StageDetailPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {stage ? <Badge tone={stageTone(stage.status)}>{labelFromEnum(stage.status)}</Badge> : null}
+            {stage && canRunDemandValidationStage(stage) ? (
+              <Button loading={runningStage} onClick={() => void handleRunStage()} size="sm">
+                {t("runDemandValidation")}
+              </Button>
+            ) : null}
             <Link className={buttonClassName({ variant: "secondary", size: "sm" })} to={workflowBackLink}>
               Back to Workflow
             </Link>

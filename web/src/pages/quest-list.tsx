@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { getQuest, getQuestStages, getQuests } from "../api/quests";
+import { getQuest, getQuestStages, getQuests, runStage } from "../api/quests";
 import { getErrorMessage } from "../api/client";
 import type { Quest, QuestStatus, StageCard, StageStatus } from "../api/types";
 import { useAuth } from "../auth/auth-context";
 import { Badge } from "../components/badge";
-import { buttonClassName } from "../components/button";
+import { Button, buttonClassName } from "../components/button";
 import { Card, CardHeading } from "../components/card";
 import { Input, Select } from "../components/input";
 import { MobileStack, Table, TableCell, TableHead } from "../components/table";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
+import { canRunDemandValidationStage } from "../lib/stages";
 
 function questTone(status: QuestStatus) {
   if (status === "complete") {
@@ -72,6 +73,8 @@ export function QuestListPage() {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [selectedQuest, setSelectedQuest] = useState<Quest | null>(null);
   const [stages, setStages] = useState<StageCard[]>([]);
+  const [runningStageId, setRunningStageId] = useState<string | null>(null);
+  const [stageRunError, setStageRunError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<QuestStatus | "all">("all");
 
@@ -129,6 +132,7 @@ export function QuestListPage() {
       setSelectedQuest(null);
       setStages([]);
       setDetailError(null);
+      setStageRunError(null);
       setDetailLoading(false);
       return;
     }
@@ -136,6 +140,7 @@ export function QuestListPage() {
     let active = true;
     setDetailLoading(true);
     setDetailError(null);
+    setStageRunError(null);
 
     void Promise.all([getQuest(selectedQuestId), getQuestStages(selectedQuestId)])
       .then(([quest, questStages]) => {
@@ -163,6 +168,22 @@ export function QuestListPage() {
       active = false;
     };
   }, [currentUser, selectedQuestId]);
+
+  async function handleRunStage(stageId: string) {
+    setRunningStageId(stageId);
+    setStageRunError(null);
+
+    try {
+      const updatedStage = await runStage(stageId);
+      setStages((currentStages) =>
+        currentStages.map((stage) => (stage.id === updatedStage.id ? updatedStage : stage)),
+      );
+    } catch (error) {
+      setStageRunError(getErrorMessage(error));
+    } finally {
+      setRunningStageId(null);
+    }
+  }
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
@@ -270,6 +291,7 @@ export function QuestListPage() {
         <CardHeading description={t("workflowDescription")} title={t("workflowTitle")} />
         {!selectedQuestId ? <p className="mt-4 text-sm text-slate-500">{t("selectQuestForStages")}</p> : null}
         {detailError ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{detailError}</p> : null}
+        {stageRunError ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{stageRunError}</p> : null}
         {detailLoading ? <p className="mt-4 text-sm text-slate-500">{t("loadingQuestDetail")}</p> : null}
         {selectedQuest ? (
           <div className="mt-6 space-y-5">
@@ -311,6 +333,11 @@ export function QuestListPage() {
                           </div>
                           <div className="flex items-center gap-2">
                             <Badge tone={stageTone(stage.status)}>{labelFromEnum(stage.status)}</Badge>
+                            {canRunDemandValidationStage(stage) ? (
+                              <Button loading={runningStageId === stage.id} onClick={() => void handleRunStage(stage.id)} size="sm">
+                                {t("runStage")}
+                              </Button>
+                            ) : null}
                             <Link className={buttonClassName({ size: "sm", variant: "secondary" })} to={`/stages/${stage.id}?quest=${selectedQuest.id}`}>
                               {t("open")}
                             </Link>
