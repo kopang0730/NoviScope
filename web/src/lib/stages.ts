@@ -4,6 +4,7 @@ export const demandValidatorAgentId = "demand_validator";
 export const literatureScoutAgentId = "literature_scout";
 export const ideaGeneratorAgentId = "idea_generator";
 export const experimentPlannerAgentId = "experiment_planner";
+export const paperMeetingWriterAgentId = "paper_meeting_writer";
 
 export type StageRunAvailability = {
   readonly canRun: boolean;
@@ -38,12 +39,20 @@ export function canRunExperimentPlannerStage(stage: StageCard) {
   );
 }
 
+export function canRunPaperMeetingWriterStage(stage: StageCard) {
+  return (
+    stage.agent_id === paperMeetingWriterAgentId &&
+    (stage.status === "pending" || stage.status === "blocked")
+  );
+}
+
 export function canRunStage(stage: StageCard) {
   return (
     canRunDemandValidationStage(stage) ||
     canRunLiteratureScoutStage(stage) ||
     canRunIdeaGeneratorStage(stage) ||
-    canRunExperimentPlannerStage(stage)
+    canRunExperimentPlannerStage(stage) ||
+    canRunPaperMeetingWriterStage(stage)
   );
 }
 
@@ -84,6 +93,16 @@ export function getStageRunAvailability(stage: StageCard): StageRunAvailability 
       reason:
         detail ||
         "Ready after a human-approved idea plus data path, code repository, and environment notes.",
+    };
+  }
+
+  if (canRunPaperMeetingWriterStage(stage)) {
+    const detail = readPayloadString(stage.evidence_payload, "blocking_detail");
+    return {
+      canRun: true,
+      reason:
+        detail ||
+        "Ready after Experiment Planner completes; generated drafts remain review-only.",
     };
   }
 

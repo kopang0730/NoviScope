@@ -31,6 +31,12 @@ from noviscope.agents.literature_scout import (
     get_literature_scout_runner,
 )
 from noviscope.agents.openalex_client import LiteratureScoutRunError
+from noviscope.agents.paper_meeting_writer import (
+    PaperMeetingWriterRunError,
+    PaperMeetingWriterRunner,
+    PaperMeetingWriterStageRunner,
+    get_paper_meeting_writer_runner,
+)
 from noviscope.agents.stage_runner import (
     ModelProviderCredentials,
     StageRunContext,
@@ -45,6 +51,7 @@ from noviscope.core.stage_policy import (
     DEMAND_VALIDATOR_AGENT_ID,
     EXPERIMENT_PLANNER_AGENT_ID,
     IDEA_GENERATOR_AGENT_ID,
+    PAPER_MEETING_WRITER_AGENT_ID,
     normalize_stage_output_payload,
 )
 from noviscope.models.provider import ModelProvider, ProviderKind
@@ -88,16 +95,19 @@ def get_stage_runner_registry(
     experiment_runner: Annotated[ExperimentPlannerRunner, Depends(get_experiment_planner_runner)],
     gap_runner: Annotated[GapHypothesisRunner, Depends(get_gap_hypothesis_runner)],
     literature_runner: Annotated[LiteratureScoutStageRunner, Depends(get_literature_scout_runner)],
+    paper_runner: Annotated[PaperMeetingWriterRunner, Depends(get_paper_meeting_writer_runner)],
 ) -> StageRunnerRegistry:
     demand_stage_runner = DemandValidationStageRunner(demand_runner)
     experiment_stage_runner = ExperimentPlannerStageRunner(experiment_runner)
     gap_stage_runner = GapHypothesisStageRunner(gap_runner)
+    paper_stage_runner = PaperMeetingWriterStageRunner(paper_runner)
     return StageRunnerRegistry(
         runners={
             demand_stage_runner.agent_id: demand_stage_runner,
             experiment_stage_runner.agent_id: experiment_stage_runner,
             gap_stage_runner.agent_id: gap_stage_runner,
             literature_runner.agent_id: literature_runner,
+            paper_stage_runner.agent_id: paper_stage_runner,
         }
     )
 
@@ -226,6 +236,17 @@ def build_experiment_setup_block(missing_inputs: list[str]) -> StageBlock:
     )
 
 
+def build_paper_dependency_block() -> StageBlock:
+    return StageBlock(
+        evidence_payload={
+            "blocking_detail": "Complete Experiment Planner before generating paper artifacts.",
+            "blocking_reason": "paper_prerequisites_incomplete",
+            "can_run": False,
+        },
+        summary="Paper & Meeting Writer is blocked until Experiment Planner completes.",
+    )
+
+
 def build_runner_block(stage: StageCard) -> StageBlock:
     return StageBlock(
         evidence_payload={
@@ -284,6 +305,10 @@ def build_dependency_block_if_needed(
         missing_inputs = missing_experiment_setup_inputs(stage.input_payload)
         if missing_inputs:
             return build_experiment_setup_block(missing_inputs)
+    if stage.agent_id == PAPER_MEETING_WRITER_AGENT_ID:
+        experiment_stage = find_workflow_stage(stages, EXPERIMENT_PLANNER_AGENT_ID)
+        if experiment_stage is None or experiment_stage.status != StageStatus.COMPLETE:
+            return build_paper_dependency_block()
     return None
 
 
@@ -380,6 +405,7 @@ def run_stage(
         ExperimentPlannerRunError,
         GapHypothesisRunError,
         LiteratureScoutRunError,
+        PaperMeetingWriterRunError,
     ) as exc:
         return apply_stage_block(
             quest_service,
