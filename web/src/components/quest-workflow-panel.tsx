@@ -35,7 +35,17 @@ export function QuestWorkflowPanel({
 
   return (
     <Card className="min-w-0">
-      <CardHeading description={t("workflowDescription")} title={t("workflowTitle")} />
+      <CardHeading
+        action={
+          selectedQuestId ? (
+            <Link className={buttonClassName({ size: "sm", variant: "secondary" })} to={`/canvas?quest=${selectedQuestId}`}>
+              {t("openFullCanvas")}
+            </Link>
+          ) : null
+        }
+        description={t("workflowDescription")}
+        title={t("workflowTitle")}
+      />
       {!selectedQuestId ? <p className="mt-4 text-sm text-slate-500">{t("selectQuestForStages")}</p> : null}
       {detailError ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{detailError}</p> : null}
       {stageRunError ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{stageRunError}</p> : null}
