@@ -4,6 +4,7 @@ import { useI18n } from "../i18n/i18n-context";
 import { labelFromEnum } from "../lib/format";
 import { demandValidatorAgentId } from "../lib/stages";
 import { Badge } from "./badge";
+import { DemandSourceReviewForm } from "./demand-source-review-form";
 
 type DemandValidationView = {
   readonly assessment: string;
@@ -85,7 +86,13 @@ function DetailBlock({
   );
 }
 
-export function DemandValidationOutput({ stage }: { readonly stage: StageCard }) {
+export function DemandValidationOutput({
+  onStageChange,
+  stage,
+}: {
+  readonly onStageChange?: (stage: StageCard) => void;
+  readonly stage: StageCard;
+}) {
   const { t } = useI18n();
   const demandValidation = buildDemandValidationView(stage);
 
@@ -153,6 +160,7 @@ export function DemandValidationOutput({ stage }: { readonly stage: StageCard })
         <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">{t("nextStep")}</p>
         <p className="mt-2 text-sm text-teal-900">{demandValidation.nextStep || t("notAvailable")}</p>
       </div>
+      <DemandSourceReviewForm onStageChange={onStageChange} stage={stage} />
     </>
   );
 }
