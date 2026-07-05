@@ -257,7 +257,24 @@ function readInitialLanguage(): Language {
   if (typeof window === "undefined") {
     return "zh";
   }
-  return window.localStorage.getItem(languageStorageKey) === "en" ? "en" : "zh";
+
+  try {
+    return window.localStorage.getItem(languageStorageKey) === "en" ? "en" : "zh";
+  } catch {
+    return "zh";
+  }
+}
+
+function persistLanguagePreference(language: Language) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(languageStorageKey, language);
+  } catch {
+    return;
+  }
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {
@@ -268,7 +285,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    window.localStorage.setItem(languageStorageKey, language);
+    persistLanguagePreference(language);
     document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
   }, [language]);
 
