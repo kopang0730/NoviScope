@@ -102,7 +102,7 @@ export function getStageRunAvailability(stage: StageCard): StageRunAvailability 
       canRun: true,
       reason:
         detail ||
-        "Ready after Experiment Planner completes; generated drafts remain review-only.",
+        "Ready after Experiment Planner completes and is human-approved; generated drafts remain review-only.",
     };
   }
 

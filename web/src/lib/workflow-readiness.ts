@@ -18,7 +18,8 @@ export type WorkflowReadinessReason =
   | "gap_prerequisites_required"
   | "idea_selection_required"
   | "experiment_setup_required"
-  | "experiment_planner_required";
+  | "experiment_planner_required"
+  | "experiment_review_required";
 
 export type WorkflowStageReadiness = {
   readonly blockingStageTitles: readonly string[];
@@ -35,6 +36,7 @@ const readinessReasonKeys: Record<WorkflowReadinessReason, TranslationKey> = {
   demand_validation_required: "workflowReadinessDemandRequired",
   demand_review_required: "workflowReadinessDemandReviewRequired",
   experiment_planner_required: "workflowReadinessExperimentPlannerRequired",
+  experiment_review_required: "workflowReadinessExperimentReviewRequired",
   experiment_setup_required: "workflowReadinessExperimentSetupRequired",
   gap_prerequisites_required: "workflowReadinessGapRequired",
   idea_selection_required: "workflowReadinessIdeaSelectionRequired",
@@ -204,9 +206,12 @@ export function getWorkflowStageReadiness(
 
   if (stage.agent_id === paperMeetingWriterAgentId) {
     const experimentStage = findStage(stages, experimentPlannerAgentId);
-    return isComplete(experimentStage)
+    if (!experimentStage || !isComplete(experimentStage)) {
+      return blockedReadiness("experiment_planner_required", experimentStage ? [experimentStage.title] : []);
+    }
+    return isHumanApproved(experimentStage)
       ? readyReadiness()
-      : blockedReadiness("experiment_planner_required", experimentStage ? [experimentStage.title] : []);
+      : blockedReadiness("experiment_review_required", [experimentStage.title]);
   }
 
   return unavailableReadiness(stage);
