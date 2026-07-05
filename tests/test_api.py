@@ -685,6 +685,22 @@ def test_stage_flow_endpoints_record_review_payloads(dev_admin_header_enabled: N
         assert body["evidence_payload"] == {"sources": ["enterprise-demand-note"]}
         assert body["human_approved"] is True
 
+        summary_only_response = client.patch(
+            f"/stages/{stage_id}",
+            json={"summary": "Summary edited without changing review decision."},
+        )
+        assert summary_only_response.status_code == 200
+        assert summary_only_response.json()["human_approved"] is True
+
+        clear_review_response = client.patch(
+            f"/stages/{stage_id}",
+            json={"human_approved": None, "review_notes": "Reset for another human review."},
+        )
+        assert clear_review_response.status_code == 200
+        clear_body = clear_review_response.json()
+        assert clear_body["human_approved"] is None
+        assert clear_body["review_notes"] == "Reset for another human review."
+
 
 def test_stage_endpoint_rejects_invalid_transition(dev_admin_header_enabled: None):
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { updateStage } from "../api/quests";
 import { getErrorMessage } from "../api/client";
 import type { StageCard, StageStatus } from "../api/types";
+import { useI18n } from "../i18n/i18n-context";
 import { labelFromEnum, stringifyJson } from "../lib/format";
 import { Button } from "./button";
 import { Card, CardHeading } from "./card";
@@ -79,28 +80,32 @@ export function StageEditor({
   readonly onStageChange: (stage: StageCard) => void;
   readonly stage: StageCard;
 }) {
+  const { t } = useI18n();
   const [formState, setFormState] = useState<FormState>(() => buildFormState(stage));
   const [showPayloads, setShowPayloads] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [stageSaved, setStageSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     setFormState(buildFormState(stage));
     setShowPayloads(false);
     setSubmitError(null);
-    setSuccessMessage(null);
   }, [stage]);
+
+  useEffect(() => {
+    setStageSaved(false);
+  }, [stage.id]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
     setSubmitError(null);
-    setSuccessMessage(null);
+    setStageSaved(false);
 
     try {
       const humanApproved =
-        formState.humanApproved === "pending_review" ? undefined : formState.humanApproved === "approved";
+        formState.humanApproved === "pending_review" ? null : formState.humanApproved === "approved";
       const updatedStage = await updateStage(stage.id, {
         evidence_payload: parseJsonRecord(formState.evidencePayload),
         human_approved: humanApproved,
@@ -112,7 +117,7 @@ export function StageEditor({
       });
 
       onStageChange(updatedStage);
-      setSuccessMessage("Stage updated successfully.");
+      setStageSaved(true);
     } catch (error) {
       setSubmitError(getErrorMessage(error));
     } finally {
@@ -122,11 +127,11 @@ export function StageEditor({
 
   return (
     <Card>
-      <CardHeading description="Update stage status, summary, and human review decision." title="Edit Stage" />
+      <CardHeading description={t("stageEditorDescription")} title={t("stageEditorTitle")} />
       <form className="mt-6 space-y-4" onSubmit={(event) => void handleSubmit(event)}>
         <div className="grid gap-4 lg:grid-cols-2">
           <Select
-            label="Status"
+            label={t("stageStatus")}
             onChange={(event) => setFormState((current) => ({ ...current, status: parseStageStatus(event.target.value) }))}
             value={formState.status}
           >
@@ -139,10 +144,10 @@ export function StageEditor({
           <Select
             hint={
               formState.humanApproved === "pending_review"
-                ? "This stage has not been reviewed yet. Choose Approved or Rejected to record a decision."
-                : "You can change the current decision, but the API does not support clearing it back to no decision."
+                ? t("stageReviewPendingHint")
+                : t("stageReviewDecisionHint")
             }
-            label="Human Approval"
+            label={t("stageHumanApproval")}
             onChange={(event) =>
               setFormState((current) => ({
                 ...current,
@@ -151,43 +156,43 @@ export function StageEditor({
             }
             value={formState.humanApproved}
           >
-            {formState.humanApproved === "pending_review" ? <option value="pending_review">Not yet reviewed</option> : null}
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
+            <option value="pending_review">{t("stageReviewPending")}</option>
+            <option value="approved">{t("stageReviewApproved")}</option>
+            <option value="rejected">{t("stageReviewRejected")}</option>
           </Select>
         </div>
         <TextArea
-          label="Summary"
+          label={t("stageSummary")}
           onChange={(event) => setFormState((current) => ({ ...current, summary: event.target.value }))}
           rows={5}
           value={formState.summary}
         />
         <TextArea
-          label="Review Notes"
+          label={t("reviewNotes")}
           onChange={(event) => setFormState((current) => ({ ...current, reviewNotes: event.target.value }))}
           rows={4}
           value={formState.reviewNotes}
         />
         <div>
           <Button onClick={() => setShowPayloads((current) => !current)} size="sm" type="button" variant="secondary">
-            {showPayloads ? "Hide advanced JSON payloads" : "Show advanced JSON payloads"}
+            {showPayloads ? t("stageHideAdvancedPayloads") : t("stageShowAdvancedPayloads")}
           </Button>
           {showPayloads ? (
             <div className="mt-4 grid gap-4 xl:grid-cols-3">
               <TextArea
-                label="Input Payload"
+                label={t("stageInputPayload")}
                 onChange={(event) => setFormState((current) => ({ ...current, inputPayload: event.target.value }))}
                 rows={10}
                 value={formState.inputPayload}
               />
               <TextArea
-                label="Output Payload"
+                label={t("stageOutputPayload")}
                 onChange={(event) => setFormState((current) => ({ ...current, outputPayload: event.target.value }))}
                 rows={10}
                 value={formState.outputPayload}
               />
               <TextArea
-                label="Evidence Payload"
+                label={t("stageEvidencePayload")}
                 onChange={(event) => setFormState((current) => ({ ...current, evidencePayload: event.target.value }))}
                 rows={10}
                 value={formState.evidencePayload}
@@ -196,9 +201,13 @@ export function StageEditor({
           ) : null}
         </div>
         {submitError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{submitError}</p> : null}
-        {successMessage ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{successMessage}</p> : null}
+        {stageSaved ? (
+          <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+            {t("stageUpdatedSuccessfully")}
+          </p>
+        ) : null}
         <Button loading={submitting} type="submit">
-          Save Stage
+          {t("stageSave")}
         </Button>
       </form>
     </Card>
