@@ -84,8 +84,13 @@ def get_admin_or_dev_header(
     value: Annotated[str | None, Header(alias="X-NoviScope-Dev-Admin")] = None,
 ) -> User | None:
     settings = get_settings()
+    if current_user is not None:
+        if current_user.role != UserRole.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin access required",
+            )
+        return current_user
     if settings.dev_admin_header_enabled and value == "true":
         return None
-    if current_user is None or current_user.role != UserRole.ADMIN:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
-    return current_user
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")

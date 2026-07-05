@@ -213,6 +213,19 @@ def test_invite_registration_login_and_me_flow():
         assert client.get("/auth/me").status_code == 401
 
 
+def test_logged_in_member_cannot_use_dev_admin_header_for_invites():
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        register_and_login(client, "MEMBER-INVITE", "member@example.com")
+
+        response = client.post(
+            "/admin/invites",
+            json={"code": "SECOND-INVITE", "max_uses": 1},
+            headers={"X-NoviScope-Dev-Admin": "true"},
+        )
+
+        assert response.status_code == 403
+
+
 def test_protected_quest_create_requires_login():
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
         response = client.post(
