@@ -367,13 +367,16 @@ python -m ruff check .
 Run API locally:
 
 ```bash
+NOVISCOPE_SESSION_COOKIE_SECURE=false \
 uvicorn noviscope.main:app --reload
 ```
 
 Use a custom SQLite database path:
 
 ```bash
-NOVISCOPE_DATABASE_URL=sqlite:///./noviscope.db uvicorn noviscope.main:app --reload
+NOVISCOPE_DATABASE_URL=sqlite:///./noviscope.db \
+NOVISCOPE_SESSION_COOKIE_SECURE=false \
+uvicorn noviscope.main:app --reload
 ```
 
 Run the web app locally:

@@ -15,7 +15,7 @@ from noviscope.auth.dependencies import (
     get_current_user,
     set_session_cookie,
 )
-from noviscope.auth.service import AuthService
+from noviscope.auth.service import AuthService, DuplicateResourceError
 from noviscope.core.config import get_settings
 from noviscope.core.crypto import SecretBox
 from noviscope.models.provider import ModelProvider, ProviderKind, ProviderScope
@@ -27,6 +27,7 @@ from noviscope.quests.service import QuestService
 router = APIRouter()
 
 NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+LoginPasswordStr = Annotated[str, StringConstraints(min_length=1)]
 PasswordStr = Annotated[str, StringConstraints(min_length=8)]
 
 
@@ -67,10 +68,17 @@ class RegisterRequest(BaseModel):
     def validate_email(cls, value: str) -> str:
         return normalize_email(value)
 
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Password must contain a non-whitespace character")
+        return value
+
 
 class LoginRequest(BaseModel):
     email: NonEmptyStr
-    password: NonEmptyStr
+    password: LoginPasswordStr
 
     @field_validator("email")
     @classmethod
@@ -248,6 +256,8 @@ def register_user(
             display_name=request.display_name,
             password=request.password,
         )
+    except DuplicateResourceError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return user_response(user)
@@ -285,12 +295,15 @@ def create_invite(
     current_admin: Annotated[User | None, Depends(get_admin_or_dev_header)],
 ) -> InviteResponse:
     admin_id = current_admin.id if current_admin is not None else None
-    invite = AuthService(session).create_invite(
-        code=request.code,
-        created_by_user_id=admin_id,
-        max_uses=request.max_uses,
-        expires_at=request.expires_at.isoformat() if request.expires_at is not None else None,
-    )
+    try:
+        invite = AuthService(session).create_invite(
+            code=request.code,
+            created_by_user_id=admin_id,
+            max_uses=request.max_uses,
+            expires_at=request.expires_at.isoformat() if request.expires_at is not None else None,
+        )
+    except DuplicateResourceError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return invite_response(invite)
 
 

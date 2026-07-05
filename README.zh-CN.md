@@ -335,13 +335,16 @@ python -m ruff check .
 本地启动 API：
 
 ```bash
+NOVISCOPE_SESSION_COOKIE_SECURE=false \
 uvicorn noviscope.main:app --reload
 ```
 
 指定 SQLite 数据库路径：
 
 ```bash
-NOVISCOPE_DATABASE_URL=sqlite:///./noviscope.db uvicorn noviscope.main:app --reload
+NOVISCOPE_DATABASE_URL=sqlite:///./noviscope.db \
+NOVISCOPE_SESSION_COOKIE_SECURE=false \
+uvicorn noviscope.main:app --reload
 ```
 
 本地启动 Web：

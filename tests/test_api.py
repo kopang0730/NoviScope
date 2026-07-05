@@ -100,6 +100,20 @@ def test_sqlite_startup_allows_placeholder_secrets(monkeypatch):
             {"provider_secret_key": "production-provider-secret"},
             "NOVISCOPE_SESSION_SECRET_KEY",
         ),
+        (
+            {
+                "provider_secret_key": "replace-with-a-long-random-secret",
+                "session_secret_key": "production-session-secret",
+            },
+            "NOVISCOPE_PROVIDER_SECRET_KEY",
+        ),
+        (
+            {
+                "provider_secret_key": "production-provider-secret",
+                "session_secret_key": "replace-with-a-different-long-random-secret",
+            },
+            "NOVISCOPE_SESSION_SECRET_KEY",
+        ),
     ],
 )
 def test_shared_deployment_rejects_placeholder_secrets_before_engine_creation(
@@ -537,6 +551,61 @@ def test_register_rejects_weak_password(dev_admin_header_enabled: None):
         assert response.status_code == 422
 
 
+def test_register_rejects_whitespace_only_password(dev_admin_header_enabled: None):
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        invite_response = client.post(
+            "/admin/invites",
+            json={"code": "WHITESPACE-PASSWORD", "max_uses": 1},
+            headers={"X-NoviScope-Dev-Admin": "true"},
+        )
+        assert invite_response.status_code == 201
+
+        response = client.post(
+            "/auth/register",
+            json={
+                "invite_code": "WHITESPACE-PASSWORD",
+                "email": "student@example.com",
+                "display_name": "Student",
+                "password": "        ",
+            },
+        )
+
+        assert response.status_code == 422
+
+
+def test_login_preserves_intentional_password_whitespace(dev_admin_header_enabled: None):
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        invite_response = client.post(
+            "/admin/invites",
+            json={"code": "SPACED-PASSWORD", "max_uses": 1},
+            headers={"X-NoviScope-Dev-Admin": "true"},
+        )
+        assert invite_response.status_code == 201
+
+        register_response = client.post(
+            "/auth/register",
+            json={
+                "invite_code": "SPACED-PASSWORD",
+                "email": "student@example.com",
+                "display_name": "Student",
+                "password": " student-password ",
+            },
+        )
+        assert register_response.status_code == 201
+
+        stripped_login_response = client.post(
+            "/auth/login",
+            json={"email": "student@example.com", "password": "student-password"},
+        )
+        assert stripped_login_response.status_code == 401
+
+        exact_login_response = client.post(
+            "/auth/login",
+            json={"email": "student@example.com", "password": " student-password "},
+        )
+        assert exact_login_response.status_code == 200
+
+
 def test_create_invite_rejects_invalid_max_uses(dev_admin_header_enabled: None):
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
         response = client.post(
@@ -546,6 +615,83 @@ def test_create_invite_rejects_invalid_max_uses(dev_admin_header_enabled: None):
         )
 
         assert response.status_code == 422
+
+
+def test_create_invite_rejects_duplicate_code_with_conflict(
+    dev_admin_header_enabled: None,
+):
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        first_response = client.post(
+            "/admin/invites",
+            json={"code": "DUPLICATE-INVITE", "max_uses": 1},
+            headers={"X-NoviScope-Dev-Admin": "true"},
+        )
+        second_response = client.post(
+            "/admin/invites",
+            json={"code": "DUPLICATE-INVITE", "max_uses": 1},
+            headers={"X-NoviScope-Dev-Admin": "true"},
+        )
+        recovery_response = client.post(
+            "/admin/invites",
+            json={"code": "DUPLICATE-INVITE-RECOVERY", "max_uses": 1},
+            headers={"X-NoviScope-Dev-Admin": "true"},
+        )
+
+        assert first_response.status_code == 201
+        assert second_response.status_code == 409
+        assert second_response.json()["detail"] == "Invite code already exists"
+        assert recovery_response.status_code == 201
+
+
+def test_register_rejects_duplicate_email_with_conflict_and_rolls_back_invite(
+    dev_admin_header_enabled: None,
+):
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        first_invite_response = client.post(
+            "/admin/invites",
+            json={"code": "DUPLICATE-EMAIL-ONE", "max_uses": 1},
+            headers={"X-NoviScope-Dev-Admin": "true"},
+        )
+        second_invite_response = client.post(
+            "/admin/invites",
+            json={"code": "DUPLICATE-EMAIL-TWO", "max_uses": 1},
+            headers={"X-NoviScope-Dev-Admin": "true"},
+        )
+        assert first_invite_response.status_code == 201
+        assert second_invite_response.status_code == 201
+
+        first_register_response = client.post(
+            "/auth/register",
+            json={
+                "invite_code": "DUPLICATE-EMAIL-ONE",
+                "email": "student@example.com",
+                "display_name": "Student",
+                "password": "student-password",
+            },
+        )
+        duplicate_register_response = client.post(
+            "/auth/register",
+            json={
+                "invite_code": "DUPLICATE-EMAIL-TWO",
+                "email": "student@example.com",
+                "display_name": "Student Again",
+                "password": "student-password",
+            },
+        )
+        rollback_register_response = client.post(
+            "/auth/register",
+            json={
+                "invite_code": "DUPLICATE-EMAIL-TWO",
+                "email": "other@example.com",
+                "display_name": "Other",
+                "password": "student-password",
+            },
+        )
+
+        assert first_register_response.status_code == 201
+        assert duplicate_register_response.status_code == 409
+        assert duplicate_register_response.json()["detail"] == "Email is already registered"
+        assert rollback_register_response.status_code == 201
 
 
 def test_invite_registration_login_and_me_flow(dev_admin_header_enabled: None):

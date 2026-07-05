@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_PROVIDER_SECRET_KEY = "noviscope-dev-secret-key-change-me"
 DEFAULT_SESSION_SECRET_KEY = "noviscope-session-dev-secret-change-me"
+PLACEHOLDER_SECRET_PREFIX = "replace-with-"
 
 
 class Settings(BaseSettings):
@@ -25,6 +26,14 @@ def is_sqlite_database_url(database_url: str) -> bool:
     return database_url.strip().lower().startswith("sqlite")
 
 
+def is_placeholder_secret(secret: str) -> bool:
+    stripped_secret = secret.strip()
+    return stripped_secret in {
+        DEFAULT_PROVIDER_SECRET_KEY,
+        DEFAULT_SESSION_SECRET_KEY,
+    } or stripped_secret.startswith(PLACEHOLDER_SECRET_PREFIX)
+
+
 def validate_deployment_settings(
     settings: Settings,
     database_url: str | None = None,
@@ -34,9 +43,9 @@ def validate_deployment_settings(
         return
 
     placeholder_env_vars: list[str] = []
-    if settings.provider_secret_key == DEFAULT_PROVIDER_SECRET_KEY:
+    if is_placeholder_secret(settings.provider_secret_key):
         placeholder_env_vars.append("NOVISCOPE_PROVIDER_SECRET_KEY")
-    if settings.session_secret_key == DEFAULT_SESSION_SECRET_KEY:
+    if is_placeholder_secret(settings.session_secret_key):
         placeholder_env_vars.append("NOVISCOPE_SESSION_SECRET_KEY")
 
     if placeholder_env_vars:

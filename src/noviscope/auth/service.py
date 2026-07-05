@@ -1,11 +1,16 @@
 from datetime import datetime
 
 from sqlalchemy import case, update
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from noviscope.auth.passwords import hash_password, verify_password
 from noviscope.models.common import utc_now
 from noviscope.models.user import InviteCode, InviteStatus, User, UserRole
+
+
+class DuplicateResourceError(ValueError):
+    pass
 
 
 class AuthService:
@@ -27,7 +32,11 @@ class AuthService:
             expires_at=expires_at,
         )
         self.session.add(invite)
-        self.session.commit()
+        try:
+            self.session.commit()
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise DuplicateResourceError("Invite code already exists") from exc
         self.session.refresh(invite)
         return invite
 
@@ -71,7 +80,11 @@ class AuthService:
             self.session.rollback()
             raise ValueError("Invalid invite code")
         self.session.add(user)
-        self.session.commit()
+        try:
+            self.session.commit()
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise DuplicateResourceError("Email is already registered") from exc
         self.session.refresh(user)
         return user
 
