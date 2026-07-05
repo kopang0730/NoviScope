@@ -70,6 +70,18 @@ def test_agents_endpoint_lists_nine_agents():
         ]
 
 
+def test_agent_assignments_require_authentication(dev_admin_header_enabled: None):
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        get_response = client.get("/agent-assignments")
+        put_response = client.put(
+            "/agent-assignments/demand_validator",
+            json={"provider_id": None},
+        )
+
+        assert get_response.status_code == 401
+        assert put_response.status_code == 401
+
+
 def test_deployment_safe_auth_defaults(monkeypatch):
     monkeypatch.delenv("NOVISCOPE_DEV_ADMIN_HEADER_ENABLED", raising=False)
     monkeypatch.delenv("NOVISCOPE_DEV_ADMIN_TOKEN", raising=False)
@@ -436,6 +448,113 @@ def test_member_cannot_update_or_delete_shared_provider(
         assert get_response.status_code == 200
         assert update_response.status_code == 403
         assert delete_response.status_code == 403
+
+
+def test_admin_can_manage_agent_assignment_with_shared_provider(
+    tmp_path,
+    dev_admin_header_enabled: None,
+):
+    database_url = f"sqlite:///{tmp_path / 'agent-assignment.db'}"
+
+    with TestClient(create_app(database_url=database_url)) as client:
+        register_and_login(client, "ASSIGNMENT-ADMIN", "admin@example.com")
+        promote_user_to_admin(database_url, "admin@example.com")
+        shared = client.post(
+            "/providers",
+            json={
+                "name": "shared-openai",
+                "kind": "openai_compatible",
+                "scope": "shared",
+                "base_url": "https://api.openai.com/v1",
+                "default_model": "gpt-4.1",
+                "api_key": "shared-key",
+            },
+        ).json()
+
+        list_response = client.get("/agent-assignments")
+        assert list_response.status_code == 200
+        assignments = list_response.json()["assignments"]
+        assert len(assignments) == 9
+        assert assignments[0]["agent_id"] == "demand_validator"
+        assert assignments[0]["provider_id"] is None
+
+        update_response = client.put(
+            "/agent-assignments/demand_validator",
+            json={"model_name": "gpt-4.1-mini", "provider_id": shared["id"]},
+        )
+
+        assert update_response.status_code == 200
+        assignment = update_response.json()
+        assert assignment["agent_id"] == "demand_validator"
+        assert assignment["provider_id"] == shared["id"]
+        assert assignment["provider_name"] == "shared-openai"
+        assert assignment["model_name"] == "gpt-4.1-mini"
+        assert assignment["effective_model"] == "gpt-4.1-mini"
+        assert "api_key" not in assignment
+        assert "shared-key" not in str(assignment)
+
+        refreshed_response = client.get("/agent-assignments")
+        assert refreshed_response.status_code == 200
+        demand_assignment = refreshed_response.json()["assignments"][0]
+        assert demand_assignment["provider_id"] == shared["id"]
+        assert demand_assignment["effective_model"] == "gpt-4.1-mini"
+
+        clear_response = client.put(
+            "/agent-assignments/demand_validator",
+            json={"provider_id": None},
+        )
+        assert clear_response.status_code == 200
+        assert clear_response.json()["provider_id"] is None
+
+
+def test_agent_assignment_updates_reject_member_and_personal_provider(
+    tmp_path,
+    dev_admin_header_enabled: None,
+):
+    database_url = f"sqlite:///{tmp_path / 'agent-assignment-access.db'}"
+
+    with TestClient(create_app(database_url=database_url)) as client:
+        register_and_login(client, "ASSIGNMENT-MEMBER", "member@example.com")
+        member_provider = client.post(
+            "/providers",
+            json={
+                "name": "member-openai",
+                "kind": "openai_compatible",
+                "scope": "personal",
+                "base_url": "https://api.openai.com/v1",
+                "default_model": "gpt-4.1",
+                "api_key": "member-key",
+            },
+        ).json()
+        member_response = client.put(
+            "/agent-assignments/demand_validator",
+            json={"provider_id": member_provider["id"]},
+        )
+        assert member_response.status_code == 403
+
+        client.post("/auth/logout")
+        register_and_login(client, "ASSIGNMENT-ADMIN", "admin@example.com")
+        promote_user_to_admin(database_url, "admin@example.com")
+        admin_personal = client.post(
+            "/providers",
+            json={
+                "name": "admin-personal",
+                "kind": "openai_compatible",
+                "scope": "personal",
+                "base_url": "https://api.openai.com/v1",
+                "default_model": "gpt-4.1",
+                "api_key": "admin-key",
+            },
+        ).json()
+        personal_response = client.put(
+            "/agent-assignments/demand_validator",
+            json={"provider_id": admin_personal["id"]},
+        )
+
+        assert personal_response.status_code == 400
+        assert personal_response.json()["detail"] == (
+            "Agent defaults must use a shared provider."
+        )
 
 
 def test_create_quest_endpoint(dev_admin_header_enabled: None):

@@ -1,5 +1,6 @@
 from sqlmodel import Session, select
 
+from noviscope.agents.assignments import AgentAssignmentService
 from noviscope.core.crypto import SecretBox
 from noviscope.models.common import utc_now
 from noviscope.models.provider import ModelProvider, ProviderKind, ProviderScope
@@ -110,6 +111,7 @@ class ProviderService:
 
     def delete_provider(self, provider_id: str) -> None:
         provider = self.get_provider(provider_id)
+        AgentAssignmentService(self.session).clear_provider_assignments(provider_id)
         self.session.delete(provider)
         self.session.commit()
 
