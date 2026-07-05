@@ -9,6 +9,7 @@ import { buttonClassName } from "../components/button";
 import { Card, CardHeading } from "../components/card";
 import { Input, Select } from "../components/input";
 import { MobileStack, Table, TableCell, TableHead } from "../components/table";
+import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
 
 function questTone(status: QuestStatus) {
@@ -55,8 +56,14 @@ const questStatusOptions: Array<QuestStatus | "all"> = [
   "archived",
 ];
 
+function directionSummary(value: string) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized.length > 180 ? `${normalized.slice(0, 180)}...` : normalized;
+}
+
 export function QuestListPage() {
   const { authReady, currentUser } = useAuth();
+  const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const [quests, setQuests] = useState<Quest[]>([]);
   const [questsLoading, setQuestsLoading] = useState(false);
@@ -163,19 +170,19 @@ export function QuestListPage() {
         <CardHeading
           action={
             <Link className={buttonClassName({ variant: "primary" })} to="/quests/new">
-              New Quest
+              {t("navNewQuest")}
             </Link>
           }
-          description="Manage research quests and inspect their current workflow stages."
-          title="Quests"
+          description={t("questListDescription")}
+          title={t("navQuests")}
         />
 
         <div className="mt-6 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
-          <Input label="Search" onChange={(event) => setQuery(event.target.value)} placeholder="Search quests..." value={query} />
-          <Select label="Status" onChange={(event) => setStatusFilter(event.target.value as QuestStatus | "all")} value={statusFilter}>
+          <Input label={t("questSearch")} onChange={(event) => setQuery(event.target.value)} placeholder={t("questSearchPlaceholder")} value={query} />
+          <Select label={t("questStatus")} onChange={(event) => setStatusFilter(event.target.value as QuestStatus | "all")} value={statusFilter}>
             {questStatusOptions.map((status) => (
               <option key={status} value={status}>
-                {status === "all" ? "All statuses" : labelFromEnum(status)}
+                {status === "all" ? t("statusAll") : labelFromEnum(status)}
               </option>
             ))}
           </Select>
@@ -183,14 +190,14 @@ export function QuestListPage() {
 
         {!currentUser && authReady ? (
           <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-            Sign in to load quest data from the API.
+            {t("questSignInPrompt")}
           </p>
         ) : null}
         {questsError ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{questsError}</p> : null}
-        {questsLoading ? <p className="mt-4 text-sm text-slate-500">Loading quests...</p> : null}
+        {questsLoading ? <p className="mt-4 text-sm text-slate-500">{t("loadingQuests")}</p> : null}
         {!questsLoading && filteredQuests.length === 0 ? (
           <p className="mt-4 rounded-lg border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-500">
-            {quests.length === 0 ? "No quests available yet." : "No quests match the current filter."}
+            {quests.length === 0 ? t("noQuestsAvailable") : t("noQuestsMatch")}
           </p>
         ) : null}
 
@@ -199,10 +206,10 @@ export function QuestListPage() {
             <Table className="mt-4">
               <thead>
                 <tr>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Direction</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Updated</TableHead>
+                  <TableHead>{t("tableTitle")}</TableHead>
+                  <TableHead>{t("tableDirection")}</TableHead>
+                  <TableHead>{t("tableStatus")}</TableHead>
+                  <TableHead>{t("updated")}</TableHead>
                 </tr>
               </thead>
               <tbody>
@@ -218,7 +225,7 @@ export function QuestListPage() {
                       <TableCell>
                         <div className="font-medium text-slate-900">{quest.title}</div>
                       </TableCell>
-                      <TableCell className="max-w-[280px] text-sm text-slate-600">{quest.initial_direction}</TableCell>
+                      <TableCell className="max-w-[280px] text-sm text-slate-600">{directionSummary(quest.initial_direction)}</TableCell>
                       <TableCell>
                         <Badge tone={questTone(quest.status)}>{labelFromEnum(quest.status)}</Badge>
                       </TableCell>
@@ -247,8 +254,10 @@ export function QuestListPage() {
                       <p className="font-medium text-slate-900">{quest.title}</p>
                       <Badge tone={questTone(quest.status)}>{labelFromEnum(quest.status)}</Badge>
                     </div>
-                    <p className="mt-2 text-sm text-slate-600">{quest.initial_direction}</p>
-                    <p className="mt-2 text-xs text-slate-500">Updated {formatDateTime(quest.updated_at)}</p>
+                    <p className="mt-2 text-sm text-slate-600">{directionSummary(quest.initial_direction)}</p>
+                    <p className="mt-2 text-xs text-slate-500">
+                      {t("updated")} {formatDateTime(quest.updated_at)}
+                    </p>
                   </button>
                 );
               })}
@@ -258,29 +267,33 @@ export function QuestListPage() {
       </Card>
 
       <Card>
-        <CardHeading description="Workflow stages for the selected quest." title="Workflow" />
-        {!selectedQuestId ? <p className="mt-4 text-sm text-slate-500">Select a quest to inspect its stages.</p> : null}
+        <CardHeading description={t("workflowDescription")} title={t("workflowTitle")} />
+        {!selectedQuestId ? <p className="mt-4 text-sm text-slate-500">{t("selectQuestForStages")}</p> : null}
         {detailError ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{detailError}</p> : null}
-        {detailLoading ? <p className="mt-4 text-sm text-slate-500">Loading quest detail...</p> : null}
+        {detailLoading ? <p className="mt-4 text-sm text-slate-500">{t("loadingQuestDetail")}</p> : null}
         {selectedQuest ? (
           <div className="mt-6 space-y-5">
             <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-base font-semibold text-slate-900">{selectedQuest.title}</h3>
-                  <p className="mt-2 text-sm text-slate-600">{selectedQuest.initial_direction}</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{selectedQuest.initial_direction}</p>
                 </div>
                 <Badge tone={questTone(selectedQuest.status)}>{labelFromEnum(selectedQuest.status)}</Badge>
               </div>
               <div className="grid gap-2 text-xs text-slate-500 sm:grid-cols-2">
-                <p>Created {formatDateTime(selectedQuest.created_at)}</p>
-                <p>Updated {formatDateTime(selectedQuest.updated_at)}</p>
+                <p>
+                  {t("created")} {formatDateTime(selectedQuest.created_at)}
+                </p>
+                <p>
+                  {t("updated")} {formatDateTime(selectedQuest.updated_at)}
+                </p>
               </div>
             </div>
 
             {stages.length === 0 ? (
               <p className="rounded-lg border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-500">
-                No stages found for this quest.
+                {t("noStagesFound")}
               </p>
             ) : (
               <div className="space-y-3">
@@ -299,12 +312,16 @@ export function QuestListPage() {
                           <div className="flex items-center gap-2">
                             <Badge tone={stageTone(stage.status)}>{labelFromEnum(stage.status)}</Badge>
                             <Link className={buttonClassName({ size: "sm", variant: "secondary" })} to={`/stages/${stage.id}?quest=${selectedQuest.id}`}>
-                              Open
+                              {t("open")}
                             </Link>
                           </div>
                         </div>
-                        <p className="mt-3 text-sm text-slate-600">{stage.summary || "No summary yet."}</p>
-                        {stage.review_notes ? <p className="mt-2 text-xs text-slate-500">Review notes: {stage.review_notes}</p> : null}
+                        <p className="mt-3 text-sm text-slate-600">{stage.summary || t("noSummaryYet")}</p>
+                        {stage.review_notes ? (
+                          <p className="mt-2 text-xs text-slate-500">
+                            {t("reviewNotes")}: {stage.review_notes}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                   </div>

@@ -9,6 +9,7 @@ import { Button } from "../components/button";
 import { Card, CardHeading } from "../components/card";
 import { Input, Select } from "../components/input";
 import { MobileStack, Table, TableCell, TableHead } from "../components/table";
+import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
 
 const providerKinds: ProviderKind[] = ["openai_compatible", "anthropic", "custom"];
@@ -37,6 +38,7 @@ function scopeBadgeTone(scope: ProviderScope) {
 
 export function ProviderSettingsPage() {
   const { currentUser } = useAuth();
+  const { t } = useI18n();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingError, setLoadingError] = useState<string | null>(null);
@@ -99,19 +101,19 @@ export function ProviderSettingsPage() {
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
       <Card>
         <CardHeading
-          description="List the providers visible to the current user. Shared providers are admin-managed."
-          title="Providers"
+          description={t("providerListDescription")}
+          title={t("navProviders")}
         />
         {!currentUser ? (
           <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-            Sign in to load provider data. The table and form still render so the UI can be reviewed without API data.
+            {t("providerSignInPrompt")}
           </p>
         ) : null}
         {loadingError ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{loadingError}</p> : null}
-        {loading ? <p className="mt-4 text-sm text-slate-500">Loading providers...</p> : null}
+        {loading ? <p className="mt-4 text-sm text-slate-500">{t("loadingProviderData")}</p> : null}
         {!loading && providers.length === 0 ? (
           <p className="mt-4 rounded-lg border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-500">
-            No providers available yet.
+            {t("noProvidersAvailable")}
           </p>
         ) : null}
         {providers.length > 0 ? (
@@ -119,11 +121,11 @@ export function ProviderSettingsPage() {
             <Table className="mt-4">
               <thead>
                 <tr>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Kind</TableHead>
-                  <TableHead>Model</TableHead>
-                  <TableHead>Scope</TableHead>
-                  <TableHead>Updated</TableHead>
+                  <TableHead>{t("tableName")}</TableHead>
+                  <TableHead>{t("tableKind")}</TableHead>
+                  <TableHead>{t("tableModel")}</TableHead>
+                  <TableHead>{t("tableScope")}</TableHead>
+                  <TableHead>{t("updated")}</TableHead>
                 </tr>
               </thead>
               <tbody>
@@ -136,7 +138,7 @@ export function ProviderSettingsPage() {
                     <TableCell>{labelFromEnum(provider.kind)}</TableCell>
                     <TableCell>{provider.default_model}</TableCell>
                     <TableCell>
-                      <Badge tone={scopeBadgeTone(provider.scope)}>{labelFromEnum(provider.scope)}</Badge>
+                      <Badge tone={scopeBadgeTone(provider.scope)}>{provider.scope === "shared" ? t("scopeShared") : t("scopePersonal")}</Badge>
                     </TableCell>
                     <TableCell>{formatDateTime(provider.updated_at)}</TableCell>
                   </tr>
@@ -151,10 +153,12 @@ export function ProviderSettingsPage() {
                       <p className="font-medium text-slate-900">{provider.name}</p>
                       <p className="mt-1 text-sm text-slate-500">{provider.default_model}</p>
                     </div>
-                    <Badge tone={scopeBadgeTone(provider.scope)}>{labelFromEnum(provider.scope)}</Badge>
+                    <Badge tone={scopeBadgeTone(provider.scope)}>{provider.scope === "shared" ? t("scopeShared") : t("scopePersonal")}</Badge>
                   </div>
                   <p className="mt-3 text-sm text-slate-600">{provider.base_url}</p>
-                  <p className="mt-2 text-xs text-slate-500">Updated {formatDateTime(provider.updated_at)}</p>
+                  <p className="mt-2 text-xs text-slate-500">
+                    {t("updated")} {formatDateTime(provider.updated_at)}
+                  </p>
                 </div>
               ))}
             </MobileStack>
@@ -163,17 +167,17 @@ export function ProviderSettingsPage() {
       </Card>
 
       <Card>
-        <CardHeading description="Create a new provider using the current backend contract." title="Add Provider" />
+        <CardHeading description={t("providerAddDescription")} title={t("providerAddTitle")} />
         <form className="mt-6 space-y-4" onSubmit={(event) => void handleSubmit(event)}>
           <Input
-            label="Name"
+            label={t("providerName")}
             onChange={(event) => setFormState((current) => ({ ...current, name: event.target.value }))}
             placeholder="GPT-4o Lab Shared"
             required
             value={formState.name}
           />
           <Select
-            label="Provider Kind"
+            label={t("providerKind")}
             onChange={(event) => setFormState((current) => ({ ...current, kind: event.target.value as ProviderKind }))}
             value={formState.kind}
           >
@@ -184,21 +188,21 @@ export function ProviderSettingsPage() {
             ))}
           </Select>
           <Input
-            label="Base URL"
+            label={t("providerBaseUrl")}
             onChange={(event) => setFormState((current) => ({ ...current, baseUrl: event.target.value }))}
             required
             type="url"
             value={formState.baseUrl}
           />
           <Input
-            label="Default Model"
+            label={t("providerDefaultModel")}
             onChange={(event) => setFormState((current) => ({ ...current, defaultModel: event.target.value }))}
             placeholder="gpt-4o"
             required
             value={formState.defaultModel}
           />
           <Input
-            label="API Key"
+            label={t("providerApiKey")}
             onChange={(event) => setFormState((current) => ({ ...current, apiKey: event.target.value }))}
             placeholder="sk-..."
             required
@@ -206,19 +210,19 @@ export function ProviderSettingsPage() {
             value={formState.apiKey}
           />
           <Select
-            hint={currentUser?.role === "admin" ? "Admins may create personal or shared providers." : "Members can create personal providers only."}
-            label="Scope"
+            hint={currentUser?.role === "admin" ? t("providerScopeSharedHint") : t("providerScopePersonalHint")}
+            label={t("providerScope")}
             onChange={(event) => setFormState((current) => ({ ...current, scope: event.target.value as ProviderScope }))}
             value={formState.scope}
           >
-            <option value="personal">Personal</option>
+            <option value="personal">{t("scopePersonal")}</option>
             <option disabled={currentUser?.role !== "admin"} value="shared">
-              Shared
+              {t("scopeShared")}
             </option>
           </Select>
           {submitError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{submitError}</p> : null}
           <Button className="w-full" loading={submitting} type="submit">
-            Save Provider
+            {t("providerSave")}
           </Button>
         </form>
       </Card>
