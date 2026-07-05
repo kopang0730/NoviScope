@@ -89,13 +89,6 @@ def build_search_query(title: str, initial_direction: str) -> str:
     return " ".join(f"{title} {initial_direction}".split())[:QUERY_CHARS]
 
 
-def openalex_api_key_value(config: OpenAlexClientConfig) -> str | None:
-    if config.api_key is None:
-        return None
-    api_key = config.api_key.get_secret_value().strip()
-    return api_key or None
-
-
 def extract_query_terms(query: str) -> list[str]:
     terms: list[str] = []
     seen: set[str] = set()
