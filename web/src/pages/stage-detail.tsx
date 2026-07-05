@@ -1,28 +1,17 @@
-import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { getQuest, getQuestStages, updateStage } from "../api/quests";
+import { getQuest, getQuestStages, runStage } from "../api/quests";
 import { getErrorMessage } from "../api/client";
 import type { Quest, StageCard, StageStatus } from "../api/types";
 import { useAuth } from "../auth/auth-context";
 import { Badge } from "../components/badge";
 import { Button, buttonClassName } from "../components/button";
 import { Card, CardHeading } from "../components/card";
-import { Select, TextArea } from "../components/input";
-import { JsonView } from "../components/json-view";
-import { formatDateTime, labelFromEnum, stringifyJson } from "../lib/format";
-
-const stageStatuses: StageStatus[] = ["pending", "running", "blocked", "complete"];
-
-type FormState = {
-  evidencePayload: string;
-  humanApproved: "pending_review" | "approved" | "rejected";
-  inputPayload: string;
-  outputPayload: string;
-  reviewNotes: string;
-  status: StageStatus;
-  summary: string;
-};
+import { StageEditor } from "../components/stage-editor";
+import { StageOutputPanel } from "../components/stage-output-summary";
+import { useI18n } from "../i18n/i18n-context";
+import { formatDateTime, labelFromEnum } from "../lib/format";
+import { canRunDemandValidationStage } from "../lib/stages";
 
 function stageTone(status: StageStatus) {
   if (status === "complete") {
@@ -37,38 +26,25 @@ function stageTone(status: StageStatus) {
   return "gray";
 }
 
-function buildFormState(stage: StageCard): FormState {
-  return {
-    evidencePayload: stringifyJson(stage.evidence_payload),
-    humanApproved: stage.human_approved === null ? "pending_review" : stage.human_approved ? "approved" : "rejected",
-    inputPayload: stringifyJson(stage.input_payload),
-    outputPayload: stringifyJson(stage.output_payload),
-    reviewNotes: stage.review_notes,
-    status: stage.status,
-    summary: stage.summary,
-  };
-}
-
 export function StageDetailPage() {
   const { stageId } = useParams();
   const [searchParams] = useSearchParams();
   const { authReady, currentUser } = useAuth();
+  const { t } = useI18n();
   const questId = searchParams.get("quest");
 
   const [quest, setQuest] = useState<Quest | null>(null);
   const [stage, setStage] = useState<StageCard | null>(null);
-  const [formState, setFormState] = useState<FormState | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [runningStage, setRunningStage] = useState(false);
 
   useEffect(() => {
     if (!stageId || !questId || !currentUser) {
       setQuest(null);
       setStage(null);
-      setFormState(null);
       setLoading(false);
       return;
     }
@@ -90,7 +66,6 @@ export function StageDetailPage() {
 
         setQuest(nextQuest);
         setStage(nextStage);
-        setFormState(buildFormState(nextStage));
       })
       .catch((error) => {
         if (!active) {
@@ -111,40 +86,23 @@ export function StageDetailPage() {
 
   const workflowBackLink = useMemo(() => (questId ? `/?quest=${questId}` : "/"), [questId]);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!stageId || !formState) {
+  async function handleRunStage() {
+    if (!stageId) {
       return;
     }
 
-    setSubmitting(true);
-    setSubmitError(null);
+    setRunningStage(true);
+    setRunError(null);
     setSuccessMessage(null);
 
     try {
-      const inputPayload = JSON.parse(formState.inputPayload) as Record<string, unknown>;
-      const outputPayload = JSON.parse(formState.outputPayload) as Record<string, unknown>;
-      const evidencePayload = JSON.parse(formState.evidencePayload) as Record<string, unknown>;
-      const humanApproved =
-        formState.humanApproved === "pending_review" ? undefined : formState.humanApproved === "approved";
-
-      const updatedStage = await updateStage(stageId, {
-        evidence_payload: evidencePayload,
-        human_approved: humanApproved,
-        input_payload: inputPayload,
-        output_payload: outputPayload,
-        review_notes: formState.reviewNotes,
-        status: formState.status,
-        summary: formState.summary,
-      });
-
+      const updatedStage = await runStage(stageId);
       setStage(updatedStage);
-      setFormState(buildFormState(updatedStage));
-      setSuccessMessage("Stage updated successfully.");
+      setSuccessMessage(updatedStage.status === "blocked" ? t("stageRunBlocked") : t("stageRunComplete"));
     } catch (error) {
-      setSubmitError(getErrorMessage(error));
+      setRunError(getErrorMessage(error));
     } finally {
-      setSubmitting(false);
+      setRunningStage(false);
     }
   }
 
@@ -179,6 +137,11 @@ export function StageDetailPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {stage ? <Badge tone={stageTone(stage.status)}>{labelFromEnum(stage.status)}</Badge> : null}
+            {stage && canRunDemandValidationStage(stage) ? (
+              <Button loading={runningStage} onClick={() => void handleRunStage()} size="sm">
+                {t("runDemandValidation")}
+              </Button>
+            ) : null}
             <Link className={buttonClassName({ variant: "secondary", size: "sm" })} to={workflowBackLink}>
               Back to Workflow
             </Link>
@@ -194,89 +157,14 @@ export function StageDetailPage() {
         ) : null}
       </Card>
 
-      {stage && formState ? (
+      {stage ? (
         <>
-          <Card>
-            <CardHeading description="Update stage status, summary, approval, and payloads." title="Edit Stage" />
-            <form className="mt-6 space-y-4" onSubmit={(event) => void handleSubmit(event)}>
-              <div className="grid gap-4 lg:grid-cols-2">
-                <Select
-                  label="Status"
-                  onChange={(event) => setFormState((current) => (current ? { ...current, status: event.target.value as StageStatus } : current))}
-                  value={formState.status}
-                >
-                  {stageStatuses.map((status) => (
-                    <option key={status} value={status}>
-                      {labelFromEnum(status)}
-                    </option>
-                  ))}
-                </Select>
-                <Select
-                  hint={
-                    formState.humanApproved === "pending_review"
-                      ? "This stage has not been reviewed yet. Choose Approved or Rejected to record a decision."
-                      : "You can change the current decision, but the API does not support clearing it back to no decision."
-                  }
-                  label="Human Approval"
-                  onChange={(event) =>
-                    setFormState((current) =>
-                      current ? { ...current, humanApproved: event.target.value as FormState["humanApproved"] } : current,
-                    )
-                  }
-                  value={formState.humanApproved}
-                >
-                  {formState.humanApproved === "pending_review" ? (
-                    <option value="pending_review">Not yet reviewed</option>
-                  ) : null}
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                </Select>
-              </div>
-              <TextArea
-                label="Summary"
-                onChange={(event) => setFormState((current) => (current ? { ...current, summary: event.target.value } : current))}
-                rows={5}
-                value={formState.summary}
-              />
-              <TextArea
-                label="Review Notes"
-                onChange={(event) => setFormState((current) => (current ? { ...current, reviewNotes: event.target.value } : current))}
-                rows={4}
-                value={formState.reviewNotes}
-              />
-              <div className="grid gap-4 xl:grid-cols-3">
-                <TextArea
-                  label="Input Payload"
-                  onChange={(event) => setFormState((current) => (current ? { ...current, inputPayload: event.target.value } : current))}
-                  rows={10}
-                  value={formState.inputPayload}
-                />
-                <TextArea
-                  label="Output Payload"
-                  onChange={(event) => setFormState((current) => (current ? { ...current, outputPayload: event.target.value } : current))}
-                  rows={10}
-                  value={formState.outputPayload}
-                />
-                <TextArea
-                  label="Evidence Payload"
-                  onChange={(event) => setFormState((current) => (current ? { ...current, evidencePayload: event.target.value } : current))}
-                  rows={10}
-                  value={formState.evidencePayload}
-                />
-              </div>
-              {submitError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{submitError}</p> : null}
-              {successMessage ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{successMessage}</p> : null}
-              <Button loading={submitting} type="submit">
-                Save Stage
-              </Button>
-            </form>
-          </Card>
+          <StageOutputPanel stage={stage} />
 
-          <div className="grid gap-4 xl:grid-cols-3">
-            <JsonView title="Input Payload" value={stage.input_payload} />
-            <JsonView title="Output Payload" value={stage.output_payload} />
-            <JsonView title="Evidence Payload" value={stage.evidence_payload} />
-          </div>
+          {runError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{runError}</p> : null}
+          {successMessage ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{successMessage}</p> : null}
+
+          <StageEditor onStageChange={setStage} stage={stage} />
         </>
       ) : null}
     </div>

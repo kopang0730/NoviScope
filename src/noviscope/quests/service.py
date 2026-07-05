@@ -1,5 +1,6 @@
 from sqlmodel import Session, select
 
+from noviscope.core.json_types import JsonObject
 from noviscope.models.common import utc_now
 from noviscope.models.quest import Quest, QuestStatus, StageCard, StageStatus
 from noviscope.models.user import User, UserRole
@@ -81,9 +82,9 @@ class QuestService:
         *,
         status: StageStatus | None = None,
         summary: str | None = None,
-        input_payload: dict[str, object] | None = None,
-        output_payload: dict[str, object] | None = None,
-        evidence_payload: dict[str, object] | None = None,
+        input_payload: JsonObject | None = None,
+        output_payload: JsonObject | None = None,
+        evidence_payload: JsonObject | None = None,
         human_approved: bool | None = None,
         review_notes: str | None = None,
     ) -> StageCard:

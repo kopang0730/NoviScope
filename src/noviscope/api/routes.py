@@ -18,6 +18,12 @@ from noviscope.auth.dependencies import (
 from noviscope.auth.service import AuthService, DuplicateResourceError
 from noviscope.core.config import get_settings
 from noviscope.core.crypto import SecretBox
+from noviscope.core.json_types import JsonObject
+from noviscope.core.stage_policy import (
+    StageConfidence,
+    normalize_stage_output_payload,
+    stage_confidence,
+)
 from noviscope.models.provider import ModelProvider, ProviderKind, ProviderScope
 from noviscope.models.quest import Quest, QuestStatus, StageCard, StageStatus
 from noviscope.models.user import InviteCode, InviteStatus, User, UserRole
@@ -122,10 +128,11 @@ class StageCardResponse(BaseModel):
     agent_id: str
     title: str
     status: StageStatus
+    confidence: StageConfidence
     summary: str
-    input_payload: dict[str, object]
-    output_payload: dict[str, object]
-    evidence_payload: dict[str, object]
+    input_payload: JsonObject
+    output_payload: JsonObject
+    evidence_payload: JsonObject
     human_approved: bool | None
     review_notes: str
     created_at: str
@@ -166,9 +173,9 @@ class StagesResponse(BaseModel):
 class StageUpdateRequest(BaseModel):
     status: StageStatus | None = None
     summary: str | None = None
-    input_payload: dict[str, object] | None = None
-    output_payload: dict[str, object] | None = None
-    evidence_payload: dict[str, object] | None = None
+    input_payload: JsonObject | None = None
+    output_payload: JsonObject | None = None
+    evidence_payload: JsonObject | None = None
     human_approved: bool | None = None
     review_notes: str | None = None
 
@@ -221,7 +228,14 @@ def provider_response(provider: ModelProvider) -> ProviderResponse:
 
 
 def stage_response(stage: StageCard) -> StageCardResponse:
-    return StageCardResponse.model_validate(stage, from_attributes=True)
+    output_payload = normalize_stage_output_payload(stage.agent_id, stage.output_payload)
+    return StageCardResponse.model_validate(
+        {
+            **stage.model_dump(),
+            "confidence": stage_confidence(stage.agent_id, output_payload),
+            "output_payload": output_payload,
+        }
+    )
 
 
 def quest_response(quest: Quest) -> QuestResponse:
@@ -472,13 +486,18 @@ def update_stage(
 ) -> StageCardResponse:
     service = QuestService(session)
     try:
-        service.get_stage_card_for_user(stage_id, current_user)
+        existing_stage = service.get_stage_card_for_user(stage_id, current_user)
+        output_payload = (
+            normalize_stage_output_payload(existing_stage.agent_id, request.output_payload)
+            if request.output_payload is not None
+            else None
+        )
         stage = service.update_stage_card(
             stage_id,
             status=request.status,
             summary=request.summary,
             input_payload=request.input_payload,
-            output_payload=request.output_payload,
+            output_payload=output_payload,
             evidence_payload=request.evidence_payload,
             human_approved=request.human_approved,
             review_notes=request.review_notes,

@@ -1,48 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { getQuest, getQuestStages, getQuests } from "../api/quests";
+import { getQuest, getQuestStages, getQuests, runStage } from "../api/quests";
 import { getErrorMessage } from "../api/client";
-import type { Quest, QuestStatus, StageCard, StageStatus } from "../api/types";
+import type { Quest, QuestStatus, StageCard } from "../api/types";
 import { useAuth } from "../auth/auth-context";
 import { Badge } from "../components/badge";
 import { buttonClassName } from "../components/button";
 import { Card, CardHeading } from "../components/card";
 import { Input, Select } from "../components/input";
+import { QuestWorkflowPanel } from "../components/quest-workflow-panel";
 import { MobileStack, Table, TableCell, TableHead } from "../components/table";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
-
-function questTone(status: QuestStatus) {
-  if (status === "complete") {
-    return "green";
-  }
-
-  if (status === "full_experiment" || status === "lightweight_experiment" || status === "demand_review") {
-    return "amber";
-  }
-
-  if (status === "idea_selection") {
-    return "teal";
-  }
-
-  return "blue";
-}
-
-function stageTone(status: StageStatus) {
-  if (status === "complete") {
-    return "green";
-  }
-
-  if (status === "running") {
-    return "amber";
-  }
-
-  if (status === "blocked") {
-    return "red";
-  }
-
-  return "gray";
-}
+import { questTone } from "../lib/status-tones";
 
 const questStatusOptions: Array<QuestStatus | "all"> = [
   "all",
@@ -72,6 +42,8 @@ export function QuestListPage() {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [selectedQuest, setSelectedQuest] = useState<Quest | null>(null);
   const [stages, setStages] = useState<StageCard[]>([]);
+  const [runningStageId, setRunningStageId] = useState<string | null>(null);
+  const [stageRunError, setStageRunError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<QuestStatus | "all">("all");
 
@@ -129,6 +101,7 @@ export function QuestListPage() {
       setSelectedQuest(null);
       setStages([]);
       setDetailError(null);
+      setStageRunError(null);
       setDetailLoading(false);
       return;
     }
@@ -136,6 +109,7 @@ export function QuestListPage() {
     let active = true;
     setDetailLoading(true);
     setDetailError(null);
+    setStageRunError(null);
 
     void Promise.all([getQuest(selectedQuestId), getQuestStages(selectedQuestId)])
       .then(([quest, questStages]) => {
@@ -163,6 +137,22 @@ export function QuestListPage() {
       active = false;
     };
   }, [currentUser, selectedQuestId]);
+
+  async function handleRunStage(stageId: string) {
+    setRunningStageId(stageId);
+    setStageRunError(null);
+
+    try {
+      const updatedStage = await runStage(stageId);
+      setStages((currentStages) =>
+        currentStages.map((stage) => (stage.id === updatedStage.id ? updatedStage : stage)),
+      );
+    } catch (error) {
+      setStageRunError(getErrorMessage(error));
+    } finally {
+      setRunningStageId(null);
+    }
+  }
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
@@ -266,71 +256,16 @@ export function QuestListPage() {
         ) : null}
       </Card>
 
-      <Card>
-        <CardHeading description={t("workflowDescription")} title={t("workflowTitle")} />
-        {!selectedQuestId ? <p className="mt-4 text-sm text-slate-500">{t("selectQuestForStages")}</p> : null}
-        {detailError ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{detailError}</p> : null}
-        {detailLoading ? <p className="mt-4 text-sm text-slate-500">{t("loadingQuestDetail")}</p> : null}
-        {selectedQuest ? (
-          <div className="mt-6 space-y-5">
-            <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-base font-semibold text-slate-900">{selectedQuest.title}</h3>
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{selectedQuest.initial_direction}</p>
-                </div>
-                <Badge tone={questTone(selectedQuest.status)}>{labelFromEnum(selectedQuest.status)}</Badge>
-              </div>
-              <div className="grid gap-2 text-xs text-slate-500 sm:grid-cols-2">
-                <p>
-                  {t("created")} {formatDateTime(selectedQuest.created_at)}
-                </p>
-                <p>
-                  {t("updated")} {formatDateTime(selectedQuest.updated_at)}
-                </p>
-              </div>
-            </div>
-
-            {stages.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-500">
-                {t("noStagesFound")}
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {stages.map((stage, index) => (
-                  <div className="rounded-lg border border-slate-200 p-4" key={stage.id}>
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-teal-200 bg-teal-50 text-sm font-semibold text-teal-700">
-                        {index + 1}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div>
-                            <p className="font-medium text-slate-900">{stage.title}</p>
-                            <p className="mt-1 text-sm text-slate-500">{stage.agent_id}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge tone={stageTone(stage.status)}>{labelFromEnum(stage.status)}</Badge>
-                            <Link className={buttonClassName({ size: "sm", variant: "secondary" })} to={`/stages/${stage.id}?quest=${selectedQuest.id}`}>
-                              {t("open")}
-                            </Link>
-                          </div>
-                        </div>
-                        <p className="mt-3 text-sm text-slate-600">{stage.summary || t("noSummaryYet")}</p>
-                        {stage.review_notes ? (
-                          <p className="mt-2 text-xs text-slate-500">
-                            {t("reviewNotes")}: {stage.review_notes}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : null}
-      </Card>
+      <QuestWorkflowPanel
+        detailError={detailError}
+        detailLoading={detailLoading}
+        onRunStage={(stageId) => void handleRunStage(stageId)}
+        runningStageId={runningStageId}
+        selectedQuest={selectedQuest}
+        selectedQuestId={selectedQuestId}
+        stageRunError={stageRunError}
+        stages={stages}
+      />
     </div>
   );
 }

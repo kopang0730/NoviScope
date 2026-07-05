@@ -6,6 +6,7 @@ from sqlmodel import Session
 
 from noviscope.api.dependencies import get_session
 from noviscope.api.routes import router
+from noviscope.api.stage_runs import router as stage_runs_router
 from noviscope.core.config import get_settings, validate_deployment_settings
 from noviscope.db.session import create_db_engine, create_schema, session_generator
 
@@ -23,6 +24,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
 
     app = FastAPI(title=settings.app_name, lifespan=lifespan)
     app.include_router(router)
+    app.include_router(stage_runs_router)
 
     def session_dependency() -> Generator[Session, None, None]:
         yield from session_generator(engine)

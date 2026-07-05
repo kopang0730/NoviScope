@@ -24,6 +24,10 @@ export type UpdateStagePayload = {
   review_notes?: string;
 };
 
+export type RunStagePayload = {
+  provider_id?: string;
+};
+
 export async function getQuests() {
   const response = await apiRequest<QuestsResponse>("/api/quests");
   return response.quests;
@@ -49,5 +53,12 @@ export function updateStage(stageId: string, payload: UpdateStagePayload) {
   return apiRequest<StageCard>(`/api/stages/${stageId}`, {
     body: payload,
     method: "PATCH",
+  });
+}
+
+export function runStage(stageId: string, payload: RunStagePayload = {}) {
+  return apiRequest<StageCard>(`/api/stages/${stageId}/run`, {
+    body: payload,
+    method: "POST",
   });
 }
