@@ -1,5 +1,5 @@
 import type { StageCard, StageStatus } from "../api/types";
-import { canRunStage } from "./stages";
+import { getWorkflowStageReadiness } from "./workflow-readiness";
 
 export type IntakeBrief = {
   readonly dataAssets: string;
@@ -140,7 +140,7 @@ export function summarizeProgress(stages: readonly StageCard[]): ProgressSummary
 export function findNextStage(stages: readonly StageCard[]) {
   return (
     stages.find((stage) => stage.status === "running") ??
-    stages.find((stage) => canRunStage(stage)) ??
+    stages.find((stage) => getWorkflowStageReadiness(stage, stages).canRun) ??
     stages.find((stage) => stage.status === "blocked") ??
     stages.find((stage) => stage.status === "pending") ??
     null

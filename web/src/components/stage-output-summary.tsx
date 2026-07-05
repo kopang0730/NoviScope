@@ -10,6 +10,10 @@ import {
   ideaGeneratorAgentId,
   paperMeetingWriterAgentId,
 } from "../lib/stages";
+import {
+  getLocalizedWorkflowReadinessReason,
+  type WorkflowStageReadiness,
+} from "../lib/workflow-readiness";
 import { Badge } from "./badge";
 import { Card, CardHeading } from "./card";
 import { ExperimentPlannerOutput } from "./experiment-planner-output";
@@ -95,11 +99,20 @@ function DetailBlock({
   );
 }
 
-export function StageRunSummary({ stage }: { readonly stage: StageCard }) {
+export function StageRunSummary({
+  stage,
+  workflowReadiness,
+}: {
+  readonly stage: StageCard;
+  readonly workflowReadiness?: WorkflowStageReadiness;
+}) {
   const { t } = useI18n();
   const availability = getStageRunAvailability(stage);
   const providerName = readString(stage.evidence_payload, "provider_name");
-  const availabilityReason = getLocalizedStageRunReason(stage, t);
+  const availabilityReason = workflowReadiness
+    ? getLocalizedWorkflowReadinessReason(workflowReadiness, t)
+    : getLocalizedStageRunReason(stage, t);
+  const canRun = workflowReadiness?.canRun ?? availability.canRun;
 
   return (
     <div className="mt-3 space-y-2">
@@ -111,7 +124,7 @@ export function StageRunSummary({ stage }: { readonly stage: StageCard }) {
       </div>
       <p className="text-sm text-slate-600">{stage.summary || t("noSummaryYet")}</p>
       <p className="text-xs text-slate-500">
-        {availability.canRun ? t("stageRunReady") : t("stageRunUnavailable")}: {availabilityReason}
+        {canRun ? t("stageRunReady") : t("stageRunUnavailable")}: {availabilityReason}
       </p>
     </div>
   );
@@ -120,19 +133,24 @@ export function StageRunSummary({ stage }: { readonly stage: StageCard }) {
 export function StageOutputPanel({
   onStageChange,
   stage,
+  workflowReadiness,
 }: {
   readonly onStageChange?: (stage: StageCard) => void;
   readonly stage: StageCard;
+  readonly workflowReadiness?: WorkflowStageReadiness;
 }) {
   const { t } = useI18n();
   const demandValidation = buildDemandValidationView(stage);
+  const runStateDescription = workflowReadiness
+    ? getLocalizedWorkflowReadinessReason(workflowReadiness, t)
+    : getStageRunAvailability(stage).reason;
 
   if (stage.agent_id === "literature_scout" && stage.status === "complete") {
     return (
       <Card>
         <CardHeading description={t("literatureScoutDescription")} title={t("literatureScoutResult")} />
         <div className="mt-5">
-          <StageRunSummary stage={stage} />
+          <StageRunSummary stage={stage} workflowReadiness={workflowReadiness} />
         </div>
         <div className="mt-5">
           <LiteratureScoutOutput stage={stage} />
@@ -146,7 +164,7 @@ export function StageOutputPanel({
       <Card>
         <CardHeading description={t("ideaGeneratorDescription")} title={t("ideaGeneratorResult")} />
         <div className="mt-5">
-          <StageRunSummary stage={stage} />
+          <StageRunSummary stage={stage} workflowReadiness={workflowReadiness} />
         </div>
         <div className="mt-5">
           <GapHypothesisOutput onStageChange={onStageChange} stage={stage} />
@@ -160,7 +178,7 @@ export function StageOutputPanel({
       <Card>
         <CardHeading description={t("experimentPlannerDescription")} title={t("experimentPlannerResult")} />
         <div className="mt-5">
-          <StageRunSummary stage={stage} />
+          <StageRunSummary stage={stage} workflowReadiness={workflowReadiness} />
         </div>
         <div className="mt-5">
           <ExperimentPlannerOutput onStageChange={onStageChange} stage={stage} />
@@ -174,7 +192,7 @@ export function StageOutputPanel({
       <Card>
         <CardHeading description={t("paperMeetingDescription")} title={t("paperMeetingResult")} />
         <div className="mt-5">
-          <StageRunSummary stage={stage} />
+          <StageRunSummary stage={stage} workflowReadiness={workflowReadiness} />
         </div>
         <div className="mt-5">
           <PaperMeetingOutput stage={stage} />
@@ -186,8 +204,8 @@ export function StageOutputPanel({
   if (!demandValidation) {
     return (
       <Card>
-        <CardHeading description={getStageRunAvailability(stage).reason} title={t("stageRunState")} />
-        <StageRunSummary stage={stage} />
+        <CardHeading description={runStateDescription} title={t("stageRunState")} />
+        <StageRunSummary stage={stage} workflowReadiness={workflowReadiness} />
       </Card>
     );
   }

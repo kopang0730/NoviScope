@@ -12,7 +12,10 @@ import { StageEditor } from "../components/stage-editor";
 import { StageOutputPanel } from "../components/stage-output-summary";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
-import { canRunStage } from "../lib/stages";
+import {
+  getLocalizedWorkflowReadinessReason,
+  getWorkflowStageReadiness,
+} from "../lib/workflow-readiness";
 
 function stageTone(status: StageStatus) {
   if (status === "complete") {
@@ -46,6 +49,7 @@ export function StageDetailPage() {
 
   const [quest, setQuest] = useState<Quest | null>(null);
   const [stage, setStage] = useState<StageCard | null>(null);
+  const [workflowStages, setWorkflowStages] = useState<readonly StageCard[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
@@ -56,6 +60,7 @@ export function StageDetailPage() {
     if (!stageId || !questId || !currentUser) {
       setQuest(null);
       setStage(null);
+      setWorkflowStages([]);
       setLoading(false);
       return;
     }
@@ -77,6 +82,7 @@ export function StageDetailPage() {
 
         setQuest(nextQuest);
         setStage(nextStage);
+        setWorkflowStages(stages);
       })
       .catch((error) => {
         if (!active) {
@@ -100,6 +106,14 @@ export function StageDetailPage() {
   }, [currentUser, questId, stageId]);
 
   const workflowBackLink = useMemo(() => (questId ? `/?quest=${questId}` : "/"), [questId]);
+  const stageWorkflowReadiness = stage ? getWorkflowStageReadiness(stage, workflowStages) : null;
+
+  function handleStageChange(nextStage: StageCard) {
+    setStage(nextStage);
+    setWorkflowStages((currentStages) =>
+      currentStages.map((candidate) => (candidate.id === nextStage.id ? nextStage : candidate)),
+    );
+  }
 
   async function handleRunStage() {
     if (!stageId) {
@@ -112,7 +126,7 @@ export function StageDetailPage() {
 
     try {
       const updatedStage = await runStage(stageId);
-      setStage(updatedStage);
+      handleStageChange(updatedStage);
       setSuccessMessage(updatedStage.status === "blocked" ? t("stageRunBlocked") : t("stageRunComplete"));
     } catch (error) {
       if (error instanceof Error) {
@@ -156,7 +170,7 @@ export function StageDetailPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {stage ? <Badge tone={stageTone(stage.status)}>{labelFromEnum(stage.status)}</Badge> : null}
-            {stage && canRunStage(stage) ? (
+            {stage && stageWorkflowReadiness?.canRun ? (
               <Button loading={runningStage} onClick={() => void handleRunStage()} size="sm">
                 {t("runStage")}
               </Button>
@@ -168,6 +182,11 @@ export function StageDetailPage() {
         </div>
         {loadError ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{loadError}</p> : null}
         {loading ? <p className="mt-4 text-sm text-slate-500">{t("stageDetailLoading")}</p> : null}
+        {stageWorkflowReadiness && !stageWorkflowReadiness.canRun ? (
+          <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            {getLocalizedWorkflowReadinessReason(stageWorkflowReadiness, t)}
+          </p>
+        ) : null}
         {stage ? (
           <div className="mt-4 grid gap-2 text-xs text-slate-500 sm:grid-cols-2">
             <p>
@@ -216,12 +235,16 @@ export function StageDetailPage() {
 
           <StageProviderReadinessCard stage={stage} />
 
-          <StageOutputPanel onStageChange={setStage} stage={stage} />
+          <StageOutputPanel
+            onStageChange={handleStageChange}
+            stage={stage}
+            workflowReadiness={stageWorkflowReadiness ?? undefined}
+          />
 
           {runError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{runError}</p> : null}
           {successMessage ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{successMessage}</p> : null}
 
-          <StageEditor onStageChange={setStage} stage={stage} />
+          <StageEditor onStageChange={handleStageChange} stage={stage} />
         </>
       ) : null}
     </div>

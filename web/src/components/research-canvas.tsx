@@ -1,8 +1,8 @@
 import type { Quest, StageCard } from "../api/types";
 import { useI18n, type TranslationKey } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
-import { canRunStage } from "../lib/stages";
 import { stageTone } from "../lib/status-tones";
+import { getWorkflowStageReadiness } from "../lib/workflow-readiness";
 import { Badge } from "./badge";
 import { CanvasStageNode, type CanvasDetail } from "./research-canvas-stage-node";
 
@@ -43,10 +43,10 @@ function needsHumanReview(stage: StageCard) {
 
 function findNextActionStage(stages: readonly StageCard[]) {
   return (
-    stages.find((stage) => stage.status === "blocked")
+    stages.find((stage) => stage.status === "running")
     ?? stages.find(needsHumanReview)
-    ?? stages.find((stage) => stage.status === "running")
-    ?? stages.find(canRunStage)
+    ?? stages.find((stage) => getWorkflowStageReadiness(stage, stages).canRun)
+    ?? stages.find((stage) => stage.status === "blocked")
     ?? stages.find((stage) => stage.status !== "complete")
     ?? null
   );
@@ -220,6 +220,7 @@ export function ResearchCanvas({
               selectedQuest={selectedQuest}
               stage={stage}
               total={stages.length}
+              workflowReadiness={getWorkflowStageReadiness(stage, stages)}
             />
           ))}
         </div>
