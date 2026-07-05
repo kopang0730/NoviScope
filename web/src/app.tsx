@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { NavLink, Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./auth/auth-context";
 import { buttonClassName } from "./components/button";
 import { Card } from "./components/card";
@@ -136,6 +136,30 @@ function AuthLayout({ children }: { children: ReactNode }) {
   );
 }
 
+function ProtectedWorkspaceLayout() {
+  const { authReady, currentUser } = useAuth();
+  const location = useLocation();
+
+  if (!authReady) {
+    return (
+      <div className="min-h-screen bg-canvas px-4 py-8 sm:px-6">
+        <div className="mx-auto max-w-xl">
+          <Card>
+            <p className="text-sm font-medium text-slate-900">Checking session</p>
+            <p className="mt-1 text-sm text-slate-600">Confirming access to the NoviScope workspace.</p>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return <Navigate replace state={{ from: `${location.pathname}${location.search}` }} to="/login" />;
+  }
+
+  return <WorkspaceLayout />;
+}
+
 export function App() {
   return (
     <Routes>
@@ -155,7 +179,7 @@ export function App() {
           </AuthLayout>
         }
       />
-      <Route element={<WorkspaceLayout />}>
+      <Route element={<ProtectedWorkspaceLayout />}>
         <Route path="/" element={<QuestListPage />} />
         <Route path="/quests/new" element={<CreateQuestPage />} />
         <Route path="/providers" element={<ProviderSettingsPage />} />

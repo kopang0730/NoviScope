@@ -57,7 +57,11 @@ class QuestService:
         return quest
 
     def list_stage_cards(self, quest_id: str) -> list[StageCard]:
-        statement = select(StageCard).where(StageCard.quest_id == quest_id)
+        statement = (
+            select(StageCard)
+            .where(StageCard.quest_id == quest_id)
+            .order_by(StageCard.created_at, StageCard.id)
+        )
         return list(self.session.exec(statement).all())
 
     def get_stage_card(self, stage_id: str) -> StageCard:

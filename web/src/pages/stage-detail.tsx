@@ -16,7 +16,7 @@ const stageStatuses: StageStatus[] = ["pending", "running", "blocked", "complete
 
 type FormState = {
   evidencePayload: string;
-  humanApproved: "unset" | "approved" | "rejected";
+  humanApproved: "pending_review" | "approved" | "rejected";
   inputPayload: string;
   outputPayload: string;
   reviewNotes: string;
@@ -40,7 +40,7 @@ function stageTone(status: StageStatus) {
 function buildFormState(stage: StageCard): FormState {
   return {
     evidencePayload: stringifyJson(stage.evidence_payload),
-    humanApproved: stage.human_approved === null ? "unset" : stage.human_approved ? "approved" : "rejected",
+    humanApproved: stage.human_approved === null ? "pending_review" : stage.human_approved ? "approved" : "rejected",
     inputPayload: stringifyJson(stage.input_payload),
     outputPayload: stringifyJson(stage.output_payload),
     reviewNotes: stage.review_notes,
@@ -125,11 +125,12 @@ export function StageDetailPage() {
       const inputPayload = JSON.parse(formState.inputPayload) as Record<string, unknown>;
       const outputPayload = JSON.parse(formState.outputPayload) as Record<string, unknown>;
       const evidencePayload = JSON.parse(formState.evidencePayload) as Record<string, unknown>;
+      const humanApproved =
+        formState.humanApproved === "pending_review" ? undefined : formState.humanApproved === "approved";
 
       const updatedStage = await updateStage(stageId, {
         evidence_payload: evidencePayload,
-        human_approved:
-          formState.humanApproved === "unset" ? null : formState.humanApproved === "approved",
+        human_approved: humanApproved,
         input_payload: inputPayload,
         output_payload: outputPayload,
         review_notes: formState.reviewNotes,
@@ -211,6 +212,11 @@ export function StageDetailPage() {
                   ))}
                 </Select>
                 <Select
+                  hint={
+                    formState.humanApproved === "pending_review"
+                      ? "This stage has not been reviewed yet. Choose Approved or Rejected to record a decision."
+                      : "You can change the current decision, but the API does not support clearing it back to no decision."
+                  }
                   label="Human Approval"
                   onChange={(event) =>
                     setFormState((current) =>
@@ -219,7 +225,9 @@ export function StageDetailPage() {
                   }
                   value={formState.humanApproved}
                 >
-                  <option value="unset">Unset</option>
+                  {formState.humanApproved === "pending_review" ? (
+                    <option value="pending_review">Not yet reviewed</option>
+                  ) : null}
                   <option value="approved">Approved</option>
                   <option value="rejected">Rejected</option>
                 </Select>

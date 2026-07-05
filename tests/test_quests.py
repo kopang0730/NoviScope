@@ -60,6 +60,42 @@ def test_create_quest_adds_demand_validation_stage(db_session: Session):
     assert stages[0].title == "Demand validation"
 
 
+def test_list_stage_cards_returns_deterministic_workflow_order(db_session: Session):
+    quest = Quest(title="Ordered workflow", initial_direction="Deterministic stage ordering")
+    db_session.add(quest)
+    db_session.commit()
+
+    for stage in [
+        StageCard(
+            id="stage_c",
+            quest_id=quest.id,
+            agent_id="reporter",
+            title="Late stage",
+            created_at="2026-01-03T00:00:00+00:00",
+        ),
+        StageCard(
+            id="stage_b",
+            quest_id=quest.id,
+            agent_id="planner",
+            title="Earlier stage",
+            created_at="2026-01-01T00:00:00+00:00",
+        ),
+        StageCard(
+            id="stage_a",
+            quest_id=quest.id,
+            agent_id="validator",
+            title="Earliest stage",
+            created_at="2026-01-01T00:00:00+00:00",
+        ),
+    ]:
+        db_session.add(stage)
+    db_session.commit()
+
+    stages = QuestService(db_session).list_stage_cards(quest.id)
+
+    assert [stage.id for stage in stages] == ["stage_a", "stage_b", "stage_c"]
+
+
 def test_update_stage_records_payloads_and_advances_quest_after_review(db_session: Session):
     service = QuestService(db_session)
     quest = service.create_quest(

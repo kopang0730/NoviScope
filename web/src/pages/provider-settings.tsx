@@ -145,7 +145,7 @@ export function ProviderSettingsPage() {
             </Table>
             <MobileStack>
               {providers.map((provider) => (
-                <Card className="p-4" key={provider.id}>
+                <div className="rounded-lg border border-slate-200 bg-white p-4" key={provider.id}>
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-medium text-slate-900">{provider.name}</p>
@@ -155,7 +155,7 @@ export function ProviderSettingsPage() {
                   </div>
                   <p className="mt-3 text-sm text-slate-600">{provider.base_url}</p>
                   <p className="mt-2 text-xs text-slate-500">Updated {formatDateTime(provider.updated_at)}</p>
-                </Card>
+                </div>
               ))}
             </MobileStack>
           </>
