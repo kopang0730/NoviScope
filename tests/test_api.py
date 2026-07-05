@@ -1,6 +1,9 @@
 from fastapi.testclient import TestClient
+from sqlmodel import Session, select
 
+from noviscope.db.session import create_db_engine
 from noviscope.main import create_app
+from noviscope.models.user import User, UserRole
 
 
 def register_and_login(client: TestClient, invite_code: str, email: str) -> None:
@@ -24,6 +27,15 @@ def register_and_login(client: TestClient, invite_code: str, email: str) -> None
 
     login_response = client.post("/auth/login", json={"email": email, "password": "password"})
     assert login_response.status_code == 200
+
+
+def promote_user_to_admin(database_url: str, email: str) -> None:
+    engine = create_db_engine(database_url)
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.email == email)).one()
+        user.role = UserRole.ADMIN
+        session.add(user)
+        session.commit()
 
 
 def test_health_endpoint():
@@ -52,6 +64,7 @@ def test_agents_endpoint_lists_nine_agents():
 
 def test_provider_crud_endpoints_do_not_return_api_key():
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        register_and_login(client, "INVITE-PROVIDER", "provider@example.com")
         create_response = client.post(
             "/providers",
             json={
@@ -91,6 +104,152 @@ def test_provider_crud_endpoints_do_not_return_api_key():
 
         missing_response = client.get(f"/providers/{provider_id}")
         assert missing_response.status_code == 404
+
+
+def test_provider_routes_require_authentication():
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        register_and_login(client, "AUTH-PROVIDER", "provider@example.com")
+        provider = client.post(
+            "/providers",
+            json={
+                "name": "auth-openai",
+                "kind": "openai_compatible",
+                "base_url": "https://api.openai.com/v1",
+                "default_model": "gpt-4.1",
+                "api_key": "auth-key",
+            },
+        ).json()
+        client.post("/auth/logout")
+
+        create_response = client.post(
+            "/providers",
+            json={
+                "name": "missing-auth",
+                "kind": "openai_compatible",
+                "base_url": "https://api.openai.com/v1",
+                "default_model": "gpt-4.1",
+                "api_key": "missing-auth-key",
+            },
+        )
+        list_response = client.get("/providers")
+        get_response = client.get(f"/providers/{provider['id']}")
+        update_response = client.patch(
+            f"/providers/{provider['id']}",
+            json={"default_model": "gpt-4.1-mini"},
+        )
+        delete_response = client.delete(f"/providers/{provider['id']}")
+
+        assert create_response.status_code == 401
+        assert list_response.status_code == 401
+        assert get_response.status_code == 401
+        assert update_response.status_code == 401
+        assert delete_response.status_code == 401
+
+
+def test_provider_visibility_shared_and_personal():
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        register_and_login(client, "INVITE-ONE", "one@example.com")
+        personal = client.post(
+            "/providers",
+            json={
+                "name": "one-personal",
+                "kind": "openai_compatible",
+                "scope": "personal",
+                "base_url": "https://api.deepseek.com",
+                "default_model": "deepseek-chat",
+                "api_key": "one-key",
+            },
+        ).json()
+        client.post("/auth/logout")
+
+        register_and_login(client, "INVITE-TWO", "two@example.com")
+        response = client.get("/providers")
+
+        assert response.status_code == 200
+        provider_ids = [provider["id"] for provider in response.json()["providers"]]
+        assert personal["id"] not in provider_ids
+
+
+def test_provider_detail_update_and_delete_reject_other_users_personal_provider():
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        register_and_login(client, "PROVIDER-ONE", "one@example.com")
+        personal = client.post(
+            "/providers",
+            json={
+                "name": "one-personal",
+                "kind": "openai_compatible",
+                "scope": "personal",
+                "base_url": "https://api.deepseek.com",
+                "default_model": "deepseek-chat",
+                "api_key": "one-key",
+            },
+        ).json()
+        client.post("/auth/logout")
+
+        register_and_login(client, "PROVIDER-TWO", "two@example.com")
+        get_response = client.get(f"/providers/{personal['id']}")
+        update_response = client.patch(
+            f"/providers/{personal['id']}",
+            json={"default_model": "deepseek-reasoner"},
+        )
+        delete_response = client.delete(f"/providers/{personal['id']}")
+
+        assert get_response.status_code == 403
+        assert update_response.status_code == 403
+        assert delete_response.status_code == 403
+
+
+def test_member_cannot_create_shared_provider(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'providers-access.db'}"
+
+    with TestClient(create_app(database_url=database_url)) as client:
+        register_and_login(client, "PROVIDER-MEMBER", "member@example.com")
+        response = client.post(
+            "/providers",
+            json={
+                "name": "shared-openai",
+                "kind": "openai_compatible",
+                "scope": "shared",
+                "base_url": "https://api.openai.com/v1",
+                "default_model": "gpt-4.1",
+                "api_key": "shared-key",
+            },
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Admin access required"
+
+
+def test_member_cannot_update_or_delete_shared_provider(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'shared-provider.db'}"
+
+    with TestClient(create_app(database_url=database_url)) as client:
+        register_and_login(client, "PROVIDER-ADMIN", "admin@example.com")
+        promote_user_to_admin(database_url, "admin@example.com")
+        shared = client.post(
+            "/providers",
+            json={
+                "name": "shared-openai",
+                "kind": "openai_compatible",
+                "scope": "shared",
+                "base_url": "https://api.openai.com/v1",
+                "default_model": "gpt-4.1",
+                "api_key": "shared-key",
+            },
+        ).json()
+        client.post("/auth/logout")
+
+        register_and_login(client, "PROVIDER-MEMBER", "member@example.com")
+        get_response = client.get(f"/providers/{shared['id']}")
+        update_response = client.patch(
+            f"/providers/{shared['id']}",
+            json={"default_model": "gpt-4.1-mini"},
+        )
+        delete_response = client.delete(f"/providers/{shared['id']}")
+
+        assert get_response.status_code == 200
+        assert update_response.status_code == 403
+        assert delete_response.status_code == 403
 
 
 def test_create_quest_endpoint():
