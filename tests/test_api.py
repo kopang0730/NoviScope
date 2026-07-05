@@ -103,10 +103,80 @@ def test_create_quest_endpoint():
 
         assert response.status_code == 201
         body = response.json()
+        assert body["owner_user_id"]
         assert body["title"] == "AI+Sports Badminton"
         assert body["status"] == "draft"
         assert body["first_stage"]["agent_id"] == "demand_validator"
         assert body["first_stage"]["status"] == "pending"
+
+
+def test_quest_list_returns_only_current_user_quests():
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        register_and_login(client, "INVITE-ONE", "one@example.com")
+        first = client.post(
+            "/quests",
+            json={"title": "One", "initial_direction": "AI+体育"},
+        ).json()
+        client.post("/auth/logout")
+
+        register_and_login(client, "INVITE-TWO", "two@example.com")
+        second = client.post(
+            "/quests",
+            json={"title": "Two", "initial_direction": "手写文本擦除"},
+        ).json()
+
+        response = client.get("/quests")
+
+        assert response.status_code == 200
+        quests = response.json()["quests"]
+        assert [quest["title"] for quest in quests] == ["Two"]
+        assert [quest["id"] for quest in quests] == [second["id"]]
+        assert first["id"] not in [quest["id"] for quest in quests]
+
+
+def test_quest_detail_rejects_other_users():
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        register_and_login(client, "DETAIL-ONE", "owner@example.com")
+        quest = client.post(
+            "/quests",
+            json={"title": "Owner Quest", "initial_direction": "AI+体育"},
+        ).json()
+        owner_response = client.get(f"/quests/{quest['id']}")
+        assert owner_response.status_code == 200
+        assert owner_response.json()["id"] == quest["id"]
+        assert owner_response.json()["owner_user_id"] == quest["owner_user_id"]
+
+        client.post("/auth/logout")
+
+        register_and_login(client, "DETAIL-TWO", "other@example.com")
+        response = client.get(f"/quests/{quest['id']}")
+
+        assert response.status_code == 403
+        assert "not accessible" in response.json()["detail"]
+
+
+def test_stage_routes_reject_cross_user_access():
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        register_and_login(client, "OWNER-INVITE", "owner@example.com")
+        quest = client.post(
+            "/quests",
+            json={"title": "Owner Quest", "initial_direction": "AI+体育"},
+        ).json()
+        stage_id = quest["first_stage"]["id"]
+        client.post("/auth/logout")
+
+        register_and_login(client, "OTHER-INVITE", "other@example.com")
+
+        list_response = client.get(f"/quests/{quest['id']}/stages")
+        update_response = client.patch(
+            f"/stages/{stage_id}",
+            json={"status": "running"},
+        )
+
+        assert list_response.status_code == 403
+        assert "not accessible" in list_response.json()["detail"]
+        assert update_response.status_code == 403
+        assert "not accessible" in update_response.json()["detail"]
 
 
 def test_stage_flow_endpoints_record_review_payloads():

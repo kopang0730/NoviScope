@@ -28,6 +28,7 @@ class StageStatus(StrEnum):
 
 class Quest(SQLModel, table=True):
     id: str = Field(default_factory=lambda: new_id("quest"), primary_key=True)
+    owner_user_id: str | None = Field(default=None, foreign_key="user.id", index=True)
     title: str
     initial_direction: str
     status: QuestStatus = Field(

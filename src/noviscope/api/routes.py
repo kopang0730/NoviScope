@@ -17,7 +17,7 @@ from noviscope.auth.service import AuthService
 from noviscope.core.config import get_settings
 from noviscope.core.crypto import SecretBox
 from noviscope.models.provider import ModelProvider, ProviderKind
-from noviscope.models.quest import QuestStatus, StageCard, StageStatus
+from noviscope.models.quest import Quest, QuestStatus, StageCard, StageStatus
 from noviscope.models.user import InviteCode, InviteStatus, User, UserRole
 from noviscope.providers.service import ProviderService
 from noviscope.quests.service import QuestService
@@ -91,10 +91,25 @@ class StageCardResponse(BaseModel):
 
 class QuestCreateResponse(BaseModel):
     id: str
+    owner_user_id: str | None
     title: str
     initial_direction: str
     status: QuestStatus
     first_stage: StageCardResponse
+
+
+class QuestResponse(BaseModel):
+    id: str
+    owner_user_id: str | None
+    title: str
+    initial_direction: str
+    status: QuestStatus
+    created_at: str
+    updated_at: str
+
+
+class QuestsResponse(BaseModel):
+    quests: list[QuestResponse]
 
 
 class AgentsResponse(BaseModel):
@@ -161,6 +176,10 @@ def provider_response(provider: ModelProvider) -> ProviderResponse:
 
 def stage_response(stage: StageCard) -> StageCardResponse:
     return StageCardResponse.model_validate(stage, from_attributes=True)
+
+
+def quest_response(quest: Quest) -> QuestResponse:
+    return QuestResponse.model_validate(quest, from_attributes=True)
 
 
 def get_provider_service(session: Session) -> ProviderService:
@@ -311,16 +330,18 @@ def delete_provider(
 def create_quest(
     request: QuestCreateRequest,
     session: Annotated[Session, Depends(get_session)],
-    _current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> QuestCreateResponse:
     service = QuestService(session)
     quest = service.create_quest(
         title=request.title,
         initial_direction=request.initial_direction,
+        owner_user_id=current_user.id,
     )
     first_stage = service.list_stage_cards(quest.id)[0]
     return QuestCreateResponse(
         id=quest.id,
+        owner_user_id=quest.owner_user_id,
         title=quest.title,
         initial_direction=quest.initial_direction,
         status=quest.status,
@@ -328,16 +349,48 @@ def create_quest(
     )
 
 
+@router.get("/quests", response_model=QuestsResponse)
+def list_quests(
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> QuestsResponse:
+    service = QuestService(session)
+    return QuestsResponse(
+        quests=[quest_response(quest) for quest in service.list_quests_for_user(current_user)]
+    )
+
+
+@router.get("/quests/{quest_id}", response_model=QuestResponse)
+def get_quest(
+    quest_id: str,
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> QuestResponse:
+    service = QuestService(session)
+    try:
+        return quest_response(service.get_quest_for_user(quest_id, current_user))
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+
 @router.get("/quests/{quest_id}/stages", response_model=StagesResponse)
 def list_quest_stages(
     quest_id: str,
     session: Annotated[Session, Depends(get_session)],
-    _current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> StagesResponse:
     service = QuestService(session)
-    return StagesResponse(
-        stages=[stage_response(stage) for stage in service.list_stage_cards(quest_id)]
-    )
+    try:
+        service.get_quest_for_user(quest_id, current_user)
+        return StagesResponse(
+            stages=[stage_response(stage) for stage in service.list_stage_cards(quest_id)]
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
 
 
 @router.patch("/stages/{stage_id}", response_model=StageCardResponse)
@@ -345,10 +398,11 @@ def update_stage(
     stage_id: str,
     request: StageUpdateRequest,
     session: Annotated[Session, Depends(get_session)],
-    _current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> StageCardResponse:
     service = QuestService(session)
     try:
+        service.get_stage_card_for_user(stage_id, current_user)
         stage = service.update_stage_card(
             stage_id,
             status=request.status,
@@ -362,5 +416,7 @@ def update_stage(
         return stage_response(stage)
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
