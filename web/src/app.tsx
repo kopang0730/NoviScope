@@ -25,8 +25,8 @@ function WorkspaceLayout() {
   return (
     <div className="min-h-screen bg-canvas text-ink">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <div className="flex items-center gap-3">
+        <div className="mx-auto flex max-w-[1440px] flex-col items-start gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-100 text-xl font-semibold text-teal-700">
               N
             </div>
@@ -35,12 +35,12 @@ function WorkspaceLayout() {
               <p className="text-xs text-slate-500">Lab workspace</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="text-right">
+          <div className="flex min-w-0 items-center gap-3 self-stretch sm:self-auto">
+            <div className="min-w-0 text-left sm:text-right">
               <p className="text-sm font-medium text-slate-800">
                 {currentUser?.display_name ?? "Guest"}
               </p>
-              <p className="text-xs text-slate-500">
+              <p className="break-all text-xs text-slate-500 sm:max-w-none">
                 {currentUser?.email ?? (authReady ? "Sign in to access lab data" : "Checking session")}
               </p>
             </div>
