@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, Final
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, SecretStr
@@ -62,6 +62,8 @@ from noviscope.providers.service import ProviderService
 from noviscope.quests.service import QuestService
 
 router = APIRouter()
+
+ACCEPTED_HUMAN_DEMAND_VERDICTS: Final = frozenset({"plausible", "verified"})
 
 
 class StageRunRequest(BaseModel):
@@ -223,6 +225,20 @@ def build_demand_review_block(stage_title: str) -> StageBlock:
     )
 
 
+def build_demand_evidence_review_block(stage_title: str) -> StageBlock:
+    return StageBlock(
+        evidence_payload={
+            "blocking_detail": (
+                "Record at least one plausible or verified human demand evidence source "
+                f"before running {stage_title}."
+            ),
+            "blocking_reason": "demand_evidence_review_required",
+            "can_run": False,
+        },
+        summary=f"{stage_title} is blocked until human demand evidence is recorded.",
+    )
+
+
 def build_gap_dependency_block(missing_stage_names: list[str]) -> StageBlock:
     missing = ", ".join(missing_stage_names)
     return StageBlock(
@@ -335,6 +351,12 @@ def build_dependency_block_if_needed(
     if stage.agent_id != DEMAND_VALIDATOR_AGENT_ID and demand_stage is not None:
         if demand_stage.status == StageStatus.COMPLETE and demand_stage.human_approved is not True:
             return build_demand_review_block(stage.title)
+        if (
+            demand_stage.status == StageStatus.COMPLETE
+            and demand_stage.human_approved is True
+            and not has_recorded_human_demand_evidence(demand_stage)
+        ):
+            return build_demand_evidence_review_block(stage.title)
     if stage.agent_id == IDEA_GENERATOR_AGENT_ID:
         missing_stage_names: list[str] = []
         if DEMAND_VALIDATOR_AGENT_ID not in completed_agent_ids:
@@ -368,6 +390,18 @@ def find_workflow_stage(stages: list[StageCard], agent_id: str) -> StageCard | N
         (workflow_stage for workflow_stage in stages if workflow_stage.agent_id == agent_id),
         None,
     )
+
+
+def has_recorded_human_demand_evidence(stage: StageCard) -> bool:
+    verdict = stage.evidence_payload.get("human_demand_verdict")
+    if not isinstance(verdict, str) or verdict not in ACCEPTED_HUMAN_DEMAND_VERDICTS:
+        return False
+
+    sources = stage.evidence_payload.get("human_demand_sources")
+    if not isinstance(sources, list):
+        return False
+
+    return any(isinstance(source, str) and source.strip() for source in sources)
 
 
 def build_runner_provider(

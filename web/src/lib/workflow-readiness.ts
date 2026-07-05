@@ -15,6 +15,7 @@ export type WorkflowReadinessReason =
   | "runner_not_implemented"
   | "demand_validation_required"
   | "demand_review_required"
+  | "demand_evidence_review_required"
   | "gap_prerequisites_required"
   | "idea_selection_required"
   | "experiment_setup_required"
@@ -34,6 +35,7 @@ const experimentSetupInputKeys = ["data_path", "code_repository", "environment_n
 
 const readinessReasonKeys: Record<WorkflowReadinessReason, TranslationKey> = {
   demand_validation_required: "workflowReadinessDemandRequired",
+  demand_evidence_review_required: "workflowReadinessDemandEvidenceRequired",
   demand_review_required: "workflowReadinessDemandReviewRequired",
   experiment_planner_required: "workflowReadinessExperimentPlannerRequired",
   experiment_review_required: "workflowReadinessExperimentReviewRequired",
@@ -76,6 +78,16 @@ function isComplete(stage: StageCard | undefined) {
 
 function isHumanApproved(stage: StageCard | undefined) {
   return stage?.human_approved === true;
+}
+
+function hasRecordedHumanDemandEvidence(stage: StageCard | undefined) {
+  if (stage === undefined || stage.status !== "complete" || stage.human_approved !== true) {
+    return false;
+  }
+
+  const verdict = readString(stage.evidence_payload, "human_demand_verdict");
+  const sources = readStringArray(stage.evidence_payload, "human_demand_sources");
+  return (verdict === "plausible" || verdict === "verified") && sources.length > 0;
 }
 
 function isRunnableStatus(stage: StageCard) {
@@ -173,13 +185,21 @@ export function getWorkflowStageReadiness(
     if (!demandStage || !isComplete(demandStage)) {
       return blockedReadiness("demand_validation_required", demandStage ? [demandStage.title] : []);
     }
-    return isHumanApproved(demandStage)
+    if (!isHumanApproved(demandStage)) {
+      return blockedReadiness("demand_review_required", [demandStage.title]);
+    }
+    return hasRecordedHumanDemandEvidence(demandStage)
       ? readyReadiness()
-      : blockedReadiness("demand_review_required", [demandStage.title]);
+      : blockedReadiness("demand_evidence_review_required", [demandStage.title]);
   }
 
-  if (demandStage && isComplete(demandStage) && !isHumanApproved(demandStage)) {
-    return blockedReadiness("demand_review_required", [demandStage.title]);
+  if (demandStage && isComplete(demandStage)) {
+    if (!isHumanApproved(demandStage)) {
+      return blockedReadiness("demand_review_required", [demandStage.title]);
+    }
+    if (!hasRecordedHumanDemandEvidence(demandStage)) {
+      return blockedReadiness("demand_evidence_review_required", [demandStage.title]);
+    }
   }
 
   if (stage.agent_id === ideaGeneratorAgentId) {

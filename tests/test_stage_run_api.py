@@ -46,6 +46,10 @@ from noviscope.main import create_app
 from noviscope.models.user import User, UserRole
 
 DEV_ADMIN_HEADERS = {"X-NoviScope-Dev-Admin": "test-dev-admin-token-0123456789abcdef"}
+HUMAN_DEMAND_EVIDENCE_PAYLOAD = {
+    "human_demand_sources": ["Interview note: coaches need objective badminton feedback."],
+    "human_demand_verdict": "verified",
+}
 
 
 class FakeDemandValidationRunner:
@@ -493,7 +497,49 @@ def test_run_literature_scout_blocks_until_demand_validation_is_approved(
     )
     assert body["evidence_payload"]["blocking_reason"] == "demand_validation_review_required"
     assert body["evidence_payload"]["blocking_detail"] == (
-        "Approve Demand validation before running Literature scout. If the demand was rejected, revise or rerun Demand validation first."
+        "Approve Demand validation before running Literature scout. If the demand was "
+        "rejected, revise or rerun Demand validation first."
+    )
+
+
+def test_run_literature_scout_blocks_until_human_demand_evidence_is_recorded(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'literature-evidence-blocked.db'}")
+    app.dependency_overrides[get_literature_scout_runner] = get_fake_literature_runner
+
+    with TestClient(app) as client:
+        register_and_login(client, "RUN-LIT-EVIDENCE-BLOCK", "lit-evidence@example.com")
+        _, demand_stage_id, literature_stage_id, _, _, _ = create_quest_with_stages(client)
+        running_response = client.patch(
+            f"/stages/{demand_stage_id}",
+            json={"status": "running"},
+        )
+        assert running_response.status_code == 200
+        complete_response = client.patch(
+            f"/stages/{demand_stage_id}",
+            json={
+                "human_approved": True,
+                "output_payload": {"confidence": "medium"},
+                "status": "complete",
+                "summary": "Demand validation complete.",
+            },
+        )
+        assert complete_response.status_code == 200
+
+        response = client.post(f"/stages/{literature_stage_id}/run", json={})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "blocked"
+    assert body["summary"] == (
+        "Literature scout is blocked until human demand evidence is recorded."
+    )
+    assert body["evidence_payload"]["blocking_reason"] == "demand_evidence_review_required"
+    assert body["evidence_payload"]["blocking_detail"] == (
+        "Record at least one plausible or verified human demand evidence source before "
+        "running Literature scout."
     )
 
 
@@ -516,6 +562,7 @@ def test_run_literature_scout_completes_without_model_provider(
             f"/stages/{demand_stage_id}",
             json={
                 "human_approved": True,
+                "evidence_payload": HUMAN_DEMAND_EVIDENCE_PAYLOAD,
                 "output_payload": {"confidence": "medium"},
                 "status": "complete",
                 "summary": "Demand validation complete.",
@@ -558,6 +605,7 @@ def test_run_gap_hypothesis_blocks_until_literature_scout_completes(
             f"/stages/{demand_stage_id}",
             json={
                 "human_approved": True,
+                "evidence_payload": HUMAN_DEMAND_EVIDENCE_PAYLOAD,
                 "output_payload": {"confidence": "medium"},
                 "status": "complete",
                 "summary": "Demand validation complete.",
@@ -601,6 +649,7 @@ def test_run_gap_hypothesis_completes_and_selection_advances_quest(
             f"/stages/{demand_stage_id}",
             json={
                 "human_approved": True,
+                "evidence_payload": HUMAN_DEMAND_EVIDENCE_PAYLOAD,
                 "output_payload": {"confidence": "medium"},
                 "status": "complete",
                 "summary": "Demand validation complete.",
