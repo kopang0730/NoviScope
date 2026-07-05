@@ -839,6 +839,48 @@ def test_run_paper_writer_blocks_until_experiment_planner_completes(
     assert body["evidence_payload"]["blocking_reason"] == "paper_prerequisites_incomplete"
 
 
+def test_run_paper_writer_blocks_until_experiment_planner_is_approved(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'paper-writer-review.db'}")
+
+    with TestClient(app) as client:
+        register_and_login(client, "RUN-PAPER-REVIEW", "paper-review@example.com")
+        _, _, _, _, experiment_stage_id, paper_stage_id = create_quest_with_stages(client)
+        experiment_running_response = client.patch(
+            f"/stages/{experiment_stage_id}",
+            json={"status": "running"},
+        )
+        assert experiment_running_response.status_code == 200
+        experiment_complete_response = client.patch(
+            f"/stages/{experiment_stage_id}",
+            json={
+                "output_payload": {
+                    "confidence": "medium",
+                    "data_availability_status": "ready",
+                    "first_runnable_script_plan": ["Run baseline inference."],
+                    "summary": "Experiment plan completed.",
+                },
+                "status": "complete",
+                "summary": "Experiment plan completed.",
+            },
+        )
+        assert experiment_complete_response.status_code == 200
+
+        response = client.post(f"/stages/{paper_stage_id}/run", json={})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "blocked"
+    assert body["summary"] == (
+        "Paper & Meeting Writer is blocked until Experiment Planner is human-approved."
+    )
+    assert body["evidence_payload"]["blocking_reason"] == (
+        "experiment_planner_review_required"
+    )
+
+
 def test_run_paper_writer_completes_with_markdown_artifacts_and_advances_after_review(
     tmp_path,
     dev_admin_header_enabled: None,
@@ -871,6 +913,14 @@ def test_run_paper_writer_completes_with_markdown_artifacts_and_advances_after_r
             },
         )
         assert experiment_complete_response.status_code == 200
+        experiment_review_response = client.patch(
+            f"/stages/{experiment_stage_id}",
+            json={
+                "human_approved": True,
+                "review_notes": "Experiment plan is ready for draft artifact generation.",
+            },
+        )
+        assert experiment_review_response.status_code == 200
 
         run_response = client.post(f"/stages/{paper_stage_id}/run", json={})
         assert run_response.status_code == 200

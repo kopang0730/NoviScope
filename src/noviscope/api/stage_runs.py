@@ -278,6 +278,20 @@ def build_paper_dependency_block() -> StageBlock:
     )
 
 
+def build_paper_review_block() -> StageBlock:
+    return StageBlock(
+        evidence_payload={
+            "blocking_detail": (
+                "Approve Experiment Planner before generating paper or meeting artifacts. "
+                "Drafts must not rely on an unreviewed experiment plan."
+            ),
+            "blocking_reason": "experiment_planner_review_required",
+            "can_run": False,
+        },
+        summary="Paper & Meeting Writer is blocked until Experiment Planner is human-approved.",
+    )
+
+
 def build_runner_block(stage: StageCard) -> StageBlock:
     return StageBlock(
         evidence_payload={
@@ -344,6 +358,8 @@ def build_dependency_block_if_needed(
         experiment_stage = find_workflow_stage(stages, EXPERIMENT_PLANNER_AGENT_ID)
         if experiment_stage is None or experiment_stage.status != StageStatus.COMPLETE:
             return build_paper_dependency_block()
+        if experiment_stage.human_approved is not True:
+            return build_paper_review_block()
     return None
 
 

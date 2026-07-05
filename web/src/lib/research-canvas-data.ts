@@ -47,7 +47,11 @@ function findSelectedIdeaTitle(stage: StageCard) {
 }
 
 export function isHumanGateStage(stage: StageCard) {
-  return stage.agent_id === demandValidatorAgentId || stage.agent_id === ideaGeneratorAgentId;
+  return (
+    stage.agent_id === demandValidatorAgentId ||
+    stage.agent_id === ideaGeneratorAgentId ||
+    stage.agent_id === experimentPlannerAgentId
+  );
 }
 
 export function needsHumanReview(stage: StageCard) {
