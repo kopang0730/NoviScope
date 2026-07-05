@@ -8,11 +8,11 @@
 
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](#开发)
 [![FastAPI](https://img.shields.io/badge/FastAPI-foundation-green)](#api)
-[![Status](https://img.shields.io/badge/status-foundation%20slice-orange)](#当前状态)
+[![Status](https://img.shields.io/badge/status-lab%20alpha-orange)](#当前状态)
 
 NoviScope 的目标用户是需要从一个不够明确的研究想法出发，逐步形成可信选题、实验设计、结果解释和论文表达的机器视觉科研团队。长期目标是搭建一个数字科研团队：它可以检索论文、梳理已有工作、提出创新点、复现 baseline、运行消融实验、审计结论，并最终生成论文和组会材料。
 
-当前仓库实现的是第一阶段后端基础切片。它还没有实现完整的文献检索、GPU 实验执行、论文生成或 PPT 生成。
+当前仓库实现的是第一版面向课题组共享部署的 Lab Alpha：包含 FastAPI 后端和 React Web MVP。它还没有实现完整的文献检索、GPU 实验执行、论文生成或 PPT 生成。
 
 ## 为什么做 NoviScope
 
@@ -78,21 +78,24 @@ NoviScope 把科研流程拆成 9 个智能体。当前基础版本已经实现�
 
 ## 当前状态
 
-已经实现的 foundation slice：
+已经实现的 Lab Alpha：
 
-- FastAPI 后端脚手架。
-- SQLModel 领域模型：provider、agent assignment、quest、stage card。
-- SQLite 数据库设置，并启用外键约束。
-- Model Gateway 抽象，以及加密的 provider 配置 API。
+- FastAPI 后端脚手架，以及 user、invite code、provider、quest、stage card 等 SQLModel 领域模型。
+- 基于邀请码的注册、session cookie 登录/登出，以及受保护的 `/auth/me`。
+- 通过 `/admin/invites` 创建邀请码；在显式开启时也保留仅供 bootstrap/测试使用的 `X-NoviScope-Dev-Admin` 路径。
+- Model Gateway 抽象，以及带 API key 加密存储的 provider 配置 API，支持 shared/personal 两种 scope。
 - 不可变的 9-agent registry，并保证 API 序列化顺序稳定。
-- Quest service：创建 quest 时自动生成第一个 `demand_validator` stage，并支持显式 stage 流转、输入/输出、证据和人工审批记录。
-- HTTP API：健康检查、agent 列表、provider CRUD、quest 创建、stage 列表和 stage 更新。
+- Quest ownership 与受保护的 quest/stage API；member 默认只能访问自己的 quest，admin 可以查看所有 quest。
+- 位于 `web/` 的 React + TypeScript + Vite + Tailwind Web 应用，已经支持注册、登录、quest 列表与详情、quest 创建、stage 更新和 provider 设置。
 - 密钥脱敏和私有数据外发保护 helper。
-- 测试覆盖 security、models、agents、gateway、quests 和 API 行为。
+- 测试覆盖 security、auth、models、agents、gateway、quests 和 API 行为。
 - GitHub issue 模板、PR 模板、贡献指南、协作规范和 MIT license。GitHub Actions CI 已在 issue #4 跟踪，等待具备 `workflow` scope 的 token 后启用。
 
 还没有实现：
 
+- 专门的首个 admin bootstrap CLI/route
+- Web 端的 admin 邀请码管理页面
+- agent assignment UI
 - arXiv、Semantic Scholar、Google Scholar、IEEE、ACM、CVF 等真实文献检索。
 - 需求来源抓取和投毒风险评分。
 - 实验室 A800 服务器上的 GPU job 调度。
@@ -100,15 +103,148 @@ NoviScope 把科研流程拆成 9 个智能体。当前基础版本已经实现�
 - 实验产物注册表。
 - Evidence Auditor 的实际执行逻辑。
 - 论文和 PPT 生成。
-- Web 前端。
+
+## 面向课题组共享部署的 Lab Alpha
+
+NoviScope 的目标是由服务器管理员部署一次，作为课题组统一入口。组内成员随后通过实验室 URL 打开 Web 应用，使用邀请码注册并登录，在同一套服务上创建 quest、查看 stage、管理自己的 provider。
+
+### 环境变量与后端启动
+
+先复制环境变量示例文件：
+
+```bash
+cp .env.example .env
+```
+
+共享部署时至少需要配置：
+
+- `NOVISCOPE_DATABASE_URL`：指向 PostgreSQL
+- `NOVISCOPE_PROVIDER_SECRET_KEY`：用于 provider key 加密的长随机密钥
+- `NOVISCOPE_SESSION_SECRET_KEY`：与上面不同、用于 session cookie 的长随机密钥
+- `NOVISCOPE_SESSION_COOKIE_SECURE=true`：通过 HTTPS 提供服务时保持开启
+- `NOVISCOPE_ARTIFACT_ROOT`：持久化 artifact 目录
+- `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=false`：共享部署默认应关闭
+- `NOVISCOPE_DEV_ADMIN_TOKEN`：仅在临时开启 bootstrap 请求头时设置
+
+如果 `NOVISCOPE_DATABASE_URL` 不是 SQLite，且 provider/session secret 仍然是
+占位值、过短或字符多样性太低，NoviScope 会在启动阶段直接拒绝运行。如果
+`NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=true`，`NOVISCOPE_DEV_ADMIN_TOKEN` 也必须是
+高熵 token。
+
+开发环境仍然可以继续使用 SQLite：
+
+```bash
+NOVISCOPE_DATABASE_URL=sqlite:///./noviscope-dev.db \
+NOVISCOPE_SESSION_COOKIE_SECURE=false \
+uvicorn noviscope.main:app --reload
+```
+
+实验室部署应使用 PostgreSQL：
+
+```bash
+uvicorn noviscope.main:app --host 127.0.0.1 --port 8000
+```
+
+### bootstrap/测试专用请求头
+
+只有在 `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=true`、请求头
+`X-NoviScope-Dev-Admin` 的值精确匹配 `NOVISCOPE_DEV_ADMIN_TOKEN`，且当前没有已登录
+admin session 时，`POST /admin/invites` 才接受这个请求头。这个请求头只应用于
+bootstrap 或测试，不应作为共享部署中的常规管理方式。
+
+当前 alpha 还没有独立的“首个 admin 创建”路由。比较现实的初始化方式是：
+
+1. 生成一次性 bootstrap token：
+   ```bash
+   python -c "import secrets; print(secrets.token_urlsafe(32))"
+   ```
+2. 临时把 `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED` 设为 `true`，并把
+   `NOVISCOPE_DEV_ADMIN_TOKEN` 设为上一步生成的 token。
+3. 用 dev admin header 创建一个 bootstrap invite，请求头值使用上一步生成的 token。
+4. 通过 `/auth/register` 注册 bootstrap 账号。
+5. 直接在 PostgreSQL 中把这个账号提升为 `admin`。
+6. 以该 admin 身份登录，继续创建正式邀请码和 shared provider，然后把 `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED` 改回 `false` 并重启 API。
+
+示例 SQL：
+
+```sql
+UPDATE "user" SET role = 'admin' WHERE email = 'admin@example.com';
+```
+
+### Web 构建与反向代理
+
+本地开发 Web：
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Vite 开发服务器会把 `/api` 代理到 `http://127.0.0.1:8000`。
+
+部署构建：
+
+```bash
+cd web
+npm install
+npm run build
+```
+
+将 `web/dist` 通过 Nginx 或 Caddy 挂到实验室 URL，并把 `/api/` 反向代理到 FastAPI。
+共享部署路径应使用 HTTPS，因为 session cookie 默认带 secure 标记：
+
+```nginx
+server {
+  listen 80;
+  server_name noviscope.example.internal;
+  return 301 https://$host$request_uri;
+}
+
+server {
+  listen 443 ssl;
+  server_name noviscope.example.internal;
+
+  ssl_certificate /etc/ssl/certs/noviscope.pem;
+  ssl_certificate_key /etc/ssl/private/noviscope.key;
+
+  location /api/ {
+    proxy_pass http://127.0.0.1:8000/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
+  location / {
+    root /srv/noviscope/web/dist;
+    try_files $uri /index.html;
+  }
+}
+```
+
+如果只是临时在可信实验室内网用 HTTP 测试，可以设置
+`NOVISCOPE_SESSION_COOKIE_SECURE=false`；不要在可暴露的共享部署中使用这个设置。
+
+部署完成后的正常使用流程：
+
+1. 服务器管理员创建邀请码和 shared provider。
+2. 组成员打开实验室 URL，用邀请码注册。
+3. 用户登录后获得 HTTP-only session cookie。
+4. member 创建并审阅自己的 quest；admin 还可以管理 shared provider 和后续邀请码。
 
 ## API
 
-启动服务：
+仅用于本地 bootstrap smoke 的启动服务：
 
 ```bash
+NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=true \
+NOVISCOPE_DEV_ADMIN_TOKEN=local-dev-admin-token-0123456789abcdef \
+NOVISCOPE_SESSION_COOKIE_SECURE=false \
 uvicorn noviscope.main:app --reload
 ```
+
+仅将此命令用于本地/bootstrap smoke。共享部署应继续使用上面的
+部署安全默认值。
 
 健康检查：
 
@@ -122,26 +258,66 @@ curl -s http://127.0.0.1:8000/health
 curl -s http://127.0.0.1:8000/agents
 ```
 
-创建模型 provider 配置：
+仅用于测试或初始化的 bootstrap invite 创建：
 
 ```bash
-curl -s -X POST http://127.0.0.1:8000/providers \
+curl -s -X POST http://127.0.0.1:8000/admin/invites \
+  -H "Content-Type: application/json" \
+  -H "X-NoviScope-Dev-Admin: ${NOVISCOPE_DEV_ADMIN_TOKEN}" \
+  -d '{"code":"BOOTSTRAP-INVITE","max_uses":1}'
+```
+
+使用邀请码注册用户：
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "invite_code":"BOOTSTRAP-INVITE",
+    "email":"member@example.com",
+    "display_name":"Member",
+    "password":"replace-with-a-password"
+  }'
+```
+
+登录并保存 session cookie：
+
+```bash
+curl -i -c /tmp/noviscope-cookies.txt -s -X POST http://127.0.0.1:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email":"member@example.com",
+    "password":"replace-with-a-password"
+  }'
+```
+
+检查当前已认证用户：
+
+```bash
+curl -s -b /tmp/noviscope-cookies.txt http://127.0.0.1:8000/auth/me
+```
+
+以已登录 member 身份创建 personal provider：
+
+```bash
+curl -s -b /tmp/noviscope-cookies.txt -X POST http://127.0.0.1:8000/providers \
   -H "Content-Type: application/json" \
   -d '{
     "name":"primary-openai",
     "kind":"openai_compatible",
     "base_url":"https://api.openai.com/v1",
     "default_model":"gpt-4.1",
-    "api_key":"example-provider-key"
+    "api_key":"example-provider-key",
+    "scope":"personal"
   }'
 ```
 
-Provider API 响应不会返回原始 API key 或密文。生产环境保存真实 key 前，应设置 `NOVISCOPE_PROVIDER_SECRET_KEY`。
+Provider API 响应不会返回原始 API key 或密文。共享部署保存真实 key 前，应先设置 `NOVISCOPE_PROVIDER_SECRET_KEY`。
 
-创建科研 quest：
+以已登录用户身份创建科研 quest：
 
 ```bash
-curl -s -X POST http://127.0.0.1:8000/quests \
+curl -s -b /tmp/noviscope-cookies.txt -X POST http://127.0.0.1:8000/quests \
   -H "Content-Type: application/json" \
   -d '{"title":"AI+Sports Badminton","initial_direction":"AI+体育，羽毛球"}'
 ```
@@ -151,7 +327,7 @@ curl -s -X POST http://127.0.0.1:8000/quests \
 人工复核后更新 stage：
 
 ```bash
-curl -s -X PATCH http://127.0.0.1:8000/stages/<stage_id> \
+curl -s -b /tmp/noviscope-cookies.txt -X PATCH http://127.0.0.1:8000/stages/<stage_id> \
   -H "Content-Type: application/json" \
   -d '{
     "status":"complete",
@@ -171,30 +347,48 @@ curl -s -X PATCH http://127.0.0.1:8000/stages/<stage_id> \
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
+cd web && npm install
 ```
 
 运行测试：
 
 ```bash
-pytest
+python -m pytest
 ```
 
 运行 lint：
 
 ```bash
-ruff check .
+python -m ruff check .
 ```
 
 本地启动 API：
 
 ```bash
+NOVISCOPE_SESSION_COOKIE_SECURE=false \
 uvicorn noviscope.main:app --reload
 ```
 
 指定 SQLite 数据库路径：
 
 ```bash
-NOVISCOPE_DATABASE_URL=sqlite:///./noviscope.db uvicorn noviscope.main:app --reload
+NOVISCOPE_DATABASE_URL=sqlite:///./noviscope.db \
+NOVISCOPE_SESSION_COOKIE_SECURE=false \
+uvicorn noviscope.main:app --reload
+```
+
+本地启动 Web：
+
+```bash
+cd web
+npm run dev
+```
+
+构建 Web：
+
+```bash
+cd web
+npm run build
 ```
 
 ## 仓库结构
@@ -209,6 +403,7 @@ src/noviscope/
   models/          SQLModel 领域模型。
   quests/          科研 quest 工作流服务。
 tests/             单元测试和 API 测试。
+web/               React + TypeScript + Vite 实验室 Web 应用。
 docs/superpowers/  设计文档和实现计划。
 ```
 
@@ -235,11 +430,12 @@ NoviScope 面向科研工作流，可信度比生成数量更重要。当前基�
 
 近期：
 
+- 专门的首个 admin bootstrap CLI 或部署命令。
+- Web 端的 admin 邀请码管理页面。
+- agent assignment 与实验室管理设置 UI。
 - 带 venue、年份和来源过滤的文献检索模块。
 - 使用可信来源 allowlist 的需求验证工作流。
-- Provider 配置 UI/API，支持 OpenAI-compatible、Anthropic、DeepSeek、Kimi、MiniMax、GLM 等模型端点。
-- Research quest 阶段流转和审计日志。
-- 用于输入方向和查看 stage card 的最小 Web 界面。
+- Research quest 审计日志与 provider 连接烟雾测试。
 - 在发布 token 获得 `workflow` scope 后启用 GitHub Actions CI。
 
 中期：

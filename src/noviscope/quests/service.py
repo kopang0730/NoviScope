@@ -2,6 +2,7 @@ from sqlmodel import Session, select
 
 from noviscope.models.common import utc_now
 from noviscope.models.quest import Quest, QuestStatus, StageCard, StageStatus
+from noviscope.models.user import User, UserRole
 
 ALLOWED_STAGE_TRANSITIONS: dict[StageStatus, set[StageStatus]] = {
     StageStatus.PENDING: {StageStatus.RUNNING, StageStatus.BLOCKED},
@@ -15,8 +16,18 @@ class QuestService:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def create_quest(self, *, title: str, initial_direction: str) -> Quest:
-        quest = Quest(title=title, initial_direction=initial_direction)
+    def create_quest(
+        self,
+        *,
+        title: str,
+        initial_direction: str,
+        owner_user_id: str | None = None,
+    ) -> Quest:
+        quest = Quest(
+            title=title,
+            initial_direction=initial_direction,
+            owner_user_id=owner_user_id,
+        )
         stage = StageCard(
             quest_id=quest.id,
             agent_id="demand_validator",
@@ -30,14 +41,38 @@ class QuestService:
         self.session.refresh(quest)
         return quest
 
+    def list_quests_for_user(self, user: User) -> list[Quest]:
+        statement = select(Quest)
+        if user.role != UserRole.ADMIN:
+            statement = statement.where(Quest.owner_user_id == user.id)
+        statement = statement.order_by(Quest.updated_at)
+        return list(self.session.exec(statement).all())
+
+    def get_quest_for_user(self, quest_id: str, user: User) -> Quest:
+        quest = self.session.get(Quest, quest_id)
+        if quest is None:
+            raise LookupError(f"Quest {quest_id} not found")
+        if user.role != UserRole.ADMIN and quest.owner_user_id != user.id:
+            raise PermissionError(f"Quest {quest_id} is not accessible")
+        return quest
+
     def list_stage_cards(self, quest_id: str) -> list[StageCard]:
-        statement = select(StageCard).where(StageCard.quest_id == quest_id)
+        statement = (
+            select(StageCard)
+            .where(StageCard.quest_id == quest_id)
+            .order_by(StageCard.created_at, StageCard.id)
+        )
         return list(self.session.exec(statement).all())
 
     def get_stage_card(self, stage_id: str) -> StageCard:
         stage = self.session.get(StageCard, stage_id)
         if stage is None:
             raise LookupError(f"Stage {stage_id} not found")
+        return stage
+
+    def get_stage_card_for_user(self, stage_id: str, user: User) -> StageCard:
+        stage = self.get_stage_card(stage_id)
+        self.get_quest_for_user(stage.quest_id, user)
         return stage
 
     def update_stage_card(

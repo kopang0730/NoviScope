@@ -2,7 +2,8 @@ from sqlmodel import Session, select
 
 from noviscope.core.crypto import SecretBox
 from noviscope.models.common import utc_now
-from noviscope.models.provider import ModelProvider, ProviderKind
+from noviscope.models.provider import ModelProvider, ProviderKind, ProviderScope
+from noviscope.models.user import User, UserRole
 
 
 class ProviderService:
@@ -18,6 +19,9 @@ class ProviderService:
         base_url: str,
         default_model: str,
         api_key: str,
+        scope: ProviderScope = ProviderScope.PERSONAL,
+        owner_user_id: str | None = None,
+        created_by_user_id: str | None = None,
     ) -> ModelProvider:
         provider = ModelProvider(
             name=name,
@@ -25,6 +29,9 @@ class ProviderService:
             base_url=base_url,
             default_model=default_model,
             api_key_ciphertext=self.secret_box.encrypt(api_key),
+            scope=scope,
+            owner_user_id=owner_user_id,
+            created_by_user_id=created_by_user_id,
         )
         self.session.add(provider)
         self.session.commit()
@@ -34,11 +41,28 @@ class ProviderService:
     def list_providers(self) -> list[ModelProvider]:
         return list(self.session.exec(select(ModelProvider)).all())
 
+    def list_providers_for_user(self, user: User) -> list[ModelProvider]:
+        statement = select(ModelProvider)
+        if user.role != UserRole.ADMIN:
+            statement = statement.where(
+                (ModelProvider.scope == ProviderScope.SHARED)
+                | (ModelProvider.owner_user_id == user.id)
+            )
+        return list(self.session.exec(statement).all())
+
     def get_provider(self, provider_id: str) -> ModelProvider:
         provider = self.session.get(ModelProvider, provider_id)
         if provider is None:
             raise LookupError(f"Provider {provider_id} not found")
         return provider
+
+    def get_provider_for_user(self, provider_id: str, user: User) -> ModelProvider:
+        provider = self.get_provider(provider_id)
+        if user.role == UserRole.ADMIN:
+            return provider
+        if provider.scope == ProviderScope.SHARED or provider.owner_user_id == user.id:
+            return provider
+        raise PermissionError(f"Provider {provider_id} is not accessible")
 
     def update_provider(
         self,
@@ -70,7 +94,24 @@ class ProviderService:
         self.session.refresh(provider)
         return provider
 
+    def update_provider_for_user(
+        self,
+        provider_id: str,
+        user: User,
+        **updates: object,
+    ) -> ModelProvider:
+        provider = self.get_provider_for_user(provider_id, user)
+        if provider.scope == ProviderScope.SHARED and user.role != UserRole.ADMIN:
+            raise PermissionError("Admin access required")
+        return self.update_provider(provider_id, **updates)
+
     def delete_provider(self, provider_id: str) -> None:
         provider = self.get_provider(provider_id)
         self.session.delete(provider)
         self.session.commit()
+
+    def delete_provider_for_user(self, provider_id: str, user: User) -> None:
+        provider = self.get_provider_for_user(provider_id, user)
+        if provider.scope == ProviderScope.SHARED and user.role != UserRole.ADMIN:
+            raise PermissionError("Admin access required")
+        self.delete_provider(provider_id)

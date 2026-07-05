@@ -12,12 +12,23 @@ class ProviderKind(StrEnum):
     CUSTOM = "custom"
 
 
+class ProviderScope(StrEnum):
+    SHARED = "shared"
+    PERSONAL = "personal"
+
+
 class ModelProvider(SQLModel, table=True):
     id: str = Field(default_factory=lambda: new_id("provider"), primary_key=True)
-    name: str = Field(index=True, unique=True)
+    name: str = Field(index=True)
     kind: ProviderKind = Field(
         sa_type=SAEnum(ProviderKind, values_callable=lambda enum: [item.value for item in enum])
     )
+    scope: ProviderScope = Field(
+        default=ProviderScope.PERSONAL,
+        sa_type=SAEnum(ProviderScope, values_callable=lambda enum: [item.value for item in enum]),
+    )
+    owner_user_id: str | None = Field(default=None, foreign_key="user.id", index=True)
+    created_by_user_id: str | None = Field(default=None, foreign_key="user.id")
     base_url: str
     default_model: str
     api_key_ciphertext: str
