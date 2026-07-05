@@ -1,6 +1,8 @@
 import type { Quest, StageCard } from "../api/types";
-import { useI18n } from "../i18n/i18n-context";
+import { useI18n, type TranslationKey } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
+import { canRunStage } from "../lib/stages";
+import { stageTone } from "../lib/status-tones";
 import { Badge } from "./badge";
 import { CanvasStageNode, type CanvasDetail } from "./research-canvas-stage-node";
 
@@ -29,6 +31,44 @@ function findSelectedIdeaTitle(stage: StageCard) {
   const ideas = readRecordArray(stage.output_payload, "ideas");
   const selectedIdea = ideas.find((idea) => selectedIdeaIds.has(readString(idea, "idea_id")));
   return selectedIdea ? readString(selectedIdea, "idea_title") : "";
+}
+
+function isHumanGateStage(stage: StageCard) {
+  return stage.agent_id === "demand_validator" || stage.agent_id === "idea_generator";
+}
+
+function needsHumanReview(stage: StageCard) {
+  return stage.status === "complete" && isHumanGateStage(stage) && stage.human_approved === null;
+}
+
+function findNextActionStage(stages: readonly StageCard[]) {
+  return (
+    stages.find((stage) => stage.status === "blocked")
+    ?? stages.find(needsHumanReview)
+    ?? stages.find((stage) => stage.status === "running")
+    ?? stages.find(canRunStage)
+    ?? stages.find((stage) => stage.status !== "complete")
+    ?? null
+  );
+}
+
+function phaseKeyForAgent(agentId: string): TranslationKey {
+  if (agentId === "demand_validator") {
+    return "canvasPhaseDemand";
+  }
+  if (agentId === "literature_scout") {
+    return "canvasPhaseDiscovery";
+  }
+  if (agentId === "idea_generator") {
+    return "canvasPhaseHypothesis";
+  }
+  if (agentId === "experiment_planner") {
+    return "canvasPhaseExperiment";
+  }
+  if (agentId === "paper_meeting_writer") {
+    return "canvasPhaseWriting";
+  }
+  return "canvasPhaseWorkflow";
 }
 
 function buildStageDetails(stage: StageCard, t: ReturnType<typeof useI18n>["t"]): CanvasDetail[] {
@@ -106,6 +146,11 @@ export function ResearchCanvas({
   readonly stages: readonly StageCard[];
 }) {
   const { t } = useI18n();
+  const nextActionStage = findNextActionStage(stages);
+  const completeCount = stages.filter((stage) => stage.status === "complete").length;
+  const blockedCount = stages.filter((stage) => stage.status === "blocked").length;
+  const reviewCount = stages.filter(needsHumanReview).length;
+  const progressLabel = stages.length > 0 ? `${completeCount}/${stages.length}` : "0/0";
 
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -121,14 +166,56 @@ export function ResearchCanvas({
         </div>
       ) : null}
 
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t("canvasProgress")}</p>
+          <p className="mt-1 text-lg font-semibold text-slate-950">{progressLabel}</p>
+          <p className="mt-1 text-xs text-slate-500">{t("canvasCompleteCount")}</p>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t("overviewBlockedStages")}</p>
+          <p className="mt-1 text-lg font-semibold text-slate-950">{blockedCount}</p>
+          <p className="mt-1 text-xs text-slate-500">{t("canvasBlockedCount")}</p>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t("stageReviewPending")}</p>
+          <p className="mt-1 text-lg font-semibold text-slate-950">{reviewCount}</p>
+          <p className="mt-1 text-xs text-slate-500">{t("canvasReviewCount")}</p>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t("canvasNextAction")}</p>
+          {nextActionStage ? (
+            <div className="mt-1 grid gap-2">
+              <p className="line-clamp-2 break-words text-sm font-semibold text-slate-950">{nextActionStage.title}</p>
+              <div>
+                <Badge tone={stageTone(nextActionStage.status)}>{labelFromEnum(nextActionStage.status)}</Badge>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-1 text-sm font-semibold text-slate-950">{t("canvasNoNextAction")}</p>
+          )}
+        </div>
+      </div>
+
       <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white p-4">
-        <div className="grid min-w-[800px] grid-cols-5 gap-2">
+        <div className="mb-4 flex min-w-[980px] flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">{t("canvasMapTitle")}</p>
+            <p className="mt-1 text-sm text-slate-500">{t("canvasMapDescription")}</p>
+          </div>
+          <Badge tone={nextActionStage ? stageTone(nextActionStage.status) : "gray"}>
+            {nextActionStage ? t("canvasNextAction") : t("canvasNoNextAction")}
+          </Badge>
+        </div>
+        <div className="grid min-w-[980px] grid-cols-5 gap-3">
           {stages.map((stage, index) => (
             <CanvasStageNode
               details={buildStageDetails(stage, t)}
               index={index}
+              isNextAction={nextActionStage?.id === stage.id}
               key={stage.id}
               onRunStage={onRunStage}
+              phaseLabel={t(phaseKeyForAgent(stage.agent_id))}
               runningStageId={runningStageId}
               selectedQuest={selectedQuest}
               stage={stage}
