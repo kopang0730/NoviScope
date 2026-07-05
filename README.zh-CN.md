@@ -2,6 +2,8 @@
 
 [English](README.md)
 
+[架构](docs/architecture.md) · [工作流](docs/workflow.md) ·
+[智能体契约](docs/agent-contracts.md) · [部署](docs/deployment.md) ·
 [贡献指南](CONTRIBUTING.md) · [协作规范](docs/COLLABORATION.md) · [许可证](LICENSE)
 
 面向机器视觉科研小组的证据驱动型数字科研工作流：把模糊研究方向转化为可验证实验、可追踪证据链和论文草稿。
@@ -12,7 +14,7 @@
 
 NoviScope 的目标用户是需要从一个不够明确的研究想法出发，逐步形成可信选题、实验设计、结果解释和论文表达的机器视觉科研团队。长期目标是搭建一个数字科研团队：它可以检索论文、梳理已有工作、提出创新点、复现 baseline、运行消融实验、审计结论，并最终生成论文和组会材料。
 
-当前仓库实现的是第一版面向课题组共享部署的 Lab Alpha：包含 FastAPI 后端和 React Web MVP。它还没有实现完整的文献检索、GPU 实验执行、论文生成或 PPT 生成。
+当前仓库实现的是面向课题组共享部署的 Lab Alpha：包含 FastAPI 后端和 React Web MVP，并已经具备第一版可运行科研工作流阶段。它还没有实现 GPU 实验执行、baseline 自动复现、Evidence Auditor 执行逻辑或 PPT 生成。
 
 ## 为什么做 NoviScope
 
@@ -86,7 +88,12 @@ NoviScope 把科研流程拆成 9 个智能体。当前基础版本已经实现�
 - Model Gateway 抽象，以及带 API key 加密存储的 provider 配置 API，支持 shared/personal 两种 scope。
 - 不可变的 9-agent registry，并保证 API 序列化顺序稳定。
 - Quest ownership 与受保护的 quest/stage API；member 默认只能访问自己的 quest，admin 可以查看所有 quest。
-- 位于 `web/` 的 React + TypeScript + Vite + Tailwind Web 应用，已经支持注册、登录、quest 列表与详情、quest 创建、stage 更新和 provider 设置。
+- 统一的 Stage Runner 协议，以及五阶段可运行 quest 工作流：Demand Validation、Literature Scout、Gap & Hypothesis Generator、Experiment Planner 和 Paper & Meeting Writer。
+- Demand validation 已输出结构化需求判断、置信度、风险、缺失证据、人工复核清单，并保留 raw response 供审计。
+- Literature Scout 使用 OpenAlex 元数据，而不是由模型编造引用。
+- 支持基于证据的 hypothesis 生成、idea 选择 gate、实验设置备注和实验计划生成。
+- 支持生成待复核的 Markdown 产物：中文研究 brief、英文 research brief、组会提纲和 IEEE 风格论文骨架，并明确标注没有真实实验结果。
+- 位于 `web/` 的 React + TypeScript + Vite + Tailwind Web 应用，已经支持注册、登录、quest 列表与详情、quest 创建、stage 更新、stage 输出审阅、artifact 下载和 provider 设置。
 - 密钥脱敏和私有数据外发保护 helper。
 - 测试覆盖 security、auth、models、agents、gateway、quests 和 API 行为。
 - GitHub issue 模板、PR 模板、贡献指南、协作规范和 MIT license。GitHub Actions CI 已在 issue #4 跟踪，等待具备 `workflow` scope 的 token 后启用。
@@ -95,14 +102,22 @@ NoviScope 把科研流程拆成 9 个智能体。当前基础版本已经实现�
 
 - 专门的首个 admin bootstrap CLI/route
 - Web 端的 admin 邀请码管理页面
-- agent assignment UI
-- arXiv、Semantic Scholar、Google Scholar、IEEE、ACM、CVF 等真实文献检索。
+- 实验室级别的 per-agent 默认 provider/model 配置
+- OpenAlex 之外的 source adapter，例如 arXiv、Semantic Scholar、IEEE、ACM、CVF
 - 需求来源抓取和投毒风险评分。
 - 实验室 A800 服务器上的 GPU job 调度。
 - baseline 自动复现。
 - 实验产物注册表。
 - Evidence Auditor 的实际执行逻辑。
-- 论文和 PPT 生成。
+- PPT 生成。
+
+## 文档地图
+
+- [架构](docs/architecture.md)：后端、前端、数据流、状态模型和信任边界。
+- [工作流](docs/workflow.md)：quest 如何经过需求验证、文献检索、idea 生成、实验规划和写作。
+- [智能体契约](docs/agent-contracts.md)：当前可执行阶段、provider 规则、输出规则，以及如何新增 runner。
+- [部署](docs/deployment.md)：单服务器课题组部署、首个 admin 初始化、provider 配置和更新流程。
+- [协作规范](docs/COLLABORATION.md)：多人协作和 AI 辅助开发规则。
 
 ## 面向课题组共享部署的 Lab Alpha
 

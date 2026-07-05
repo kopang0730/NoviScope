@@ -2,7 +2,10 @@
 
 [中文文档](README.zh-CN.md)
 
-[Contributing](CONTRIBUTING.md) · [Collaboration Guide](docs/COLLABORATION.md) · [License](LICENSE)
+[Architecture](docs/architecture.md) · [Workflow](docs/workflow.md) ·
+[Agent Contracts](docs/agent-contracts.md) · [Deployment](docs/deployment.md) ·
+[Contributing](CONTRIBUTING.md) · [Collaboration Guide](docs/COLLABORATION.md) ·
+[License](LICENSE)
 
 Evidence-driven research workflow for turning vague research directions into verified
 experiments and traceable paper drafts.
@@ -17,9 +20,10 @@ and paper draft. The long-term target is a digital research team that can search
 papers, map existing work, propose novelty, reproduce baselines, run ablations,
 audit claims, and produce paper and meeting materials with provenance.
 
-This repository currently contains the first admin-managed lab alpha: a FastAPI
-backend plus a React web MVP for invitation-based group usage. It does not yet
-implement full literature retrieval, GPU experiment execution, or paper/PPT
+This repository currently contains an admin-managed lab alpha: a FastAPI backend
+plus a React web MVP for invitation-based group usage. It includes the first
+executable research-workflow stages, but it does not yet implement GPU
+experiment execution, baseline reproduction, Evidence Auditor execution, or PPT
 generation.
 
 ## Why NoviScope
@@ -104,8 +108,20 @@ Implemented lab alpha slice:
 - Immutable 9-agent registry with deterministic API serialization.
 - Quest ownership plus protected quest and stage APIs; members only access their
   own quests by default and admins can view all quests.
+- Unified Stage Runner protocol and a runnable five-stage quest workflow:
+  Demand Validation, Literature Scout, Gap & Hypothesis Generator, Experiment
+  Planner, and Paper & Meeting Writer.
+- Demand validation output with structured assessment, confidence, risks,
+  missing evidence, human checklist, and raw-response retention.
+- Literature Scout backed by OpenAlex metadata rather than model-invented
+  citations.
+- Evidence-linked hypothesis generation, idea selection gates, experiment setup
+  notes, and experiment-plan generation.
+- Review-only Markdown artifacts for Chinese/English research briefs, meeting
+  outline, and IEEE-style paper skeleton with explicit no-results warnings.
 - React + TypeScript + Vite + Tailwind web app in `web/` for registration, login,
-  quest list/detail, quest creation, stage updates, and provider settings.
+  quest list/detail, quest creation, stage updates, stage output review, artifact
+  downloads, and provider settings.
 - Secret redaction and private outbound upload guard helpers.
 - Test suite covering security, auth, models, agents, gateway, quests, and API
   behavior.
@@ -117,14 +133,27 @@ Not implemented yet:
 
 - dedicated first-admin bootstrap CLI/route
 - admin invite-management page in the web UI
-- agent assignment UI
-- real literature retrieval from arXiv, Semantic Scholar, Google Scholar, IEEE, ACM, or CVF
+- lab-wide per-agent default provider/model controls
+- source adapters beyond OpenAlex, such as arXiv, Semantic Scholar, IEEE, ACM, or CVF
 - demand-source crawling and poisoning-risk scoring
 - GPU job scheduling on the lab A800 server
 - baseline reproduction automation
 - experiment artifact registry
 - evidence auditor execution logic
-- paper and PPT generation
+- PPT generation
+
+## Documentation Map
+
+- [Architecture](docs/architecture.md): backend, frontend, data flow, state model,
+  and trust boundaries.
+- [Workflow](docs/workflow.md): how a quest moves through demand validation,
+  literature scouting, idea generation, experiment planning, and writing.
+- [Agent Contracts](docs/agent-contracts.md): current executable stages,
+  provider rules, output rules, and how to add a runner.
+- [Deployment](docs/deployment.md): single-server lab deployment, bootstrap admin,
+  provider configuration, and update flow.
+- [Collaboration Guide](docs/COLLABORATION.md): team and AI-assisted contribution
+  rules.
 
 ## Admin-Managed Lab Alpha
 
