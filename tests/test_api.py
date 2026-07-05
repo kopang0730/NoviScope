@@ -702,6 +702,66 @@ def test_stage_flow_endpoints_record_review_payloads(dev_admin_header_enabled: N
         assert clear_body["review_notes"] == "Reset for another human review."
 
 
+def test_rejected_complete_stage_can_reopen_for_rerun(dev_admin_header_enabled: None):
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        register_and_login(client, "REOPEN-REJECTED", "reopen-rejected@example.com")
+        quest_response = client.post(
+            "/quests",
+            json={"title": "Handwritten Text Erasure", "initial_direction": "手写文本擦除"},
+        )
+        stage_id = quest_response.json()["first_stage"]["id"]
+
+        running_response = client.patch(f"/stages/{stage_id}", json={"status": "running"})
+        assert running_response.status_code == 200
+
+        complete_response = client.patch(
+            f"/stages/{stage_id}",
+            json={
+                "status": "complete",
+                "summary": "Demand validation needs another pass.",
+                "output_payload": {"confidence": "medium"},
+                "evidence_payload": {"sources": ["internal-note"]},
+                "human_approved": False,
+                "review_notes": "Rejected because the demand evidence is incomplete.",
+            },
+        )
+        assert complete_response.status_code == 200
+
+        reopen_response = client.patch(f"/stages/{stage_id}", json={"status": "blocked"})
+
+        assert reopen_response.status_code == 200
+        body = reopen_response.json()
+        assert body["status"] == "blocked"
+        assert body["human_approved"] is False
+        assert body["summary"] == "Demand validation needs another pass."
+        assert body["output_payload"] == {"confidence": "medium"}
+        assert body["evidence_payload"] == {"sources": ["internal-note"]}
+        assert body["review_notes"] == "Rejected because the demand evidence is incomplete."
+
+
+def test_complete_stage_must_be_rejected_before_reopen(dev_admin_header_enabled: None):
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        register_and_login(client, "REOPEN-APPROVED", "reopen-approved@example.com")
+        quest_response = client.post(
+            "/quests",
+            json={"title": "Badminton", "initial_direction": "AI+体育"},
+        )
+        stage_id = quest_response.json()["first_stage"]["id"]
+        assert client.patch(f"/stages/{stage_id}", json={"status": "running"}).status_code == 200
+        assert (
+            client.patch(
+                f"/stages/{stage_id}",
+                json={"status": "complete", "human_approved": True},
+            ).status_code
+            == 200
+        )
+
+        response = client.patch(f"/stages/{stage_id}", json={"status": "blocked"})
+
+        assert response.status_code == 400
+        assert "Cannot transition stage from complete to blocked" in response.json()["detail"]
+
+
 def test_stage_endpoint_rejects_invalid_transition(dev_admin_header_enabled: None):
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
         register_and_login(client, "TRANSITION-INVITE", "transition@example.com")
