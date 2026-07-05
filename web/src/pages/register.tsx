@@ -7,10 +7,12 @@ import { useAuth } from "../auth/auth-context";
 import { Button } from "../components/button";
 import { Card, CardHeading } from "../components/card";
 import { Input } from "../components/input";
+import { useI18n } from "../i18n/i18n-context";
 
 export function RegisterPage() {
   const navigate = useNavigate();
   const { setAuthenticatedUser } = useAuth();
+  const { t } = useI18n();
   const [inviteCode, setInviteCode] = useState("");
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -42,21 +44,21 @@ export function RegisterPage() {
 
   return (
     <Card>
-      <CardHeading description="Use an invite code created by an administrator to create your account." title="Register" />
+      <CardHeading description={t("registerDescription")} title={t("register")} />
       <div className="mt-4 flex gap-2 text-sm">
         <Link className="rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900" to="/login">
-          Login
+          {t("login")}
         </Link>
-        <span className="rounded-lg bg-teal-50 px-3 py-2 font-medium text-teal-700">Register</span>
+        <span className="rounded-lg bg-teal-50 px-3 py-2 font-medium text-teal-700">{t("register")}</span>
       </div>
       <form className="mt-6 space-y-4" onSubmit={(event) => void handleSubmit(event)}>
-        <Input label="Invite Code" onChange={(event) => setInviteCode(event.target.value)} required value={inviteCode} />
-        <Input autoComplete="name" label="Display Name" onChange={(event) => setDisplayName(event.target.value)} required value={displayName} />
-        <Input autoComplete="email" label="Email" onChange={(event) => setEmail(event.target.value)} required type="email" value={email} />
+        <Input label={t("inviteCode")} onChange={(event) => setInviteCode(event.target.value)} required value={inviteCode} />
+        <Input autoComplete="name" label={t("displayName")} onChange={(event) => setDisplayName(event.target.value)} required value={displayName} />
+        <Input autoComplete="email" label={t("email")} onChange={(event) => setEmail(event.target.value)} required type="email" value={email} />
         <Input
           autoComplete="new-password"
-          hint="Use at least eight characters."
-          label="Password"
+          hint={t("passwordHint")}
+          label={t("password")}
           minLength={8}
           onChange={(event) => setPassword(event.target.value)}
           required
@@ -65,7 +67,7 @@ export function RegisterPage() {
         />
         {error ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p> : null}
         <Button className="w-full" loading={submitting} type="submit">
-          Create Account
+          {t("createAccount")}
         </Button>
       </form>
     </Card>
