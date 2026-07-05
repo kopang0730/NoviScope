@@ -11,6 +11,14 @@ from noviscope.agents.demand_validation import (
     DemandValidationStageRunner,
     get_demand_validation_runner,
 )
+from noviscope.agents.experiment_planner import (
+    ExperimentPlannerRunError,
+    ExperimentPlannerRunner,
+    ExperimentPlannerStageRunner,
+    get_experiment_planner_runner,
+    has_selected_idea,
+    missing_experiment_setup_inputs,
+)
 from noviscope.agents.gap_hypothesis import (
     GapHypothesisRunError,
     GapHypothesisRunner,
@@ -35,6 +43,7 @@ from noviscope.auth.dependencies import get_current_user
 from noviscope.core.json_types import JsonObject
 from noviscope.core.stage_policy import (
     DEMAND_VALIDATOR_AGENT_ID,
+    EXPERIMENT_PLANNER_AGENT_ID,
     IDEA_GENERATOR_AGENT_ID,
     normalize_stage_output_payload,
 )
@@ -76,14 +85,17 @@ class StageBlock:
 
 def get_stage_runner_registry(
     demand_runner: Annotated[DemandValidationRunner, Depends(get_demand_validation_runner)],
+    experiment_runner: Annotated[ExperimentPlannerRunner, Depends(get_experiment_planner_runner)],
     gap_runner: Annotated[GapHypothesisRunner, Depends(get_gap_hypothesis_runner)],
     literature_runner: Annotated[LiteratureScoutStageRunner, Depends(get_literature_scout_runner)],
 ) -> StageRunnerRegistry:
     demand_stage_runner = DemandValidationStageRunner(demand_runner)
+    experiment_stage_runner = ExperimentPlannerStageRunner(experiment_runner)
     gap_stage_runner = GapHypothesisStageRunner(gap_runner)
     return StageRunnerRegistry(
         runners={
             demand_stage_runner.agent_id: demand_stage_runner,
+            experiment_stage_runner.agent_id: experiment_stage_runner,
             gap_stage_runner.agent_id: gap_stage_runner,
             literature_runner.agent_id: literature_runner,
         }
@@ -185,6 +197,35 @@ def build_gap_dependency_block(missing_stage_names: list[str]) -> StageBlock:
     )
 
 
+def build_experiment_dependency_block() -> StageBlock:
+    return StageBlock(
+        evidence_payload={
+            "blocking_detail": (
+                "Complete Gap & hypothesis generator, then select and approve one idea before "
+                "running Experiment Planner."
+            ),
+            "blocking_reason": "experiment_prerequisites_incomplete",
+            "can_run": False,
+        },
+        summary="Experiment Planner is blocked until a generated idea is selected.",
+    )
+
+
+def build_experiment_setup_block(missing_inputs: list[str]) -> StageBlock:
+    return StageBlock(
+        evidence_payload={
+            "blocking_detail": (
+                "Add data path, code repository, and environment notes before generating an "
+                "experiment plan."
+            ),
+            "blocking_reason": "missing_experiment_inputs",
+            "can_run": False,
+            "missing_inputs": missing_inputs,
+        },
+        summary="Experiment Planner needs experiment setup inputs before it can run.",
+    )
+
+
 def build_runner_block(stage: StageCard) -> StageBlock:
     return StageBlock(
         evidence_payload={
@@ -232,7 +273,25 @@ def build_dependency_block_if_needed(
             missing_stage_names.append("Literature Scout")
         if missing_stage_names:
             return build_gap_dependency_block(missing_stage_names)
+    if stage.agent_id == EXPERIMENT_PLANNER_AGENT_ID:
+        idea_stage = find_workflow_stage(stages, IDEA_GENERATOR_AGENT_ID)
+        if (
+            idea_stage is None
+            or idea_stage.status != StageStatus.COMPLETE
+            or not has_selected_idea(idea_stage)
+        ):
+            return build_experiment_dependency_block()
+        missing_inputs = missing_experiment_setup_inputs(stage.input_payload)
+        if missing_inputs:
+            return build_experiment_setup_block(missing_inputs)
     return None
+
+
+def find_workflow_stage(stages: list[StageCard], agent_id: str) -> StageCard | None:
+    return next(
+        (workflow_stage for workflow_stage in stages if workflow_stage.agent_id == agent_id),
+        None,
+    )
 
 
 def build_runner_provider(
@@ -316,7 +375,12 @@ def run_stage(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except PermissionError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-    except (DemandValidationRunError, GapHypothesisRunError, LiteratureScoutRunError) as exc:
+    except (
+        DemandValidationRunError,
+        ExperimentPlannerRunError,
+        GapHypothesisRunError,
+        LiteratureScoutRunError,
+    ) as exc:
         return apply_stage_block(
             quest_service,
             stage_id,

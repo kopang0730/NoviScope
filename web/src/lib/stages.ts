@@ -3,6 +3,7 @@ import type { StageCard } from "../api/types";
 export const demandValidatorAgentId = "demand_validator";
 export const literatureScoutAgentId = "literature_scout";
 export const ideaGeneratorAgentId = "idea_generator";
+export const experimentPlannerAgentId = "experiment_planner";
 
 export type StageRunAvailability = {
   readonly canRun: boolean;
@@ -30,11 +31,19 @@ export function canRunIdeaGeneratorStage(stage: StageCard) {
   );
 }
 
+export function canRunExperimentPlannerStage(stage: StageCard) {
+  return (
+    stage.agent_id === experimentPlannerAgentId &&
+    (stage.status === "pending" || stage.status === "blocked")
+  );
+}
+
 export function canRunStage(stage: StageCard) {
   return (
     canRunDemandValidationStage(stage) ||
     canRunLiteratureScoutStage(stage) ||
-    canRunIdeaGeneratorStage(stage)
+    canRunIdeaGeneratorStage(stage) ||
+    canRunExperimentPlannerStage(stage)
   );
 }
 
@@ -65,6 +74,16 @@ export function getStageRunAvailability(stage: StageCard): StageRunAvailability 
         "Ready after demand validation and literature scouting complete; human selection is "
         + "required before experiment design."
       ),
+    };
+  }
+
+  if (canRunExperimentPlannerStage(stage)) {
+    const detail = readPayloadString(stage.evidence_payload, "blocking_detail");
+    return {
+      canRun: true,
+      reason:
+        detail ||
+        "Ready after a human-approved idea plus data path, code repository, and environment notes.",
     };
   }
 

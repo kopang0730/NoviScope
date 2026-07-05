@@ -4,6 +4,7 @@ from noviscope.core.json_types import JsonObject
 
 DEMAND_VALIDATOR_AGENT_ID = "demand_validator"
 IDEA_GENERATOR_AGENT_ID = "idea_generator"
+EXPERIMENT_PLANNER_AGENT_ID = "experiment_planner"
 NO_EXTERNAL_VERIFICATION_RISK = (
     "High confidence was downgraded because no external source verification ran in this MVP stage."
 )
@@ -18,7 +19,7 @@ def normalize_stage_output_payload(agent_id: str, output_payload: JsonObject) ->
     if output_payload.get("confidence") != "high":
         return output_payload
 
-    if agent_id == IDEA_GENERATOR_AGENT_ID:
+    if agent_id in {IDEA_GENERATOR_AGENT_ID, EXPERIMENT_PLANNER_AGENT_ID}:
         warnings_value = output_payload.get("warnings")
         warnings = [*warnings_value] if isinstance(warnings_value, list) else []
         string_warnings = {warning for warning in warnings if isinstance(warning, str)}

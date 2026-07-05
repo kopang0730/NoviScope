@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { Quest, StageCard } from "../api/types";
 import { Badge } from "./badge";
 import { Button, buttonClassName } from "./button";
 import { Card, CardHeading } from "./card";
+import { ResearchCanvas } from "./research-canvas";
 import { StageRunSummary } from "./stage-output-summary";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
@@ -29,6 +31,7 @@ export function QuestWorkflowPanel({
   readonly stages: readonly StageCard[];
 }) {
   const { t } = useI18n();
+  const [viewMode, setViewMode] = useState<"canvas" | "list">("canvas");
 
   return (
     <Card>
@@ -57,10 +60,40 @@ export function QuestWorkflowPanel({
             </div>
           </div>
 
+          <div className="inline-flex w-fit rounded-lg border border-slate-200 bg-slate-50 p-1">
+            <button
+              className={[
+                "rounded-md px-3 py-1.5 text-sm font-medium transition",
+                viewMode === "canvas" ? "bg-white text-teal-700 shadow-sm" : "text-slate-600 hover:text-slate-900",
+              ].join(" ")}
+              onClick={() => setViewMode("canvas")}
+              type="button"
+            >
+              {t("canvasView")}
+            </button>
+            <button
+              className={[
+                "rounded-md px-3 py-1.5 text-sm font-medium transition",
+                viewMode === "list" ? "bg-white text-teal-700 shadow-sm" : "text-slate-600 hover:text-slate-900",
+              ].join(" ")}
+              onClick={() => setViewMode("list")}
+              type="button"
+            >
+              {t("stageListView")}
+            </button>
+          </div>
+
           {stages.length === 0 ? (
             <p className="rounded-lg border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-500">
               {t("noStagesFound")}
             </p>
+          ) : viewMode === "canvas" ? (
+            <ResearchCanvas
+              onRunStage={onRunStage}
+              runningStageId={runningStageId}
+              selectedQuest={selectedQuest}
+              stages={stages}
+            />
           ) : (
             <div className="space-y-3">
               {stages.map((stage, index) => (

@@ -4,11 +4,13 @@ import { useI18n } from "../i18n/i18n-context";
 import { labelFromEnum } from "../lib/format";
 import {
   demandValidatorAgentId,
+  experimentPlannerAgentId,
   getStageRunAvailability,
   ideaGeneratorAgentId,
 } from "../lib/stages";
 import { Badge } from "./badge";
 import { Card, CardHeading } from "./card";
+import { ExperimentPlannerOutput } from "./experiment-planner-output";
 import { GapHypothesisOutput } from "./gap-hypothesis-output";
 import { LiteratureScoutOutput } from "./literature-scout-output";
 
@@ -144,6 +146,20 @@ export function StageOutputPanel({
         </div>
         <div className="mt-5">
           <GapHypothesisOutput onStageChange={onStageChange} stage={stage} />
+        </div>
+      </Card>
+    );
+  }
+
+  if (stage.agent_id === experimentPlannerAgentId) {
+    return (
+      <Card>
+        <CardHeading description={t("experimentPlannerDescription")} title={t("experimentPlannerResult")} />
+        <div className="mt-5">
+          <StageRunSummary stage={stage} />
+        </div>
+        <div className="mt-5">
+          <ExperimentPlannerOutput onStageChange={onStageChange} stage={stage} />
         </div>
       </Card>
     );
