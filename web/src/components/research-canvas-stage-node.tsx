@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import type { Quest, StageCard, StageStatus } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
 import { labelFromEnum } from "../lib/format";
+import { isHumanGateStage, type CanvasDetail } from "../lib/research-canvas-data";
 import {
   getLocalizedStageRunGateReason,
   type StageRunGate,
@@ -9,11 +10,6 @@ import {
 import { stageTone } from "../lib/status-tones";
 import { Badge } from "./badge";
 import { Button, buttonClassName } from "./button";
-
-export type CanvasDetail = {
-  readonly label: string;
-  readonly value: string;
-};
 
 function statusBorderClassName(status: StageStatus) {
   if (status === "complete") {
@@ -49,7 +45,7 @@ function buildStageSignal(
   if (stage.human_approved === false) {
     return t("canvasGateRejected");
   }
-  if (stage.status === "complete" && (stage.agent_id === "demand_validator" || stage.agent_id === "idea_generator")) {
+  if (stage.status === "complete" && isHumanGateStage(stage)) {
     return t("humanReviewRequired");
   }
   if (stageRunGate.canRun) {
@@ -68,7 +64,9 @@ type CanvasStageNodeProps = {
   readonly details: readonly CanvasDetail[];
   readonly index: number;
   readonly isNextAction: boolean;
+  readonly isSelected: boolean;
   readonly onRunStage: (stageId: string) => void;
+  readonly onSelectStage: (stageId: string) => void;
   readonly phaseLabel: string;
   readonly runningStageId: string | null;
   readonly selectedQuest: Quest;
@@ -81,7 +79,9 @@ export function CanvasStageNode({
   details,
   index,
   isNextAction,
+  isSelected,
   onRunStage,
+  onSelectStage,
   phaseLabel,
   runningStageId,
   selectedQuest,
@@ -107,7 +107,8 @@ export function CanvasStageNode({
         className={[
           "flex min-h-[380px] flex-col rounded-lg border p-4 shadow-sm transition",
           statusBorderClassName(stage.status),
-          isNextAction ? "ring-2 ring-teal-400 ring-offset-2" : "",
+          isSelected ? "ring-2 ring-teal-500 ring-offset-2" : "",
+          !isSelected && isNextAction ? "ring-2 ring-teal-300 ring-offset-2" : "",
         ].join(" ")}
       >
         <div className="flex items-start justify-between gap-3">
@@ -168,6 +169,9 @@ export function CanvasStageNode({
         </div>
 
         <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
+          <Button onClick={() => onSelectStage(stage.id)} size="sm" variant={isSelected ? "primary" : "secondary"}>
+            {isSelected ? t("canvasSelectedStage") : t("canvasInspectStage")}
+          </Button>
           {stageRunGate.canRun ? (
             <Button loading={runningStageId === stage.id} onClick={() => onRunStage(stage.id)} size="sm">
               {t("runStage")}
