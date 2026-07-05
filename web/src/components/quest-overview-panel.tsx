@@ -3,11 +3,12 @@ import type { Quest, StageCard } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
 import { buildPreviewData, findNextStage, parseIntakeBrief, summarizeProgress } from "../lib/quest-overview";
+import { buildQuestReviewPacket } from "../lib/quest-review-export";
 import { getLocalizedStageRunReason } from "../lib/stage-run-text";
 import { paperMeetingWriterAgentId } from "../lib/stages";
 import { questTone, stageTone } from "../lib/status-tones";
 import { Badge } from "./badge";
-import { buttonClassName } from "./button";
+import { Button, buttonClassName } from "./button";
 import { Card, CardHeading } from "./card";
 
 type QuestOverviewPanelProps = {
@@ -66,6 +67,17 @@ function usePreviewItems(stages: readonly StageCard[]): readonly PreviewItem[] {
   ];
 }
 
+function downloadReviewPacket(quest: Quest, stages: readonly StageCard[]) {
+  const packet = buildQuestReviewPacket(quest, stages);
+  const blob = new Blob([packet.content], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = packet.filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 export function QuestOverviewPanel({
   detailError,
   detailLoading,
@@ -83,7 +95,17 @@ export function QuestOverviewPanel({
 
   return (
     <Card>
-      <CardHeading description={t("questOverviewDescription")} title={t("questOverviewTitle")} />
+      <CardHeading
+        action={
+          selectedQuest ? (
+            <Button onClick={() => downloadReviewPacket(selectedQuest, stages)} size="sm" type="button" variant="secondary">
+              {t("downloadReviewPacket")}
+            </Button>
+          ) : null
+        }
+        description={t("questOverviewDescription")}
+        title={t("questOverviewTitle")}
+      />
       {!selectedQuestId ? <p className="mt-4 text-sm text-slate-500">{t("questOverviewEmpty")}</p> : null}
       {detailError ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{detailError}</p> : null}
       {detailLoading ? <p className="mt-4 text-sm text-slate-500">{t("loadingQuestDetail")}</p> : null}
