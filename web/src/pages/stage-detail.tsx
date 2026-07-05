@@ -7,6 +7,7 @@ import { useAuth } from "../auth/auth-context";
 import { Badge } from "../components/badge";
 import { Button, buttonClassName } from "../components/button";
 import { Card, CardHeading } from "../components/card";
+import { StageProviderReadinessCard } from "../components/stage-provider-readiness";
 import { StageEditor } from "../components/stage-editor";
 import { StageOutputPanel } from "../components/stage-output-summary";
 import { useI18n } from "../i18n/i18n-context";
@@ -212,6 +213,8 @@ export function StageDetailPage() {
               </p>
             )}
           </Card>
+
+          <StageProviderReadinessCard stage={stage} />
 
           <StageOutputPanel onStageChange={setStage} stage={stage} />
 

@@ -5,6 +5,7 @@ import { Badge } from "./badge";
 import { Button, buttonClassName } from "./button";
 import { Card, CardHeading } from "./card";
 import { ResearchCanvas } from "./research-canvas";
+import { WorkflowProviderReadinessNotice } from "./stage-provider-readiness";
 import { StageRunSummary } from "./stage-output-summary";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
@@ -97,50 +98,55 @@ export function QuestWorkflowPanel({
             <p className="rounded-lg border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-500">
               {t("noStagesFound")}
             </p>
-          ) : viewMode === "canvas" ? (
-            <ResearchCanvas
-              onRunStage={onRunStage}
-              runningStageId={runningStageId}
-              selectedQuest={selectedQuest}
-              stages={stages}
-            />
           ) : (
-            <div className="space-y-3">
-              {stages.map((stage, index) => (
-                <div className="rounded-lg border border-slate-200 p-4" key={stage.id}>
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-teal-200 bg-teal-50 text-sm font-semibold text-teal-700">
-                      {index + 1}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-col gap-3">
-                        <div>
-                          <p className="font-medium text-slate-900">{stage.title}</p>
-                          <p className="mt-1 text-sm text-slate-500">{stage.agent_id}</p>
+            <>
+              <WorkflowProviderReadinessNotice stages={stages} />
+              {viewMode === "canvas" ? (
+                <ResearchCanvas
+                  onRunStage={onRunStage}
+                  runningStageId={runningStageId}
+                  selectedQuest={selectedQuest}
+                  stages={stages}
+                />
+              ) : (
+                <div className="space-y-3">
+                  {stages.map((stage, index) => (
+                    <div className="rounded-lg border border-slate-200 p-4" key={stage.id}>
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-teal-200 bg-teal-50 text-sm font-semibold text-teal-700">
+                          {index + 1}
                         </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge tone={stageTone(stage.status)}>{labelFromEnum(stage.status)}</Badge>
-                          {canRunStage(stage) ? (
-                            <Button loading={runningStageId === stage.id} onClick={() => onRunStage(stage.id)} size="sm">
-                              {t("runStage")}
-                            </Button>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-col gap-3">
+                            <div>
+                              <p className="font-medium text-slate-900">{stage.title}</p>
+                              <p className="mt-1 text-sm text-slate-500">{stage.agent_id}</p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge tone={stageTone(stage.status)}>{labelFromEnum(stage.status)}</Badge>
+                              {canRunStage(stage) ? (
+                                <Button loading={runningStageId === stage.id} onClick={() => onRunStage(stage.id)} size="sm">
+                                  {t("runStage")}
+                                </Button>
+                              ) : null}
+                              <Link className={buttonClassName({ size: "sm", variant: "secondary" })} to={`/stages/${stage.id}?quest=${selectedQuest.id}`}>
+                                {t("open")}
+                              </Link>
+                            </div>
+                          </div>
+                          <StageRunSummary stage={stage} />
+                          {stage.review_notes ? (
+                            <p className="mt-2 text-xs text-slate-500">
+                              {t("reviewNotes")}: {stage.review_notes}
+                            </p>
                           ) : null}
-                          <Link className={buttonClassName({ size: "sm", variant: "secondary" })} to={`/stages/${stage.id}?quest=${selectedQuest.id}`}>
-                            {t("open")}
-                          </Link>
                         </div>
                       </div>
-                      <StageRunSummary stage={stage} />
-                      {stage.review_notes ? (
-                        <p className="mt-2 text-xs text-slate-500">
-                          {t("reviewNotes")}: {stage.review_notes}
-                        </p>
-                      ) : null}
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       ) : null}
