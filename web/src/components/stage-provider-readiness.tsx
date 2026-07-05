@@ -1,78 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { getAgentAssignments } from "../api/agent-assignments";
-import { getErrorMessage } from "../api/client";
-import { getProviders } from "../api/providers";
-import type { AgentAssignment, Provider, StageCard } from "../api/types";
-import { useAuth } from "../auth/auth-context";
-import { useI18n, type TranslationKey } from "../i18n/i18n-context";
+import type { StageCard } from "../api/types";
+import { useI18n } from "../i18n/i18n-context";
 import { labelFromEnum } from "../lib/format";
+import type { ProviderReadinessData } from "../lib/provider-readiness-data";
 import {
   getStageProviderReadiness,
   isModelBackedStage,
   type ProviderReadiness,
-  type ProviderReadinessReason,
-  type ProviderReadinessSource,
   type ProviderReadinessStatus,
 } from "../lib/provider-readiness";
+import {
+  providerReadinessLabelKey,
+  providerReadinessReasonKey,
+  providerReadinessSourceKey,
+} from "../lib/provider-readiness-text";
 import { Badge, type BadgeTone } from "./badge";
 import { buttonClassName } from "./button";
 import { Card, CardHeading } from "./card";
-
-type ProviderReadinessData = {
-  readonly assignments: readonly AgentAssignment[];
-  readonly error: string | null;
-  readonly loading: boolean;
-  readonly providers: readonly Provider[];
-};
-
-function useProviderReadinessData(): ProviderReadinessData {
-  const { currentUser } = useAuth();
-  const [assignments, setAssignments] = useState<AgentAssignment[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [providers, setProviders] = useState<Provider[]>([]);
-
-  useEffect(() => {
-    if (!currentUser) {
-      setAssignments([]);
-      setError(null);
-      setLoading(false);
-      setProviders([]);
-      return;
-    }
-
-    let active = true;
-    setError(null);
-    setLoading(true);
-
-    void Promise.all([getProviders(), getAgentAssignments()])
-      .then(([nextProviders, nextAssignments]) => {
-        if (!active) {
-          return;
-        }
-        setAssignments(nextAssignments);
-        setProviders(nextProviders);
-      })
-      .catch((nextError) => {
-        if (!active) {
-          return;
-        }
-        setError(getErrorMessage(nextError));
-      })
-      .finally(() => {
-        if (active) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [currentUser]);
-
-  return { assignments, error, loading, providers };
-}
 
 function readinessTone(status: ProviderReadinessStatus): BadgeTone {
   if (status === "blocked") {
@@ -85,43 +30,6 @@ function readinessTone(status: ProviderReadinessStatus): BadgeTone {
     return "green";
   }
   return "gray";
-}
-
-function readinessLabelKey(status: ProviderReadinessStatus): TranslationKey {
-  if (status === "blocked") {
-    return "providerReadinessBlocked";
-  }
-  if (status === "server_managed") {
-    return "providerReadinessServerManaged";
-  }
-  if (status === "ready") {
-    return "providerReadinessReady";
-  }
-  return "providerReadinessNotRequired";
-}
-
-function readinessReasonKey(reason: ProviderReadinessReason): TranslationKey {
-  const reasonKeys: Record<ProviderReadinessReason, TranslationKey> = {
-    agent_default_ready: "providerReadinessReasonAgentDefaultReady",
-    assigned_provider_inactive: "providerReadinessReasonAssignedInactive",
-    assigned_provider_missing: "providerReadinessReasonAssignedMissing",
-    assigned_provider_unsupported: "providerReadinessReasonAssignedUnsupported",
-    auto_select_ready: "providerReadinessReasonAutoSelectReady",
-    missing_provider: "providerReadinessReasonMissingProvider",
-    not_required: "providerReadinessReasonNotRequired",
-    server_managed: "providerReadinessReasonServerManaged",
-  };
-  return reasonKeys[reason];
-}
-
-function readinessSourceKey(source: ProviderReadinessSource): TranslationKey {
-  const sourceKeys: Record<ProviderReadinessSource, TranslationKey> = {
-    agent_default: "providerReadinessSourceAgentDefault",
-    auto_select: "providerReadinessSourceAutoSelect",
-    not_required: "providerReadinessSourceNotRequired",
-    server_managed: "providerReadinessSourceServerManaged",
-  };
-  return sourceKeys[source];
 }
 
 function ProviderReadinessDetails({ readiness }: { readonly readiness: ProviderReadiness }) {
@@ -149,7 +57,7 @@ function ProviderReadinessDetails({ readiness }: { readonly readiness: ProviderR
           {t("providerReadinessSource")}
         </p>
         <p className="mt-1 font-medium text-slate-900">
-          {t(readinessSourceKey(readiness.source))}
+          {t(providerReadinessSourceKey(readiness.source))}
         </p>
       </div>
       <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
@@ -166,9 +74,15 @@ function ProviderReadinessDetails({ readiness }: { readonly readiness: ProviderR
   );
 }
 
-export function StageProviderReadinessCard({ stage }: { readonly stage: StageCard }) {
+export function StageProviderReadinessCard({
+  readinessData,
+  stage,
+}: {
+  readonly readinessData: ProviderReadinessData;
+  readonly stage: StageCard;
+}) {
   const { t } = useI18n();
-  const { assignments, error, loading, providers } = useProviderReadinessData();
+  const { assignments, error, loaded, loading, providers } = readinessData;
   const readiness = useMemo(
     () => getStageProviderReadiness(stage, providers, assignments),
     [assignments, providers, stage],
@@ -182,13 +96,13 @@ export function StageProviderReadinessCard({ stage }: { readonly stage: StageCar
       />
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Badge tone={readinessTone(readiness.status)}>
-          {t(readinessLabelKey(readiness.status))}
+          {t(providerReadinessLabelKey(readiness.status))}
         </Badge>
         {readiness.providerKind ? (
           <Badge tone="gray">{labelFromEnum(readiness.providerKind)}</Badge>
         ) : null}
       </div>
-      {loading ? (
+      {loading || !loaded ? (
         <p className="mt-4 text-sm text-slate-500">{t("providerReadinessLoading")}</p>
       ) : null}
       {error ? (
@@ -197,7 +111,7 @@ export function StageProviderReadinessCard({ stage }: { readonly stage: StageCar
         </p>
       ) : null}
       <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-        {t(readinessReasonKey(readiness.reason))}
+        {t(providerReadinessReasonKey(readiness.reason))}
       </p>
       <div className="mt-4">
         <ProviderReadinessDetails readiness={readiness} />
@@ -215,12 +129,14 @@ export function StageProviderReadinessCard({ stage }: { readonly stage: StageCar
 }
 
 export function WorkflowProviderReadinessNotice({
+  readinessData,
   stages,
 }: {
+  readonly readinessData: ProviderReadinessData;
   readonly stages: readonly StageCard[];
 }) {
   const { t } = useI18n();
-  const { assignments, error, loading, providers } = useProviderReadinessData();
+  const { assignments, error, loaded, loading, providers } = readinessData;
   const modelBackedStages = useMemo(() => stages.filter(isModelBackedStage), [stages]);
   const readinessByStage = useMemo(
     () =>
@@ -239,7 +155,7 @@ export function WorkflowProviderReadinessNotice({
     return null;
   }
 
-  if (loading) {
+  if (loading || !loaded) {
     return (
       <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
         {t("providerReadinessLoading")}

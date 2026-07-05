@@ -11,6 +11,7 @@ import { Input } from "../components/input";
 import { ResearchCanvas } from "../components/research-canvas";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
+import { useProviderReadinessData } from "../lib/provider-readiness-data";
 import { questTone } from "../lib/status-tones";
 
 function directionSummary(value: string) {
@@ -32,6 +33,7 @@ export function CanvasWorkspacePage() {
   const [runningStageId, setRunningStageId] = useState<string | null>(null);
   const [stageRunError, setStageRunError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const providerReadinessData = useProviderReadinessData();
 
   const selectedQuestId = searchParams.get("quest");
 
@@ -235,6 +237,7 @@ export function CanvasWorkspacePage() {
               ) : (
                 <ResearchCanvas
                   onRunStage={(stageId) => void handleRunStage(stageId)}
+                  providerReadinessData={providerReadinessData}
                   runningStageId={runningStageId}
                   selectedQuest={selectedQuest}
                   showHeading={false}

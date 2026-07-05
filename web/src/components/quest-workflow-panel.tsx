@@ -6,14 +6,15 @@ import { Button, buttonClassName } from "./button";
 import { Card, CardHeading } from "./card";
 import { ResearchCanvas } from "./research-canvas";
 import { WorkflowProviderReadinessNotice } from "./stage-provider-readiness";
-import { StageRunSummary } from "./stage-output-summary";
+import { StageRunSummary } from "./stage-run-summary";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
-import { questTone, stageTone } from "../lib/status-tones";
+import { useProviderReadinessData } from "../lib/provider-readiness-data";
 import {
-  getLocalizedWorkflowReadinessReason,
-  getWorkflowStageReadiness,
-} from "../lib/workflow-readiness";
+  getLocalizedStageRunGateReason,
+  getStageRunGate,
+} from "../lib/stage-run-gate";
+import { questTone, stageTone } from "../lib/status-tones";
 
 export function QuestWorkflowPanel({
   detailError,
@@ -36,6 +37,7 @@ export function QuestWorkflowPanel({
 }) {
   const { t } = useI18n();
   const [viewMode, setViewMode] = useState<"canvas" | "list">("canvas");
+  const providerReadinessData = useProviderReadinessData();
 
   return (
     <Card className="min-w-0">
@@ -103,10 +105,11 @@ export function QuestWorkflowPanel({
             </p>
           ) : (
             <>
-              <WorkflowProviderReadinessNotice stages={stages} />
+              <WorkflowProviderReadinessNotice readinessData={providerReadinessData} stages={stages} />
               {viewMode === "canvas" ? (
                 <ResearchCanvas
                   onRunStage={onRunStage}
+                  providerReadinessData={providerReadinessData}
                   runningStageId={runningStageId}
                   selectedQuest={selectedQuest}
                   stages={stages}
@@ -114,7 +117,11 @@ export function QuestWorkflowPanel({
               ) : (
                 <div className="space-y-3">
                   {stages.map((stage, index) => {
-                    const workflowReadiness = getWorkflowStageReadiness(stage, stages);
+                    const stageRunGate = getStageRunGate({
+                      providerReadinessData,
+                      stage,
+                      stages,
+                    });
                     return (
                       <div className="rounded-lg border border-slate-200 p-4" key={stage.id}>
                         <div className="flex items-start gap-3">
@@ -129,10 +136,10 @@ export function QuestWorkflowPanel({
                               </div>
                               <div className="flex flex-wrap items-center gap-2">
                                 <Badge tone={stageTone(stage.status)}>{labelFromEnum(stage.status)}</Badge>
-                                <Badge tone={workflowReadiness.canRun ? "teal" : "amber"}>
-                                  {workflowReadiness.canRun ? t("stageRunReady") : t("stageRunUnavailable")}
+                                <Badge tone={stageRunGate.canRun ? "teal" : "amber"}>
+                                  {stageRunGate.canRun ? t("stageRunReady") : t("stageRunUnavailable")}
                                 </Badge>
-                                {workflowReadiness.canRun ? (
+                                {stageRunGate.canRun ? (
                                   <Button loading={runningStageId === stage.id} onClick={() => onRunStage(stage.id)} size="sm">
                                     {t("runStage")}
                                   </Button>
@@ -142,10 +149,10 @@ export function QuestWorkflowPanel({
                                 </Link>
                               </div>
                             </div>
-                            <StageRunSummary stage={stage} workflowReadiness={workflowReadiness} />
-                            {!workflowReadiness.canRun ? (
+                            <StageRunSummary stage={stage} stageRunGate={stageRunGate} />
+                            {!stageRunGate.canRun ? (
                               <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                                {getLocalizedWorkflowReadinessReason(workflowReadiness, t)}
+                                {getLocalizedStageRunGateReason(stageRunGate, t)}
                               </p>
                             ) : null}
                             {stage.review_notes ? (
