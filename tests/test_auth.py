@@ -78,3 +78,30 @@ def test_register_member_rejects_invalid_invite(db_session: Session):
             display_name="Student",
             password="student-password",
         )
+
+
+def test_register_member_rejects_expired_invite(db_session: Session):
+    admin = User(
+        email="admin@example.com",
+        display_name="Admin",
+        password_hash="hash",
+        role=UserRole.ADMIN,
+    )
+    invite = InviteCode(
+        code="LAB-EXPIRED",
+        created_by_user_id=admin.id,
+        expires_at="2000-01-01T00:00:00+00:00",
+    )
+    db_session.add(admin)
+    db_session.add(invite)
+    db_session.commit()
+
+    service = AuthService(db_session)
+
+    with pytest.raises(ValueError, match="Invalid invite code"):
+        service.register_member(
+            invite_code="LAB-EXPIRED",
+            email="student@example.com",
+            display_name="Student",
+            password="student-password",
+        )

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlmodel import Session, select
 
 from noviscope.auth.passwords import hash_password, verify_password
@@ -67,4 +69,13 @@ class AuthService:
             raise ValueError("Invalid invite code")
         if invite.used_count >= invite.max_uses:
             raise ValueError("Invalid invite code")
+        if invite.expires_at is not None:
+            try:
+                expires_at = datetime.fromisoformat(invite.expires_at)
+            except ValueError as exc:
+                raise ValueError("Invalid invite code") from exc
+            if expires_at.tzinfo is None:
+                raise ValueError("Invalid invite code")
+            if expires_at <= utc_now():
+                raise ValueError("Invalid invite code")
         return invite
