@@ -124,9 +124,12 @@ cp .env.example .env
 - `NOVISCOPE_SESSION_COOKIE_SECURE=true`：通过 HTTPS 提供服务时保持开启
 - `NOVISCOPE_ARTIFACT_ROOT`：持久化 artifact 目录
 - `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=false`：共享部署默认应关闭
+- `NOVISCOPE_DEV_ADMIN_TOKEN`：仅在临时开启 bootstrap 请求头时设置
 
-如果 `NOVISCOPE_DATABASE_URL` 不是 SQLite，且任一 secret 仍然保留开发占位值，
-NoviScope 现在会在启动阶段直接拒绝运行。
+如果 `NOVISCOPE_DATABASE_URL` 不是 SQLite，且 provider/session secret 仍然是
+占位值、过短或字符多样性太低，NoviScope 会在启动阶段直接拒绝运行。如果
+`NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=true`，`NOVISCOPE_DEV_ADMIN_TOKEN` 也必须是
+高熵 token。
 
 开发环境仍然可以继续使用 SQLite：
 
@@ -144,15 +147,23 @@ uvicorn noviscope.main:app --host 127.0.0.1 --port 8000
 
 ### bootstrap/测试专用请求头
 
-只有在 `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=true` 且当前没有已登录 admin session 时，`POST /admin/invites` 才接受 `X-NoviScope-Dev-Admin: true`。这个请求头只应用于 bootstrap 或测试，不应作为共享部署中的常规管理方式。
+只有在 `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=true`、请求头
+`X-NoviScope-Dev-Admin` 的值精确匹配 `NOVISCOPE_DEV_ADMIN_TOKEN`，且当前没有已登录
+admin session 时，`POST /admin/invites` 才接受这个请求头。这个请求头只应用于
+bootstrap 或测试，不应作为共享部署中的常规管理方式。
 
 当前 alpha 还没有独立的“首个 admin 创建”路由。比较现实的初始化方式是：
 
-1. 临时把 `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED` 设为 `true`。
-2. 用 dev admin header 创建一个 bootstrap invite。
-3. 通过 `/auth/register` 注册 bootstrap 账号。
-4. 直接在 PostgreSQL 中把这个账号提升为 `admin`。
-5. 以该 admin 身份登录，继续创建正式邀请码和 shared provider，然后把 `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED` 改回 `false` 并重启 API。
+1. 生成一次性 bootstrap token：
+   ```bash
+   python -c "import secrets; print(secrets.token_urlsafe(32))"
+   ```
+2. 临时把 `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED` 设为 `true`，并把
+   `NOVISCOPE_DEV_ADMIN_TOKEN` 设为上一步生成的 token。
+3. 用 dev admin header 创建一个 bootstrap invite，请求头值使用上一步生成的 token。
+4. 通过 `/auth/register` 注册 bootstrap 账号。
+5. 直接在 PostgreSQL 中把这个账号提升为 `admin`。
+6. 以该 admin 身份登录，继续创建正式邀请码和 shared provider，然后把 `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED` 改回 `false` 并重启 API。
 
 示例 SQL：
 
@@ -180,12 +191,22 @@ npm install
 npm run build
 ```
 
-将 `web/dist` 通过 Nginx 或 Caddy 挂到实验室 URL，并把 `/api/` 反向代理到 FastAPI：
+将 `web/dist` 通过 Nginx 或 Caddy 挂到实验室 URL，并把 `/api/` 反向代理到 FastAPI。
+共享部署路径应使用 HTTPS，因为 session cookie 默认带 secure 标记：
 
 ```nginx
 server {
   listen 80;
   server_name noviscope.example.internal;
+  return 301 https://$host$request_uri;
+}
+
+server {
+  listen 443 ssl;
+  server_name noviscope.example.internal;
+
+  ssl_certificate /etc/ssl/certs/noviscope.pem;
+  ssl_certificate_key /etc/ssl/private/noviscope.key;
 
   location /api/ {
     proxy_pass http://127.0.0.1:8000/;
@@ -201,6 +222,9 @@ server {
 }
 ```
 
+如果只是临时在可信实验室内网用 HTTP 测试，可以设置
+`NOVISCOPE_SESSION_COOKIE_SECURE=false`；不要在可暴露的共享部署中使用这个设置。
+
 部署完成后的正常使用流程：
 
 1. 服务器管理员创建邀请码和 shared provider。
@@ -214,6 +238,7 @@ server {
 
 ```bash
 NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=true \
+NOVISCOPE_DEV_ADMIN_TOKEN=local-dev-admin-token-0123456789abcdef \
 NOVISCOPE_SESSION_COOKIE_SECURE=false \
 uvicorn noviscope.main:app --reload
 ```
@@ -238,7 +263,7 @@ curl -s http://127.0.0.1:8000/agents
 ```bash
 curl -s -X POST http://127.0.0.1:8000/admin/invites \
   -H "Content-Type: application/json" \
-  -H "X-NoviScope-Dev-Admin: true" \
+  -H "X-NoviScope-Dev-Admin: ${NOVISCOPE_DEV_ADMIN_TOKEN}" \
   -d '{"code":"BOOTSTRAP-INVITE","max_uses":1}'
 ```
 

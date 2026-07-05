@@ -115,7 +115,7 @@ def test_create_schema_upgrades_legacy_provider_table_and_allows_duplicate_names
         assert {"scope", "owner_user_id", "created_by_user_id"}.issubset(columns)
         assert connection.execute(
             text("SELECT scope FROM modelprovider WHERE id = 'provider_legacy_1'")
-        ).scalar_one() == "personal"
+        ).scalar_one() == "shared"
 
         index_rows = connection.execute(
             text("PRAGMA index_list('modelprovider')")
@@ -168,6 +168,17 @@ def test_create_schema_upgrades_legacy_provider_table_and_allows_duplicate_names
         assert connection.execute(
             text("SELECT COUNT(*) FROM modelprovider WHERE name = 'shared-name'")
         ).scalar_one() == 2
+
+    with Session(engine) as session:
+        member = make_user("member@example.com")
+        session.add(member)
+        session.commit()
+
+        providers = ProviderService(session, SecretBox("test-secret")).list_providers_for_user(
+            member
+        )
+
+        assert "provider_legacy_1" in {provider.id for provider in providers}
 
 
 def test_member_cannot_access_other_users_personal_provider(db_session: Session):

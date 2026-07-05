@@ -148,9 +148,12 @@ Shared deployment should set:
 - `NOVISCOPE_SESSION_COOKIE_SECURE=true` when serving the app over HTTPS
 - `NOVISCOPE_ARTIFACT_ROOT` to a persistent artifact directory
 - `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=false` by default
+- `NOVISCOPE_DEV_ADMIN_TOKEN` only when temporarily enabling the bootstrap header
 
 If `NOVISCOPE_DATABASE_URL` is non-SQLite, NoviScope now refuses to start while
-either secret is still set to the development placeholder.
+provider/session secrets are placeholders, too short, or low-entropy. If
+`NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=true`, `NOVISCOPE_DEV_ADMIN_TOKEN` must also
+be a high-entropy token.
 
 Development can still use SQLite:
 
@@ -168,18 +171,24 @@ uvicorn noviscope.main:app --host 127.0.0.1 --port 8000
 
 ### Bootstrap/test header
 
-`POST /admin/invites` accepts `X-NoviScope-Dev-Admin: true` only when
-`NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=true` and there is no authenticated admin
-session. Use this header only for bootstrap/testing, not as a normal admin path.
+`POST /admin/invites` accepts `X-NoviScope-Dev-Admin` only when
+`NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=true`, the header value exactly matches
+`NOVISCOPE_DEV_ADMIN_TOKEN`, and there is no authenticated admin session. Use
+this header only for bootstrap/testing, not as a normal admin path.
 
 The current alpha does not yet include a dedicated first-admin creation route. A
 practical initial setup is:
 
-1. Temporarily set `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=true`.
-2. Create a bootstrap invite with the dev header.
-3. Register the bootstrap account through `/auth/register`.
-4. Promote that account to `admin` directly in PostgreSQL.
-5. Log in as that admin, create ongoing invites/shared providers, then set
+1. Generate a one-time bootstrap token:
+   ```bash
+   python -c "import secrets; print(secrets.token_urlsafe(32))"
+   ```
+2. Temporarily set `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=true` and
+   `NOVISCOPE_DEV_ADMIN_TOKEN=<generated-token>`.
+3. Create a bootstrap invite with the dev header value set to the generated token.
+4. Register the bootstrap account through `/auth/register`.
+5. Promote that account to `admin` directly in PostgreSQL.
+6. Log in as that admin, create ongoing invites/shared providers, then set
    `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=false` and restart the API.
 
 Example promotion SQL:
@@ -209,12 +218,22 @@ npm run build
 ```
 
 Serve `web/dist` from your lab URL through Nginx or Caddy and proxy `/api/` to
-the FastAPI backend:
+the FastAPI backend. The shared deployment path should use HTTPS because session
+cookies are secure by default:
 
 ```nginx
 server {
   listen 80;
   server_name noviscope.example.internal;
+  return 301 https://$host$request_uri;
+}
+
+server {
+  listen 443 ssl;
+  server_name noviscope.example.internal;
+
+  ssl_certificate /etc/ssl/certs/noviscope.pem;
+  ssl_certificate_key /etc/ssl/private/noviscope.key;
 
   location /api/ {
     proxy_pass http://127.0.0.1:8000/;
@@ -230,6 +249,10 @@ server {
 }
 ```
 
+If you temporarily test on plain HTTP inside a trusted lab network, set
+`NOVISCOPE_SESSION_COOKIE_SECURE=false`; do not use that setting for an exposed
+shared deployment.
+
 Once deployed, the normal lab flow is:
 
 1. The server admin creates invitation codes and shared providers.
@@ -244,6 +267,7 @@ Run the service for local bootstrap smoke only:
 
 ```bash
 NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=true \
+NOVISCOPE_DEV_ADMIN_TOKEN=local-dev-admin-token-0123456789abcdef \
 NOVISCOPE_SESSION_COOKIE_SECURE=false \
 uvicorn noviscope.main:app --reload
 ```
@@ -268,7 +292,7 @@ Create a bootstrap invite for testing or initial setup only:
 ```bash
 curl -s -X POST http://127.0.0.1:8000/admin/invites \
   -H "Content-Type: application/json" \
-  -H "X-NoviScope-Dev-Admin: true" \
+  -H "X-NoviScope-Dev-Admin: ${NOVISCOPE_DEV_ADMIN_TOKEN}" \
   -d '{"code":"BOOTSTRAP-INVITE","max_uses":1}'
 ```
 

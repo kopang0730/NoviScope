@@ -68,10 +68,10 @@ def _upgrade_modelprovider_schema(engine: Engine) -> None:
         if "scope" in missing_columns:
             connection.execute(text("ALTER TABLE modelprovider ADD COLUMN scope VARCHAR"))
             connection.execute(
-                text("UPDATE modelprovider SET scope = 'personal' WHERE scope IS NULL")
+                text("UPDATE modelprovider SET scope = 'shared' WHERE scope IS NULL")
             )
             connection.execute(
-                text("ALTER TABLE modelprovider ALTER COLUMN scope SET DEFAULT 'personal'")
+                text("ALTER TABLE modelprovider ALTER COLUMN scope SET DEFAULT 'shared'")
             )
             connection.execute(text("ALTER TABLE modelprovider ALTER COLUMN scope SET NOT NULL"))
         if "owner_user_id" in missing_columns:
@@ -159,7 +159,7 @@ def _upgrade_sqlite_modelprovider_schema(engine: Engine, existing_columns: set[s
                 id,
                 name,
                 kind,
-                {"COALESCE(scope, 'personal')" if "scope" in existing_columns else "'personal'"},
+                {"COALESCE(scope, 'shared')" if "scope" in existing_columns else "'shared'"},
                 {"owner_user_id" if "owner_user_id" in existing_columns else "NULL"},
                 {"created_by_user_id" if "created_by_user_id" in existing_columns else "NULL"},
                 base_url,

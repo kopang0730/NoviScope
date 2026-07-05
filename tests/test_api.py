@@ -7,12 +7,18 @@ from noviscope.db.session import create_db_engine
 from noviscope.main import create_app
 from noviscope.models.user import User, UserRole
 
+DEV_ADMIN_TOKEN = "test-dev-admin-token-0123456789abcdef"
+DEV_ADMIN_HEADERS = {"X-NoviScope-Dev-Admin": DEV_ADMIN_TOKEN}
+STRONG_PROVIDER_SECRET = "provider-secret-0123456789abcdef-strong"
+STRONG_SESSION_SECRET = "session-secret-0123456789abcdef-strong"
+STRONG_BOOTSTRAP_TOKEN = "bootstrap-token-0123456789abcdef-strong"
+
 
 def register_and_login(client: TestClient, invite_code: str, email: str) -> None:
     invite_response = client.post(
         "/admin/invites",
         json={"code": invite_code, "max_uses": 1},
-        headers={"X-NoviScope-Dev-Admin": "true"},
+        headers=DEV_ADMIN_HEADERS,
     )
     assert invite_response.status_code == 201
 
@@ -66,10 +72,12 @@ def test_agents_endpoint_lists_nine_agents():
 
 def test_deployment_safe_auth_defaults(monkeypatch):
     monkeypatch.delenv("NOVISCOPE_DEV_ADMIN_HEADER_ENABLED", raising=False)
+    monkeypatch.delenv("NOVISCOPE_DEV_ADMIN_TOKEN", raising=False)
     monkeypatch.delenv("NOVISCOPE_SESSION_COOKIE_SECURE", raising=False)
     settings = Settings(_env_file=None)
 
     assert settings.dev_admin_header_enabled is False
+    assert settings.dev_admin_token is None
     assert settings.session_cookie_secure is True
 
 
@@ -93,32 +101,63 @@ def test_sqlite_startup_allows_placeholder_secrets(monkeypatch):
     ("settings_kwargs", "expected_env_var"),
     [
         (
-            {"session_secret_key": "production-session-secret"},
+            {"session_secret_key": STRONG_SESSION_SECRET},
             "NOVISCOPE_PROVIDER_SECRET_KEY",
         ),
         (
-            {"provider_secret_key": "production-provider-secret"},
+            {"provider_secret_key": STRONG_PROVIDER_SECRET},
             "NOVISCOPE_SESSION_SECRET_KEY",
         ),
         (
             {
                 "provider_secret_key": "replace-with-a-long-random-secret",
-                "session_secret_key": "production-session-secret",
+                "session_secret_key": STRONG_SESSION_SECRET,
             },
             "NOVISCOPE_PROVIDER_SECRET_KEY",
         ),
         (
             {
-                "provider_secret_key": "production-provider-secret",
+                "provider_secret_key": STRONG_PROVIDER_SECRET,
                 "session_secret_key": "replace-with-a-different-long-random-secret",
             },
             "NOVISCOPE_SESSION_SECRET_KEY",
         ),
+        (
+            {
+                "provider_secret_key": "short",
+                "session_secret_key": STRONG_SESSION_SECRET,
+            },
+            "NOVISCOPE_PROVIDER_SECRET_KEY",
+        ),
+        (
+            {
+                "provider_secret_key": STRONG_PROVIDER_SECRET,
+                "session_secret_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            },
+            "NOVISCOPE_SESSION_SECRET_KEY",
+        ),
+        (
+            {
+                "provider_secret_key": STRONG_PROVIDER_SECRET,
+                "session_secret_key": STRONG_SESSION_SECRET,
+                "dev_admin_header_enabled": True,
+            },
+            "NOVISCOPE_DEV_ADMIN_TOKEN",
+        ),
+        (
+            {
+                "provider_secret_key": STRONG_PROVIDER_SECRET,
+                "session_secret_key": STRONG_SESSION_SECRET,
+                "dev_admin_header_enabled": True,
+                "dev_admin_token": "short",
+            },
+            "NOVISCOPE_DEV_ADMIN_TOKEN",
+        ),
     ],
 )
-def test_shared_deployment_rejects_placeholder_secrets_before_engine_creation(
+def test_shared_deployment_rejects_weak_secrets_before_engine_creation(
     monkeypatch,
-    settings_kwargs: dict[str, str],
+    settings_kwargs: dict[str, object],
     expected_env_var: str,
 ):
     settings = Settings(_env_file=None, **settings_kwargs)
@@ -140,8 +179,30 @@ def test_shared_deployment_rejects_placeholder_secrets_before_engine_creation(
 def test_shared_deployment_accepts_non_placeholder_secrets(monkeypatch):
     settings = Settings(
         _env_file=None,
-        provider_secret_key="production-provider-secret",
-        session_secret_key="production-session-secret",
+        provider_secret_key=STRONG_PROVIDER_SECRET,
+        session_secret_key=STRONG_SESSION_SECRET,
+    )
+    seen_database_urls: list[str] = []
+
+    def fake_create_db_engine(database_url: str) -> object:
+        seen_database_urls.append(database_url)
+        return object()
+
+    monkeypatch.setattr("noviscope.main.get_settings", lambda: settings)
+    monkeypatch.setattr("noviscope.main.create_db_engine", fake_create_db_engine)
+
+    create_app(database_url="postgresql://user:pass@localhost:5432/noviscope")
+
+    assert seen_database_urls == ["postgresql://user:pass@localhost:5432/noviscope"]
+
+
+def test_shared_deployment_accepts_strong_bootstrap_token(monkeypatch):
+    settings = Settings(
+        _env_file=None,
+        provider_secret_key=STRONG_PROVIDER_SECRET,
+        session_secret_key=STRONG_SESSION_SECRET,
+        dev_admin_header_enabled=True,
+        dev_admin_token=STRONG_BOOTSTRAP_TOKEN,
     )
     seen_database_urls: list[str] = []
 
@@ -509,7 +570,7 @@ def test_dev_admin_header_rejected_by_default():
         response = client.post(
             "/admin/invites",
             json={"code": "DEFAULT-DISABLED", "max_uses": 1},
-            headers={"X-NoviScope-Dev-Admin": "true"},
+            headers=DEV_ADMIN_HEADERS,
         )
 
         assert response.status_code == 403
@@ -522,11 +583,24 @@ def test_dev_admin_header_explicit_opt_in_permits_bootstrap(
         response = client.post(
             "/admin/invites",
             json={"code": "OPT-IN-BOOTSTRAP", "max_uses": 1},
-            headers={"X-NoviScope-Dev-Admin": "true"},
+            headers=DEV_ADMIN_HEADERS,
         )
 
         assert response.status_code == 201
         assert response.json()["code"] == "OPT-IN-BOOTSTRAP"
+
+
+def test_dev_admin_header_rejects_literal_true_when_token_is_configured(
+    dev_admin_header_enabled: None,
+):
+    with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
+        response = client.post(
+            "/admin/invites",
+            json={"code": "LITERAL-TRUE-BOOTSTRAP", "max_uses": 1},
+            headers={"X-NoviScope-Dev-Admin": "true"},
+        )
+
+        assert response.status_code == 403
 
 
 def test_register_rejects_weak_password(dev_admin_header_enabled: None):
@@ -534,7 +608,7 @@ def test_register_rejects_weak_password(dev_admin_header_enabled: None):
         invite_response = client.post(
             "/admin/invites",
             json={"code": "WEAK-PASSWORD", "max_uses": 1},
-            headers={"X-NoviScope-Dev-Admin": "true"},
+            headers=DEV_ADMIN_HEADERS,
         )
         assert invite_response.status_code == 201
 
@@ -556,7 +630,7 @@ def test_register_rejects_whitespace_only_password(dev_admin_header_enabled: Non
         invite_response = client.post(
             "/admin/invites",
             json={"code": "WHITESPACE-PASSWORD", "max_uses": 1},
-            headers={"X-NoviScope-Dev-Admin": "true"},
+            headers=DEV_ADMIN_HEADERS,
         )
         assert invite_response.status_code == 201
 
@@ -578,7 +652,7 @@ def test_login_preserves_intentional_password_whitespace(dev_admin_header_enable
         invite_response = client.post(
             "/admin/invites",
             json={"code": "SPACED-PASSWORD", "max_uses": 1},
-            headers={"X-NoviScope-Dev-Admin": "true"},
+            headers=DEV_ADMIN_HEADERS,
         )
         assert invite_response.status_code == 201
 
@@ -611,7 +685,7 @@ def test_create_invite_rejects_invalid_max_uses(dev_admin_header_enabled: None):
         response = client.post(
             "/admin/invites",
             json={"code": "BAD-MAX-USES", "max_uses": 0},
-            headers={"X-NoviScope-Dev-Admin": "true"},
+            headers=DEV_ADMIN_HEADERS,
         )
 
         assert response.status_code == 422
@@ -624,17 +698,17 @@ def test_create_invite_rejects_duplicate_code_with_conflict(
         first_response = client.post(
             "/admin/invites",
             json={"code": "DUPLICATE-INVITE", "max_uses": 1},
-            headers={"X-NoviScope-Dev-Admin": "true"},
+            headers=DEV_ADMIN_HEADERS,
         )
         second_response = client.post(
             "/admin/invites",
             json={"code": "DUPLICATE-INVITE", "max_uses": 1},
-            headers={"X-NoviScope-Dev-Admin": "true"},
+            headers=DEV_ADMIN_HEADERS,
         )
         recovery_response = client.post(
             "/admin/invites",
             json={"code": "DUPLICATE-INVITE-RECOVERY", "max_uses": 1},
-            headers={"X-NoviScope-Dev-Admin": "true"},
+            headers=DEV_ADMIN_HEADERS,
         )
 
         assert first_response.status_code == 201
@@ -650,12 +724,12 @@ def test_register_rejects_duplicate_email_with_conflict_and_rolls_back_invite(
         first_invite_response = client.post(
             "/admin/invites",
             json={"code": "DUPLICATE-EMAIL-ONE", "max_uses": 1},
-            headers={"X-NoviScope-Dev-Admin": "true"},
+            headers=DEV_ADMIN_HEADERS,
         )
         second_invite_response = client.post(
             "/admin/invites",
             json={"code": "DUPLICATE-EMAIL-TWO", "max_uses": 1},
-            headers={"X-NoviScope-Dev-Admin": "true"},
+            headers=DEV_ADMIN_HEADERS,
         )
         assert first_invite_response.status_code == 201
         assert second_invite_response.status_code == 201
@@ -699,7 +773,7 @@ def test_invite_registration_login_and_me_flow(dev_admin_header_enabled: None):
         invite_response = client.post(
             "/admin/invites",
             json={"code": "LAB-INVITE", "max_uses": 1},
-            headers={"X-NoviScope-Dev-Admin": "true"},
+            headers=DEV_ADMIN_HEADERS,
         )
         assert invite_response.status_code == 201
 
@@ -741,7 +815,7 @@ def test_logged_in_member_cannot_use_dev_admin_header_for_invites(
         response = client.post(
             "/admin/invites",
             json={"code": "SECOND-INVITE", "max_uses": 1},
-            headers={"X-NoviScope-Dev-Admin": "true"},
+            headers=DEV_ADMIN_HEADERS,
         )
 
         assert response.status_code == 403

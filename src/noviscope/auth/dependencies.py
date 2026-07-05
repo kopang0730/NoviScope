@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from hmac import compare_digest
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, Request, Response, status
@@ -97,6 +98,11 @@ def get_admin_or_dev_header(
                 detail="Admin access required",
             )
         return current_user
-    if settings.dev_admin_header_enabled and value == "true":
+    if (
+        settings.dev_admin_header_enabled
+        and settings.dev_admin_token
+        and value
+        and compare_digest(value, settings.dev_admin_token)
+    ):
         return None
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
