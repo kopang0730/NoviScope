@@ -5,6 +5,7 @@ import { buttonClassName } from "./components/button";
 import { Card } from "./components/card";
 import { LanguageToggle } from "./components/language-toggle";
 import { useI18n } from "./i18n/i18n-context";
+import { CanvasWorkspacePage } from "./pages/canvas-workspace";
 import { CreateQuestPage } from "./pages/create-quest";
 import { LoginPage } from "./pages/login";
 import { ProviderSettingsPage } from "./pages/provider-settings";
@@ -71,6 +72,9 @@ function WorkspaceLayout() {
           <nav className="flex flex-col gap-1 md:gap-2">
             <NavLink className={({ isActive }) => navLinkClassName(isActive)} to="/">
               {t("navQuests")}
+            </NavLink>
+            <NavLink className={({ isActive }) => navLinkClassName(isActive)} to="/canvas">
+              {t("navCanvas")}
             </NavLink>
             <NavLink className={({ isActive }) => navLinkClassName(isActive)} to="/quests/new">
               {t("navNewQuest")}
@@ -190,6 +194,7 @@ export function App() {
       />
       <Route element={<ProtectedWorkspaceLayout />}>
         <Route path="/" element={<QuestListPage />} />
+        <Route path="/canvas" element={<CanvasWorkspacePage />} />
         <Route path="/quests/new" element={<CreateQuestPage />} />
         <Route path="/providers" element={<ProviderSettingsPage />} />
         <Route path="/stages/:stageId" element={<StageDetailPage />} />
