@@ -7,12 +7,14 @@ import {
   experimentPlannerAgentId,
   getStageRunAvailability,
   ideaGeneratorAgentId,
+  paperMeetingWriterAgentId,
 } from "../lib/stages";
 import { Badge } from "./badge";
 import { Card, CardHeading } from "./card";
 import { ExperimentPlannerOutput } from "./experiment-planner-output";
 import { GapHypothesisOutput } from "./gap-hypothesis-output";
 import { LiteratureScoutOutput } from "./literature-scout-output";
+import { PaperMeetingOutput } from "./paper-meeting-output";
 
 type DemandValidationView = {
   readonly assessment: string;
@@ -160,6 +162,20 @@ export function StageOutputPanel({
         </div>
         <div className="mt-5">
           <ExperimentPlannerOutput onStageChange={onStageChange} stage={stage} />
+        </div>
+      </Card>
+    );
+  }
+
+  if (stage.agent_id === paperMeetingWriterAgentId) {
+    return (
+      <Card>
+        <CardHeading description={t("paperMeetingDescription")} title={t("paperMeetingResult")} />
+        <div className="mt-5">
+          <StageRunSummary stage={stage} />
+        </div>
+        <div className="mt-5">
+          <PaperMeetingOutput stage={stage} />
         </div>
       </Card>
     );

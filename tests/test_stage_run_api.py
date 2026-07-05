@@ -28,10 +28,17 @@ from noviscope.agents.openalex_client import (
     OpenAlexSource,
     OpenAlexWork,
 )
+from noviscope.agents.paper_meeting_writer import (
+    PaperMeetingWriterOutput,
+    PaperMeetingWriterRequest,
+    PaperMeetingWriterRunner,
+    get_paper_meeting_writer_runner,
+)
 from noviscope.core.stage_policy import (
     EXPERIMENT_PLANNER_AGENT_ID,
     NO_EXPERIMENT_VERIFICATION_RISK,
     NO_EXTERNAL_VERIFICATION_RISK,
+    PAPER_MEETING_WRITER_AGENT_ID,
 )
 from noviscope.main import create_app
 
@@ -161,6 +168,44 @@ class FakeExperimentPlannerRunner:
         )
 
 
+class FakePaperMeetingWriterRunner:
+    def run(self, request: PaperMeetingWriterRequest) -> PaperMeetingWriterOutput:
+        return PaperMeetingWriterOutput(
+            chinese_research_brief_markdown=(
+                "# 中文研究 Brief\n\n"
+                "## 已验证事实\n- 需求场景来自羽毛球训练反馈。\n\n"
+                "## 未完成实验\n- 当前还没有真实实验结果。"
+            ),
+            confidence="medium",
+            english_research_brief_markdown=(
+                "# Research Brief\n\n"
+                "## Verified Facts\n- The demand scenario is badminton coach feedback.\n\n"
+                "## Experiment Results\n- Not available yet."
+            ),
+            experiment_results_not_available=["Baseline and ablation metrics are not available."],
+            human_review_required=["Confirm whether the selected idea is worth writing up."],
+            ieee_paper_skeleton_markdown=(
+                "# IEEE Paper Skeleton\n\n"
+                "## Abstract\nTBD after experiments.\n\n"
+                "## Results\nNo experiment results are available yet."
+            ),
+            meeting_outline_markdown=(
+                "# Group Meeting Outline\n\n"
+                "1. Real demand\n2. Literature evidence\n3. Experiment plan"
+            ),
+            model_generated_hypotheses=[
+                "Temporal consistency may reduce missed badminton actions.",
+            ],
+            raw_response="fake paper writer response",
+            source_stage_ids=request.source_stage_ids,
+            summary="Generated four traceable Markdown artifacts.",
+            verified_facts=[
+                "The retrieved paper metadata includes a badminton benchmark.",
+            ],
+            warnings=[],
+        )
+
+
 def get_fake_runner() -> DemandValidationRunner:
     return FakeDemandValidationRunner()
 
@@ -175,6 +220,10 @@ def get_fake_gap_runner() -> GapHypothesisRunner:
 
 def get_fake_experiment_runner() -> ExperimentPlannerRunner:
     return FakeExperimentPlannerRunner()
+
+
+def get_fake_paper_runner() -> PaperMeetingWriterRunner:
+    return FakePaperMeetingWriterRunner()
 
 
 def register_and_login(client: TestClient, invite_code: str, email: str) -> None:
@@ -230,7 +279,7 @@ def create_quest(client: TestClient) -> str:
     return response.json()["first_stage"]["id"]
 
 
-def create_quest_with_stages(client: TestClient) -> tuple[str, str, str, str, str]:
+def create_quest_with_stages(client: TestClient) -> tuple[str, str, str, str, str, str]:
     response = client.post(
         "/quests",
         json={
@@ -254,12 +303,16 @@ def create_quest_with_stages(client: TestClient) -> tuple[str, str, str, str, st
     experiment_stage = next(
         stage for stage in stages if stage["agent_id"] == EXPERIMENT_PLANNER_AGENT_ID
     )
+    paper_stage = next(
+        stage for stage in stages if stage["agent_id"] == PAPER_MEETING_WRITER_AGENT_ID
+    )
     return (
         quest_id,
         demand_stage["id"],
         literature_stage["id"],
         idea_stage["id"],
         experiment_stage["id"],
+        paper_stage["id"],
     )
 
 
@@ -338,7 +391,7 @@ def test_run_literature_scout_blocks_until_demand_validation_completes(
 
     with TestClient(app) as client:
         register_and_login(client, "RUN-LIT-BLOCK", "lit-blocked@example.com")
-        _, _, literature_stage_id, _, _ = create_quest_with_stages(client)
+        _, _, literature_stage_id, _, _, _ = create_quest_with_stages(client)
 
         response = client.post(f"/stages/{literature_stage_id}/run", json={})
 
@@ -361,7 +414,7 @@ def test_run_literature_scout_completes_without_model_provider(
 
     with TestClient(app) as client:
         register_and_login(client, "RUN-LIT", "lit-runner@example.com")
-        _, demand_stage_id, literature_stage_id, _, _ = create_quest_with_stages(client)
+        _, demand_stage_id, literature_stage_id, _, _, _ = create_quest_with_stages(client)
         running_response = client.patch(
             f"/stages/{demand_stage_id}",
             json={"status": "running"},
@@ -400,7 +453,7 @@ def test_run_gap_hypothesis_blocks_until_literature_scout_completes(
 
     with TestClient(app) as client:
         register_and_login(client, "RUN-GAP-BLOCK", "gap-blocked@example.com")
-        _, demand_stage_id, _, idea_stage_id, _ = create_quest_with_stages(client)
+        _, demand_stage_id, _, idea_stage_id, _, _ = create_quest_with_stages(client)
         running_response = client.patch(
             f"/stages/{demand_stage_id}",
             json={"status": "running"},
@@ -435,9 +488,14 @@ def test_run_gap_hypothesis_completes_and_selection_advances_quest(
     with TestClient(app) as client:
         register_and_login(client, "RUN-GAP", "gap-runner@example.com")
         create_personal_provider(client)
-        quest_id, demand_stage_id, literature_stage_id, idea_stage_id, _ = create_quest_with_stages(
-            client
-        )
+        (
+            quest_id,
+            demand_stage_id,
+            literature_stage_id,
+            idea_stage_id,
+            _,
+            _,
+        ) = create_quest_with_stages(client)
         demand_running_response = client.patch(
             f"/stages/{demand_stage_id}",
             json={"status": "running"},
@@ -526,7 +584,7 @@ def test_run_experiment_planner_blocks_until_idea_selection(
 
     with TestClient(app) as client:
         register_and_login(client, "RUN-EXP-BLOCK", "exp-blocked@example.com")
-        _, _, _, _, experiment_stage_id = create_quest_with_stages(client)
+        _, _, _, _, experiment_stage_id, _ = create_quest_with_stages(client)
 
         response = client.post(f"/stages/{experiment_stage_id}/run", json={})
 
@@ -547,7 +605,7 @@ def test_run_experiment_planner_blocks_without_setup_inputs(
 
     with TestClient(app) as client:
         register_and_login(client, "RUN-EXP-INPUT-BLOCK", "exp-input@example.com")
-        _, _, _, idea_stage_id, experiment_stage_id = create_quest_with_stages(client)
+        _, _, _, idea_stage_id, experiment_stage_id, _ = create_quest_with_stages(client)
         running_response = client.patch(
             f"/stages/{idea_stage_id}",
             json={"status": "running"},
@@ -593,7 +651,7 @@ def test_run_experiment_planner_completes_with_setup_inputs_and_advances_after_r
     with TestClient(app) as client:
         register_and_login(client, "RUN-EXP", "exp-runner@example.com")
         create_personal_provider(client)
-        quest_id, _, _, idea_stage_id, experiment_stage_id = create_quest_with_stages(client)
+        quest_id, _, _, idea_stage_id, experiment_stage_id, _ = create_quest_with_stages(client)
         idea_running_response = client.patch(
             f"/stages/{idea_stage_id}",
             json={"status": "running"},
@@ -666,6 +724,96 @@ def test_run_experiment_planner_completes_with_setup_inputs_and_advances_after_r
     assert quest_response.json()["status"] == "full_experiment"
 
 
+def test_run_paper_writer_blocks_until_experiment_planner_completes(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'paper-writer-block.db'}")
+
+    with TestClient(app) as client:
+        register_and_login(client, "RUN-PAPER-BLOCK", "paper-blocked@example.com")
+        _, _, _, _, _, paper_stage_id = create_quest_with_stages(client)
+
+        response = client.post(f"/stages/{paper_stage_id}/run", json={})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "blocked"
+    assert body["summary"] == (
+        "Paper & Meeting Writer is blocked until Experiment Planner completes."
+    )
+    assert body["evidence_payload"]["blocking_reason"] == "paper_prerequisites_incomplete"
+
+
+def test_run_paper_writer_completes_with_markdown_artifacts_and_advances_after_review(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'paper-writer-run.db'}")
+    app.dependency_overrides[get_paper_meeting_writer_runner] = get_fake_paper_runner
+
+    with TestClient(app) as client:
+        register_and_login(client, "RUN-PAPER", "paper-runner@example.com")
+        create_personal_provider(client)
+        quest_id, _, _, _, experiment_stage_id, paper_stage_id = create_quest_with_stages(
+            client
+        )
+        experiment_running_response = client.patch(
+            f"/stages/{experiment_stage_id}",
+            json={"status": "running"},
+        )
+        assert experiment_running_response.status_code == 200
+        experiment_complete_response = client.patch(
+            f"/stages/{experiment_stage_id}",
+            json={
+                "output_payload": {
+                    "confidence": "medium",
+                    "data_availability_status": "ready",
+                    "first_runnable_script_plan": ["Run baseline inference."],
+                    "summary": "Experiment plan completed.",
+                },
+                "status": "complete",
+                "summary": "Experiment plan completed.",
+            },
+        )
+        assert experiment_complete_response.status_code == 200
+
+        run_response = client.post(f"/stages/{paper_stage_id}/run", json={})
+        assert run_response.status_code == 200
+        run_body = run_response.json()
+        review_response = client.patch(
+            f"/stages/{paper_stage_id}",
+            json={
+                "human_approved": True,
+                "review_notes": "Draft package is ready for group discussion.",
+            },
+        )
+        quest_response = client.get(f"/quests/{quest_id}")
+
+    assert run_body["status"] == "complete"
+    assert run_body["confidence"] == "medium"
+    assert run_body["output_payload"]["chinese_research_brief_markdown"].startswith(
+        "# 中文研究 Brief"
+    )
+    assert run_body["output_payload"]["english_research_brief_markdown"].startswith(
+        "# Research Brief"
+    )
+    assert run_body["output_payload"]["meeting_outline_markdown"].startswith(
+        "# Group Meeting Outline"
+    )
+    assert run_body["output_payload"]["ieee_paper_skeleton_markdown"].startswith(
+        "# IEEE Paper Skeleton"
+    )
+    assert run_body["output_payload"]["experiment_results_not_available"]
+    assert run_body["output_payload"]["human_review_required"]
+    assert run_body["evidence_payload"]["artifact_count"] == 4
+    assert run_body["evidence_payload"]["download_format"] == "markdown"
+    assert run_body["evidence_payload"]["no_experiment_results"] is True
+    assert review_response.status_code == 200
+    assert quest_response.status_code == 200
+    assert quest_response.json()["status"] == "writing"
+
+
 def test_update_idea_stage_downgrades_manual_high_confidence(
     tmp_path,
     dev_admin_header_enabled: None,
@@ -674,7 +822,7 @@ def test_update_idea_stage_downgrades_manual_high_confidence(
 
     with TestClient(app) as client:
         register_and_login(client, "PATCH-IDEA-HIGH", "idea-patcher@example.com")
-        _, _, _, idea_stage_id, _ = create_quest_with_stages(client)
+        _, _, _, idea_stage_id, _, _ = create_quest_with_stages(client)
 
         response = client.patch(
             f"/stages/{idea_stage_id}",
@@ -706,7 +854,7 @@ def test_update_experiment_planner_stage_downgrades_manual_high_confidence(
 
     with TestClient(app) as client:
         register_and_login(client, "PATCH-EXP-HIGH", "experiment-patcher@example.com")
-        _, _, _, _, experiment_stage_id = create_quest_with_stages(client)
+        _, _, _, _, experiment_stage_id, _ = create_quest_with_stages(client)
 
         response = client.patch(
             f"/stages/{experiment_stage_id}",

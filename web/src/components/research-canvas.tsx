@@ -96,6 +96,17 @@ function buildStageDetails(stage: StageCard, t: ReturnType<typeof useI18n>["t"])
     }
   }
 
+  if (stage.agent_id === "paper_meeting_writer") {
+    const artifactCount = stage.evidence_payload.artifact_count;
+    const downloadFormat = readString(stage.evidence_payload, "download_format");
+    if (typeof artifactCount === "number") {
+      details.push({ label: t("canvasArtifacts"), value: String(artifactCount) });
+    }
+    if (downloadFormat) {
+      details.push({ label: t("canvasDownloadFormat"), value: labelFromEnum(downloadFormat) });
+    }
+  }
+
   if (blockingDetail) {
     details.push({ label: t("canvasBlocked"), value: blockingDetail });
   }

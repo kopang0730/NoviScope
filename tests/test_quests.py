@@ -60,12 +60,14 @@ def test_create_quest_adds_core_research_workflow_stages(db_session: Session):
         "literature_scout",
         "idea_generator",
         "experiment_planner",
+        "paper_meeting_writer",
     ]
     assert [stage.title for stage in stages] == [
         "Demand validation",
         "Literature scout",
         "Gap & hypothesis generator",
         "Experiment planner",
+        "Paper & meeting writer",
     ]
 
 
@@ -272,6 +274,39 @@ def test_approving_experiment_plan_advances_quest_to_full_experiment(
     assert completed.human_approved is True
     assert saved_quest is not None
     assert saved_quest.status == QuestStatus.FULL_EXPERIMENT
+
+
+def test_approving_paper_writer_stage_advances_quest_to_writing(
+    db_session: Session,
+) -> None:
+    service = QuestService(db_session)
+    quest = service.create_quest(
+        title="Handwritten Text Erasure",
+        initial_direction="擦除试卷中的手写文本",
+    )
+    paper_stage = service.list_stage_cards(quest.id)[4]
+
+    running = service.update_stage_card(
+        paper_stage.id,
+        status=StageStatus.RUNNING,
+        input_payload={"source_stage_ids": {"experiment_planner": "stage_experiment"}},
+    )
+    completed = service.update_stage_card(
+        running.id,
+        status=StageStatus.COMPLETE,
+        output_payload={
+            "confidence": "medium",
+            "english_research_brief_markdown": "# Research Brief",
+            "experiment_results_not_available": ["No metrics yet."],
+        },
+        human_approved=True,
+        review_notes="Approved for group meeting preparation.",
+    )
+    saved_quest = db_session.get(Quest, quest.id)
+
+    assert completed.human_approved is True
+    assert saved_quest is not None
+    assert saved_quest.status == QuestStatus.WRITING
 
 
 def test_invalid_stage_transition_is_rejected(db_session: Session):
