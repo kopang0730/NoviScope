@@ -11,6 +11,12 @@ from noviscope.agents.demand_validation import (
     DemandValidationStageRunner,
     get_demand_validation_runner,
 )
+from noviscope.agents.literature_scout import (
+    LITERATURE_SCOUT_AGENT_ID,
+    LiteratureScoutRunError,
+    LiteratureScoutStageRunner,
+    get_literature_scout_runner,
+)
 from noviscope.agents.stage_runner import (
     ModelProviderCredentials,
     StageRunContext,
@@ -21,8 +27,8 @@ from noviscope.api.dependencies import get_session
 from noviscope.api.routes import StageCardResponse, get_provider_service, stage_response
 from noviscope.auth.dependencies import get_current_user
 from noviscope.core.json_types import JsonObject
-from noviscope.core.stage_policy import normalize_stage_output_payload
-from noviscope.models.provider import ModelProvider
+from noviscope.core.stage_policy import DEMAND_VALIDATOR_AGENT_ID, normalize_stage_output_payload
+from noviscope.models.provider import ModelProvider, ProviderKind
 from noviscope.models.quest import StageCard, StageStatus
 from noviscope.models.user import User
 from noviscope.providers.service import ProviderService
@@ -60,9 +66,15 @@ class StageBlock:
 
 def get_stage_runner_registry(
     demand_runner: Annotated[DemandValidationRunner, Depends(get_demand_validation_runner)],
+    literature_runner: Annotated[LiteratureScoutStageRunner, Depends(get_literature_scout_runner)],
 ) -> StageRunnerRegistry:
     demand_stage_runner = DemandValidationStageRunner(demand_runner)
-    return StageRunnerRegistry(runners={demand_stage_runner.agent_id: demand_stage_runner})
+    return StageRunnerRegistry(
+        runners={
+            demand_stage_runner.agent_id: demand_stage_runner,
+            literature_runner.agent_id: literature_runner,
+        }
+    )
 
 
 def select_provider(context: ProviderSelectionContext) -> ProviderSelection:
@@ -112,6 +124,17 @@ def build_provider_credentials(
     )
 
 
+def build_server_managed_provider() -> ModelProviderCredentials:
+    return ModelProviderCredentials(
+        api_key=SecretStr(""),
+        base_url="https://api.openalex.org",
+        id="server_openalex",
+        kind=ProviderKind.CUSTOM,
+        model="openalex-works",
+        name="OpenAlex",
+    )
+
+
 def build_provider_block(selection: ProviderSelection) -> StageBlock:
     return StageBlock(
         evidence_payload={
@@ -120,6 +143,17 @@ def build_provider_block(selection: ProviderSelection) -> StageBlock:
             "can_run": False,
         },
         summary="No active model provider is available for this user.",
+    )
+
+
+def build_literature_dependency_block() -> StageBlock:
+    return StageBlock(
+        evidence_payload={
+            "blocking_detail": "Complete Demand validation before running Literature Scout.",
+            "blocking_reason": "demand_validation_incomplete",
+            "can_run": False,
+        },
+        summary="Literature Scout is blocked until Demand validation is complete.",
     )
 
 
@@ -148,6 +182,34 @@ def apply_stage_block(
     return stage_response(blocked_stage)
 
 
+def build_literature_dependency_block_if_needed(
+    stage: StageCard,
+    stages: list[StageCard],
+) -> StageBlock | None:
+    if stage.agent_id != LITERATURE_SCOUT_AGENT_ID:
+        return None
+    demand_complete = any(
+        workflow_stage.agent_id == DEMAND_VALIDATOR_AGENT_ID
+        and workflow_stage.status == StageStatus.COMPLETE
+        for workflow_stage in stages
+    )
+    if demand_complete:
+        return None
+    return build_literature_dependency_block()
+
+
+def build_runner_provider(
+    runner: StageRunner,
+    selection_context: ProviderSelectionContext,
+) -> ModelProviderCredentials | StageBlock:
+    if not runner.supported_provider_kinds:
+        return build_server_managed_provider()
+    selection = select_provider(selection_context)
+    if selection.provider is None:
+        return build_provider_block(selection)
+    return build_provider_credentials(selection.provider, selection_context.provider_service)
+
+
 @router.post("/stages/{stage_id}/run", response_model=StageCardResponse)
 def run_stage(
     stage_id: str,
@@ -165,34 +227,42 @@ def run_stage(
             return apply_stage_block(quest_service, stage_id, build_runner_block(stage))
 
         quest = quest_service.get_quest_for_user(stage.quest_id, current_user)
-        selection = select_provider(
+        dependency_block = build_literature_dependency_block_if_needed(
+            stage,
+            quest_service.list_stage_cards(quest.id),
+        )
+        if dependency_block is not None:
+            return apply_stage_block(quest_service, stage_id, dependency_block)
+
+        provider_or_block = build_runner_provider(
+            runner,
             ProviderSelectionContext(
                 current_user=current_user,
                 provider_id=request.provider_id,
                 provider_service=provider_service,
                 runner=runner,
-            )
+            ),
         )
-        if selection.provider is None:
-            return apply_stage_block(quest_service, stage_id, build_provider_block(selection))
+        if isinstance(provider_or_block, StageBlock):
+            return apply_stage_block(quest_service, stage_id, provider_or_block)
 
-        provider = build_provider_credentials(selection.provider, provider_service)
+        provider = provider_or_block
         queued_context = StageRunContext(provider=provider, quest=quest, stage=stage)
         running_stage = quest_service.update_stage_card(
             stage_id,
             input_payload=runner.build_input_payload(queued_context),
             status=StageStatus.RUNNING,
         )
-        running_context = StageRunContext(
-            provider=provider,
-            quest=quest,
-            stage=running_stage,
-        )
+        running_context = StageRunContext(provider=provider, quest=quest, stage=running_stage)
         result = runner.run(running_context)
+        output_payload = normalize_stage_output_payload(
+            stage.agent_id,
+            {**result.output_payload, "confidence": result.confidence},
+        )
         completed_stage = quest_service.update_stage_card(
             stage_id,
             evidence_payload=result.evidence_payload,
-            output_payload=normalize_stage_output_payload(stage.agent_id, result.output_payload),
+            output_payload=output_payload,
             summary=result.summary,
             status=StageStatus.COMPLETE,
         )
@@ -201,7 +271,7 @@ def run_stage(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except PermissionError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-    except DemandValidationRunError as exc:
+    except (DemandValidationRunError, LiteratureScoutRunError) as exc:
         return apply_stage_block(
             quest_service,
             stage_id,

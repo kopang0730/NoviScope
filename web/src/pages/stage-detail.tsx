@@ -11,7 +11,7 @@ import { StageEditor } from "../components/stage-editor";
 import { StageOutputPanel } from "../components/stage-output-summary";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
-import { canRunDemandValidationStage } from "../lib/stages";
+import { canRunStage } from "../lib/stages";
 
 function stageTone(status: StageStatus) {
   if (status === "complete") {
@@ -137,9 +137,9 @@ export function StageDetailPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {stage ? <Badge tone={stageTone(stage.status)}>{labelFromEnum(stage.status)}</Badge> : null}
-            {stage && canRunDemandValidationStage(stage) ? (
+            {stage && canRunStage(stage) ? (
               <Button loading={runningStage} onClick={() => void handleRunStage()} size="sm">
-                {t("runDemandValidation")}
+                {t("runStage")}
               </Button>
             ) : null}
             <Link className={buttonClassName({ variant: "secondary", size: "sm" })} to={workflowBackLink}>

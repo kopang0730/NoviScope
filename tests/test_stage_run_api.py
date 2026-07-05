@@ -6,6 +6,14 @@ from noviscope.agents.demand_validation import (
     DemandValidationRunner,
     get_demand_validation_runner,
 )
+from noviscope.agents.literature_scout import (
+    LITERATURE_SCOUT_AGENT_ID,
+    LiteratureScoutStageRunner,
+    OpenAlexLocation,
+    OpenAlexSource,
+    OpenAlexWork,
+    get_literature_scout_runner,
+)
 from noviscope.core.stage_policy import NO_EXTERNAL_VERIFICATION_RISK
 from noviscope.main import create_app
 
@@ -41,8 +49,30 @@ class FakeDemandValidationRunner:
         )
 
 
+class FakeOpenAlexClient:
+    def search(self, query: str, *, current_year: int) -> list[OpenAlexWork]:
+        return [
+            OpenAlexWork(
+                abstract_inverted_index={"badminton": [0], "recognition": [1]},
+                id="https://openalex.org/W123",
+                primary_location=OpenAlexLocation(
+                    landing_page_url="https://example.org/openalex-paper",
+                    source=OpenAlexSource(display_name="CVPR", type="conference"),
+                ),
+                publication_year=2025,
+                relevance_score=80.0,
+                title="Badminton recognition benchmark",
+                type="proceedings-article",
+            )
+        ]
+
+
 def get_fake_runner() -> DemandValidationRunner:
     return FakeDemandValidationRunner()
+
+
+def get_fake_literature_runner() -> LiteratureScoutStageRunner:
+    return LiteratureScoutStageRunner(FakeOpenAlexClient(), current_year=2026)
 
 
 def register_and_login(client: TestClient, invite_code: str, email: str) -> None:
@@ -96,6 +126,29 @@ def create_quest(client: TestClient) -> str:
     )
     assert response.status_code == 201
     return response.json()["first_stage"]["id"]
+
+
+def create_quest_with_stages(client: TestClient) -> tuple[str, str, str]:
+    response = client.post(
+        "/quests",
+        json={
+            "initial_direction": (
+                "# NoviScope Quest Intake\n"
+                "- Research direction: Badminton action recognition"
+            ),
+            "title": "Badminton action recognition",
+        },
+    )
+    assert response.status_code == 201
+    quest_id = response.json()["id"]
+    stages_response = client.get(f"/quests/{quest_id}/stages")
+    assert stages_response.status_code == 200
+    stages = stages_response.json()["stages"]
+    demand_stage = next(stage for stage in stages if stage["agent_id"] == "demand_validator")
+    literature_stage = next(
+        stage for stage in stages if stage["agent_id"] == LITERATURE_SCOUT_AGENT_ID
+    )
+    return quest_id, demand_stage["id"], literature_stage["id"]
 
 
 def test_run_demand_validation_stage_completes_with_provider(
@@ -162,6 +215,68 @@ def test_run_demand_validation_stage_blocks_without_provider(
     assert body["evidence_payload"]["blocking_detail"] == (
         "Configure an active OpenAI-compatible or custom provider before running this stage."
     )
+
+
+def test_run_literature_scout_blocks_until_demand_validation_completes(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'literature-blocked.db'}")
+    app.dependency_overrides[get_literature_scout_runner] = get_fake_literature_runner
+
+    with TestClient(app) as client:
+        register_and_login(client, "RUN-LIT-BLOCK", "lit-blocked@example.com")
+        _, _, literature_stage_id = create_quest_with_stages(client)
+
+        response = client.post(f"/stages/{literature_stage_id}/run", json={})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "blocked"
+    assert body["summary"] == "Literature Scout is blocked until Demand validation is complete."
+    assert body["evidence_payload"]["blocking_reason"] == "demand_validation_incomplete"
+    assert body["evidence_payload"]["blocking_detail"] == (
+        "Complete Demand validation before running Literature Scout."
+    )
+
+
+def test_run_literature_scout_completes_without_model_provider(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'literature-run.db'}")
+    app.dependency_overrides[get_literature_scout_runner] = get_fake_literature_runner
+
+    with TestClient(app) as client:
+        register_and_login(client, "RUN-LIT", "lit-runner@example.com")
+        _, demand_stage_id, literature_stage_id = create_quest_with_stages(client)
+        running_response = client.patch(
+            f"/stages/{demand_stage_id}",
+            json={"status": "running"},
+        )
+        assert running_response.status_code == 200
+        complete_response = client.patch(
+            f"/stages/{demand_stage_id}",
+            json={
+                "human_approved": True,
+                "output_payload": {"confidence": "medium"},
+                "status": "complete",
+                "summary": "Demand validation complete.",
+            },
+        )
+        assert complete_response.status_code == 200
+
+        response = client.post(f"/stages/{literature_stage_id}/run", json={})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "complete"
+    assert body["confidence"] == "medium"
+    assert body["output_payload"]["confidence"] == "medium"
+    assert body["input_payload"]["source"] == "openalex_works_api"
+    assert body["output_payload"]["source"] == "openalex_works_api"
+    assert body["output_payload"]["papers"][0]["openalex_id"] == "https://openalex.org/W123"
+    assert body["evidence_payload"]["can_run"] is True
 
 
 def test_update_demand_validation_stage_downgrades_manual_high_confidence(

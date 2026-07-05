@@ -5,6 +5,7 @@ import { labelFromEnum } from "../lib/format";
 import { demandValidatorAgentId, getStageRunAvailability } from "../lib/stages";
 import { Badge } from "./badge";
 import { Card, CardHeading } from "./card";
+import { LiteratureScoutOutput } from "./literature-scout-output";
 
 type DemandValidationView = {
   readonly assessment: string;
@@ -108,6 +109,20 @@ export function StageRunSummary({ stage }: { readonly stage: StageCard }) {
 export function StageOutputPanel({ stage }: { readonly stage: StageCard }) {
   const { t } = useI18n();
   const demandValidation = buildDemandValidationView(stage);
+
+  if (stage.agent_id === "literature_scout" && stage.status === "complete") {
+    return (
+      <Card>
+        <CardHeading description={t("literatureScoutDescription")} title={t("literatureScoutResult")} />
+        <div className="mt-5">
+          <StageRunSummary stage={stage} />
+        </div>
+        <div className="mt-5">
+          <LiteratureScoutOutput stage={stage} />
+        </div>
+      </Card>
+    );
+  }
 
   if (!demandValidation) {
     return (

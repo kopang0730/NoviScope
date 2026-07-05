@@ -1,6 +1,7 @@
 import type { StageCard } from "../api/types";
 
 export const demandValidatorAgentId = "demand_validator";
+export const literatureScoutAgentId = "literature_scout";
 
 export type StageRunAvailability = {
   readonly canRun: boolean;
@@ -14,6 +15,17 @@ export function canRunDemandValidationStage(stage: StageCard) {
   );
 }
 
+export function canRunLiteratureScoutStage(stage: StageCard) {
+  return (
+    stage.agent_id === literatureScoutAgentId &&
+    (stage.status === "pending" || stage.status === "blocked")
+  );
+}
+
+export function canRunStage(stage: StageCard) {
+  return canRunDemandValidationStage(stage) || canRunLiteratureScoutStage(stage);
+}
+
 function readPayloadString(payload: Record<string, unknown>, key: string) {
   const value = payload[key];
   return typeof value === "string" ? value : "";
@@ -24,6 +36,13 @@ export function getStageRunAvailability(stage: StageCard): StageRunAvailability 
     return {
       canRun: true,
       reason: "Ready if an active OpenAI-compatible or custom provider is configured.",
+    };
+  }
+
+  if (canRunLiteratureScoutStage(stage)) {
+    return {
+      canRun: true,
+      reason: "Ready after demand validation completes; backend blocks if the prerequisite is missing.",
     };
   }
 

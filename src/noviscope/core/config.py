@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_PROVIDER_SECRET_KEY = "noviscope-dev-secret-key-change-me"
@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     dev_admin_header_enabled: bool = Field(default=False)
     dev_admin_token: str | None = Field(default=None)
     artifact_root: str = Field(default=".noviscope/artifacts")
+    openalex_email: str | None = Field(default=None)
+    openalex_api_key: SecretStr | None = Field(default=None, repr=False)
 
     model_config = SettingsConfigDict(env_prefix="NOVISCOPE_", env_file=".env")
 

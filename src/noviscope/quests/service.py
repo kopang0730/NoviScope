@@ -1,6 +1,10 @@
+from datetime import timedelta
+
 from sqlmodel import Session, select
 
+from noviscope.agents.literature_scout import LITERATURE_SCOUT_AGENT_ID
 from noviscope.core.json_types import JsonObject
+from noviscope.core.stage_policy import DEMAND_VALIDATOR_AGENT_ID
 from noviscope.models.common import utc_now
 from noviscope.models.quest import Quest, QuestStatus, StageCard, StageStatus
 from noviscope.models.user import User, UserRole
@@ -29,15 +33,26 @@ class QuestService:
             initial_direction=initial_direction,
             owner_user_id=owner_user_id,
         )
-        stage = StageCard(
+        stage_created_at = utc_now()
+        demand_stage = StageCard(
             quest_id=quest.id,
-            agent_id="demand_validator",
+            agent_id=DEMAND_VALIDATOR_AGENT_ID,
+            created_at=stage_created_at.isoformat(),
             title="Demand validation",
             status=StageStatus.PENDING,
             summary="Validate real-world demand before literature and experiment stages.",
         )
+        literature_stage = StageCard(
+            quest_id=quest.id,
+            agent_id=LITERATURE_SCOUT_AGENT_ID,
+            created_at=(stage_created_at + timedelta(microseconds=1)).isoformat(),
+            title="Literature scout",
+            status=StageStatus.PENDING,
+            summary="Find recent papers from OpenAlex after demand validation is complete.",
+        )
         self.session.add(quest)
-        self.session.add(stage)
+        self.session.add(demand_stage)
+        self.session.add(literature_stage)
         self.session.commit()
         self.session.refresh(quest)
         return quest
@@ -118,7 +133,7 @@ class QuestService:
             raise ValueError(f"Cannot transition stage from {current.value} to {target.value}")
 
     def _sync_quest_after_stage_update(self, stage: StageCard) -> None:
-        if stage.agent_id != "demand_validator" or stage.status != StageStatus.COMPLETE:
+        if stage.agent_id != DEMAND_VALIDATOR_AGENT_ID or stage.status != StageStatus.COMPLETE:
             return
         quest = self.session.get(Quest, stage.quest_id)
         if quest is None:
