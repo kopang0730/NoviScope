@@ -8,8 +8,8 @@ import { Badge } from "../components/badge";
 import { buttonClassName } from "../components/button";
 import { Card, CardHeading } from "../components/card";
 import { Input, Select } from "../components/input";
+import { QuestOverviewPanel } from "../components/quest-overview-panel";
 import { QuestWorkflowPanel } from "../components/quest-workflow-panel";
-import { MobileStack, Table, TableCell, TableHead } from "../components/table";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
 import { questTone } from "../lib/status-tones";
@@ -28,7 +28,7 @@ const questStatusOptions: Array<QuestStatus | "all"> = [
 
 function directionSummary(value: string) {
   const normalized = value.replace(/\s+/g, " ").trim();
-  return normalized.length > 180 ? `${normalized.slice(0, 180)}...` : normalized;
+  return normalized.length > 110 ? `${normalized.slice(0, 110)}...` : normalized;
 }
 
 export function QuestListPage() {
@@ -155,8 +155,8 @@ export function QuestListPage() {
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
-      <Card>
+    <div className="grid gap-4 xl:grid-cols-[240px_minmax(320px,1fr)_380px] 2xl:grid-cols-[280px_minmax(0,1fr)_420px]">
+      <Card className="h-fit xl:sticky xl:top-4">
         <CardHeading
           action={
             <Link className={buttonClassName({ variant: "primary" })} to="/quests/new">
@@ -167,7 +167,7 @@ export function QuestListPage() {
           title={t("navQuests")}
         />
 
-        <div className="mt-6 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+        <div className="mt-6 grid gap-3">
           <Input label={t("questSearch")} onChange={(event) => setQuery(event.target.value)} placeholder={t("questSearchPlaceholder")} value={query} />
           <Select label={t("questStatus")} onChange={(event) => setStatusFilter(event.target.value as QuestStatus | "all")} value={statusFilter}>
             {questStatusOptions.map((status) => (
@@ -192,69 +192,42 @@ export function QuestListPage() {
         ) : null}
 
         {filteredQuests.length > 0 ? (
-          <>
-            <Table className="mt-4">
-              <thead>
-                <tr>
-                  <TableHead>{t("tableTitle")}</TableHead>
-                  <TableHead>{t("tableDirection")}</TableHead>
-                  <TableHead>{t("tableStatus")}</TableHead>
-                  <TableHead>{t("updated")}</TableHead>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredQuests.map((quest) => {
-                  const isSelected = quest.id === selectedQuestId;
+          <div className="mt-4 space-y-2">
+            {filteredQuests.map((quest) => {
+              const isSelected = quest.id === selectedQuestId;
 
-                  return (
-                    <tr
-                      className={isSelected ? "bg-teal-50" : "cursor-pointer hover:bg-slate-50"}
-                      key={quest.id}
-                      onClick={() => setSearchParams({ quest: quest.id })}
-                    >
-                      <TableCell>
-                        <div className="font-medium text-slate-900">{quest.title}</div>
-                      </TableCell>
-                      <TableCell className="max-w-[280px] text-sm text-slate-600">{directionSummary(quest.initial_direction)}</TableCell>
-                      <TableCell>
-                        <Badge tone={questTone(quest.status)}>{labelFromEnum(quest.status)}</Badge>
-                      </TableCell>
-                      <TableCell>{formatDateTime(quest.updated_at)}</TableCell>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </Table>
-
-            <MobileStack>
-              {filteredQuests.map((quest) => {
-                const isSelected = quest.id === selectedQuestId;
-
-                return (
-                  <button
-                    className={[
-                      "w-full rounded-lg border px-4 py-4 text-left shadow-sm transition",
-                      isSelected ? "border-teal-300 bg-teal-50" : "border-slate-200 bg-white",
-                    ].join(" ")}
-                    key={quest.id}
-                    onClick={() => setSearchParams({ quest: quest.id })}
-                    type="button"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="font-medium text-slate-900">{quest.title}</p>
-                      <Badge tone={questTone(quest.status)}>{labelFromEnum(quest.status)}</Badge>
-                    </div>
-                    <p className="mt-2 text-sm text-slate-600">{directionSummary(quest.initial_direction)}</p>
-                    <p className="mt-2 text-xs text-slate-500">
-                      {t("updated")} {formatDateTime(quest.updated_at)}
-                    </p>
-                  </button>
-                );
-              })}
-            </MobileStack>
-          </>
+              return (
+                <button
+                  className={[
+                    "w-full rounded-lg border px-4 py-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2",
+                    isSelected ? "border-teal-300 bg-teal-50 shadow-sm" : "border-slate-200 bg-white hover:bg-slate-50",
+                  ].join(" ")}
+                  key={quest.id}
+                  onClick={() => setSearchParams({ quest: quest.id })}
+                  type="button"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-medium text-slate-900">{quest.title}</p>
+                    <Badge tone={questTone(quest.status)}>{labelFromEnum(quest.status)}</Badge>
+                  </div>
+                  <p className="mt-2 text-sm text-slate-600">{directionSummary(quest.initial_direction)}</p>
+                  <p className="mt-2 text-xs text-slate-500">
+                    {t("updated")} {formatDateTime(quest.updated_at)}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
         ) : null}
       </Card>
+
+      <QuestOverviewPanel
+        detailError={detailError}
+        detailLoading={detailLoading}
+        selectedQuest={selectedQuest}
+        selectedQuestId={selectedQuestId}
+        stages={stages}
+      />
 
       <QuestWorkflowPanel
         detailError={detailError}

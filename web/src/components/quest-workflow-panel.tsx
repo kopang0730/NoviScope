@@ -31,7 +31,7 @@ export function QuestWorkflowPanel({
   readonly stages: readonly StageCard[];
 }) {
   const { t } = useI18n();
-  const [viewMode, setViewMode] = useState<"canvas" | "list">("canvas");
+  const [viewMode, setViewMode] = useState<"canvas" | "list">("list");
 
   return (
     <Card>
@@ -42,11 +42,11 @@ export function QuestWorkflowPanel({
       {detailLoading ? <p className="mt-4 text-sm text-slate-500">{t("loadingQuestDetail")}</p> : null}
       {selectedQuest ? (
         <div className="mt-6 space-y-5">
-          <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t("currentQuest")}</p>
                 <h3 className="text-base font-semibold text-slate-900">{selectedQuest.title}</h3>
-                <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{selectedQuest.initial_direction}</p>
               </div>
               <Badge tone={questTone(selectedQuest.status)}>{labelFromEnum(selectedQuest.status)}</Badge>
             </div>
@@ -103,12 +103,12 @@ export function QuestWorkflowPanel({
                       {index + 1}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex flex-col gap-3">
                         <div>
                           <p className="font-medium text-slate-900">{stage.title}</p>
                           <p className="mt-1 text-sm text-slate-500">{stage.agent_id}</p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <Badge tone={stageTone(stage.status)}>{labelFromEnum(stage.status)}</Badge>
                           {canRunStage(stage) ? (
                             <Button loading={runningStageId === stage.id} onClick={() => onRunStage(stage.id)} size="sm">

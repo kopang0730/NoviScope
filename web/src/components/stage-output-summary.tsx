@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { StageCard } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
 import { labelFromEnum } from "../lib/format";
+import { getLocalizedStageRunReason } from "../lib/stage-run-text";
 import {
   demandValidatorAgentId,
   experimentPlannerAgentId,
@@ -98,6 +99,7 @@ export function StageRunSummary({ stage }: { readonly stage: StageCard }) {
   const { t } = useI18n();
   const availability = getStageRunAvailability(stage);
   const providerName = readString(stage.evidence_payload, "provider_name");
+  const availabilityReason = getLocalizedStageRunReason(stage, t);
 
   return (
     <div className="mt-3 space-y-2">
@@ -109,7 +111,7 @@ export function StageRunSummary({ stage }: { readonly stage: StageCard }) {
       </div>
       <p className="text-sm text-slate-600">{stage.summary || t("noSummaryYet")}</p>
       <p className="text-xs text-slate-500">
-        {availability.canRun ? t("stageRunReady") : t("stageRunUnavailable")}: {availability.reason}
+        {availability.canRun ? t("stageRunReady") : t("stageRunUnavailable")}: {availabilityReason}
       </p>
     </div>
   );

@@ -21,6 +21,7 @@ type QuestIntakeState = {
   painPoint: string;
   scenario: string;
   target: string;
+  targetUser: string;
   title: string;
 };
 
@@ -34,6 +35,7 @@ const emptyIntake: QuestIntakeState = {
   painPoint: "",
   scenario: "",
   target: "",
+  targetUser: "",
   title: "",
 };
 
@@ -49,6 +51,7 @@ const examples: Record<"zh" | "en", Record<"erasure" | "badminton", QuestIntakeS
       painPoint: "Fast shuttle motion, occlusion, motion blur, and limited annotated badminton-specific data.",
       scenario: "AI + sports training: coaches want objective feedback on shuttle trajectory and athlete actions.",
       target: "Input: badminton video. Output: shuttle trajectory, action labels, and structured analysis for training review.",
+      targetUser: "Badminton coaches, athletes, and training analysts who review practice or match videos.",
       title: "Badminton trajectory and action recognition",
     },
     erasure: {
@@ -61,6 +64,7 @@ const examples: Record<"zh" | "en", Record<"erasure" | "badminton", QuestIntakeS
       painPoint: "Existing inpainting may damage printed text, table borders, and thin worksheet lines.",
       scenario: "Education company reuses completed exam sheets and needs to remove students' handwriting.",
       target: "Input: filled scanned worksheet. Output: clean worksheet with printed content preserved.",
+      targetUser: "Education companies, teachers, and content teams that need reusable clean worksheets.",
       title: "Handwritten text erasure for reusable exam sheets",
     },
   },
@@ -75,6 +79,7 @@ const examples: Record<"zh" | "en", Record<"erasure" | "badminton", QuestIntakeS
       painPoint: "羽毛球速度快、遮挡多、运动模糊明显，并且专门标注数据有限。",
       scenario: "AI + 体育训练场景：教练希望获得客观的羽毛球轨迹和动作反馈。",
       target: "输入：羽毛球训练或比赛视频。输出：球轨迹、动作标签和训练复盘分析。",
+      targetUser: "羽毛球教练、运动员，以及负责训练复盘的视频分析人员。",
       title: "羽毛球轨迹与动作识别",
     },
     erasure: {
@@ -87,6 +92,7 @@ const examples: Record<"zh" | "en", Record<"erasure" | "badminton", QuestIntakeS
       painPoint: "现有 inpainting 可能破坏印刷文字、表格边框和试卷细线。",
       scenario: "教培企业想复用已填写试卷，需要擦除学生手写内容。",
       target: "输入：已填写的扫描试卷。输出：保留印刷内容的干净试卷。",
+      targetUser: "教培企业、老师，以及需要复用干净试卷的内容生产团队。",
       title: "面向试卷复用的手写文本擦除",
     },
   },
@@ -117,6 +123,7 @@ function buildInitialDirection(formState: QuestIntakeState, language: "zh" | "en
           painPoint: "当前痛点或可能 gap",
           scenario: "真实应用场景或需求来源",
           target: "输入与期望输出",
+          targetUser: "目标用户或客户",
           title: "# NoviScope Quest 采集表",
         }
       : {
@@ -136,6 +143,7 @@ function buildInitialDirection(formState: QuestIntakeState, language: "zh" | "en
           painPoint: "Current pain point or suspected gap",
           scenario: "Real-world scenario / demand source",
           target: "Input and desired output",
+          targetUser: "Target user or customer",
           title: "# NoviScope Quest Intake",
         };
 
@@ -143,6 +151,7 @@ function buildInitialDirection(formState: QuestIntakeState, language: "zh" | "en
     labels.title,
     optionalLine(labels.direction, formState.direction, labels.empty),
     optionalLine(labels.scenario, formState.scenario, labels.empty),
+    optionalLine(labels.targetUser, formState.targetUser, labels.empty),
     optionalLine(labels.target, formState.target, labels.empty),
     optionalLine(labels.painPoint, formState.painPoint, labels.empty),
     optionalLine(labels.knownWork, formState.knownWork, labels.empty),
@@ -248,6 +257,14 @@ export function CreateQuestPage() {
                 placeholder={t("questScenarioPlaceholder")}
                 rows={4}
                 value={formState.scenario}
+              />
+              <TextArea
+                hint={t("questTargetUserHint")}
+                label={t("questTargetUser")}
+                onChange={(event) => updateField("targetUser", event.target.value)}
+                placeholder={t("questTargetUserPlaceholder")}
+                rows={4}
+                value={formState.targetUser}
               />
               <TextArea
                 label={t("questTarget")}

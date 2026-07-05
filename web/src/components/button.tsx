@@ -21,7 +21,7 @@ export function buttonClassName({
         : "bg-transparent text-slate-700 hover:bg-slate-100";
 
   return [
-    "inline-flex items-center justify-center rounded-lg font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
+    "inline-flex items-center justify-center whitespace-nowrap rounded-lg font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
     sizeClassName,
     variantClassName,
     className,
