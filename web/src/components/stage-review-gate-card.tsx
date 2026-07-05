@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { getErrorMessage } from "../api/client";
 import { updateStage } from "../api/quests";
 import type { StageCard } from "../api/types";
-import { useI18n } from "../i18n/i18n-context";
+import { useI18n, type TranslationKey } from "../i18n/i18n-context";
 import { labelFromEnum } from "../lib/format";
 import { stageTone } from "../lib/status-tones";
 import { Badge, type BadgeTone } from "./badge";
@@ -53,18 +53,21 @@ export function StageReviewGateCard({
   const [notes, setNotes] = useState(stage.review_notes);
   const [pendingDecision, setPendingDecision] = useState<ReviewDecision | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
-  const [reviewSaved, setReviewSaved] = useState(false);
+  const [reopening, setReopening] = useState(false);
+  const [successKey, setSuccessKey] = useState<TranslationKey | null>(null);
   const decision = reviewDecision(stage);
   const canRecordReview = stage.status === "complete";
+  const canReopenForRerun = canRecordReview && stage.human_approved === false;
 
   useEffect(() => {
     setNotes(stage.review_notes);
     setPendingDecision(null);
     setReviewError(null);
+    setReopening(false);
   }, [stage.id, stage.review_notes, stage.human_approved]);
 
   useEffect(() => {
-    setReviewSaved(false);
+    setSuccessKey(null);
   }, [stage.id]);
 
   async function submitReview(nextDecision: ReviewDecision) {
@@ -74,7 +77,7 @@ export function StageReviewGateCard({
 
     setPendingDecision(nextDecision);
     setReviewError(null);
-    setReviewSaved(false);
+    setSuccessKey(null);
 
     try {
       const updatedStage = await updateStage(stage.id, {
@@ -82,7 +85,7 @@ export function StageReviewGateCard({
         review_notes: notes.trim(),
       });
       onStageChange(updatedStage);
-      setReviewSaved(true);
+      setSuccessKey("stageReviewSaved");
     } catch (error) {
       if (error instanceof Error) {
         setReviewError(getErrorMessage(error));
@@ -91,6 +94,30 @@ export function StageReviewGateCard({
       throw error;
     } finally {
       setPendingDecision(null);
+    }
+  }
+
+  async function reopenForRerun() {
+    if (!canReopenForRerun) {
+      return;
+    }
+
+    setReopening(true);
+    setReviewError(null);
+    setSuccessKey(null);
+
+    try {
+      const updatedStage = await updateStage(stage.id, { status: "blocked" });
+      onStageChange(updatedStage);
+      setSuccessKey("stageReviewReopened");
+    } catch (error) {
+      if (error instanceof Error) {
+        setReviewError(getErrorMessage(error));
+        return;
+      }
+      throw error;
+    } finally {
+      setReopening(false);
     }
   }
 
@@ -136,14 +163,19 @@ export function StageReviewGateCard({
           {t("stageReviewActionUnavailable")}
         </p>
       ) : null}
+      {canReopenForRerun ? (
+        <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+          {t("stageReviewReopenDescription")}
+        </p>
+      ) : null}
       {reviewError ? (
         <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
           {reviewError}
         </p>
       ) : null}
-      {reviewSaved ? (
+      {successKey ? (
         <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-          {t("stageReviewSaved")}
+          {t(successKey)}
         </p>
       ) : null}
 
@@ -174,6 +206,11 @@ export function StageReviewGateCard({
         >
           {t("stageReviewResetAction")}
         </Button>
+        {canReopenForRerun ? (
+          <Button loading={reopening} onClick={() => void reopenForRerun()} size="sm" variant="secondary">
+            {t("stageReviewReopenAction")}
+          </Button>
+        ) : null}
       </div>
     </Card>
   );

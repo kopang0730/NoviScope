@@ -147,7 +147,7 @@ class QuestService:
     ) -> StageCard:
         stage = self.get_stage_card(stage_id)
         if status is not None:
-            self._assert_transition_allowed(stage.status, status)
+            self._assert_transition_allowed(stage, status)
             stage.status = status
         if summary is not None:
             stage.summary = summary
@@ -168,8 +168,15 @@ class QuestService:
         self.session.refresh(stage)
         return stage
 
-    def _assert_transition_allowed(self, current: StageStatus, target: StageStatus) -> None:
+    def _assert_transition_allowed(self, stage: StageCard, target: StageStatus) -> None:
+        current = stage.status
         if current == target:
+            return
+        if (
+            current == StageStatus.COMPLETE
+            and target == StageStatus.BLOCKED
+            and stage.human_approved is False
+        ):
             return
         if target not in ALLOWED_STAGE_TRANSITIONS[current]:
             raise ValueError(f"Cannot transition stage from {current.value} to {target.value}")
