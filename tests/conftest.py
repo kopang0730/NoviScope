@@ -8,6 +8,7 @@ from noviscope.db.session import create_db_engine
 from noviscope.models.agent import AgentAssignment  # noqa: F401
 from noviscope.models.provider import ModelProvider  # noqa: F401
 from noviscope.models.quest import Quest, StageCard  # noqa: F401
+from noviscope.models.user import InviteCode, User  # noqa: F401
 
 
 @pytest.fixture()
