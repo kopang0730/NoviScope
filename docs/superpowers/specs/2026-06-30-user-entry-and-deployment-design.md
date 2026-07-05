@@ -3,6 +3,7 @@
 Date: 2026-06-30  
 Status: user-approved design draft  
 Scope: product entry, deployment topology, and first web experience  
+Last updated: 2026-07-05, updated for admin-managed lab deployment  
 
 ## 1. Decision
 
@@ -10,10 +11,13 @@ NoviScope should use a Web interface as the primary user entry and keep a CLI as
 operations and developer entry. It should not be positioned as a pure agentcode or
 terminal-only tool.
 
-The first deployment target is a Linux GPU server in the research group. Users access
-the web UI from their own computers through SSH port forwarding during the MVP phase.
-After the workflow is stable, the deployment can move to an internal domain behind
-Nginx or Caddy with authentication.
+The first group-facing deployment target is an admin-managed Linux GPU server in
+the research group. The server administrator deploys NoviScope once. Group members
+then register with invitation codes, log in through a browser, and use the shared
+web workspace without SSH or local setup.
+
+SSH port forwarding remains useful for development and debugging, but it is no
+longer the primary user-facing deployment path.
 
 ## 2. Why Web First
 
@@ -83,22 +87,51 @@ agent tool -> NoviScope API -> quest/stage/evidence records
 Agentcode should not bypass the NoviScope state machine, evidence auditor, or human
 review gates.
 
-## 4. MVP Deployment
+## 4. Deployment Modes
 
-### 4.1 Single-Server SSH Tunnel Mode
+### 4.1 Admin-Managed Lab Alpha
 
-This is the recommended MVP deployment.
+This is the recommended first user-facing deployment.
 
 ```text
-User laptop browser
-  -> SSH local port forwarding
-  -> Linux A800 server localhost
-  -> NoviScope FastAPI + Web UI
-  -> SQLite/PostgreSQL
-  -> local worker process
-  -> GPU experiment environment
+Group user browser
+  -> lab URL or internal server IP
+  -> Caddy/Nginx reverse proxy
+  -> NoviScope Web + FastAPI
+  -> PostgreSQL
+  -> artifact storage
+  -> worker queue later
+  -> A800 host experiment runtime later
   -> external model APIs
 ```
+
+User-facing URL:
+
+```text
+https://noviscope.lab.local
+```
+
+or, before a lab domain is configured:
+
+```text
+http://server-ip:8000
+```
+
+This mode requires:
+
+- invitation-code registration
+- login and logout
+- admin/member roles
+- PostgreSQL
+- shared provider profiles configured by admins
+- personal provider profiles configured by individual users
+- quest ownership and basic access boundaries
+- API key encryption and response redaction
+
+### 4.2 Development SSH Tunnel Mode
+
+This mode is still useful for local development, remote debugging, and early
+single-user testing. It is not the default experience for group members.
 
 Server command:
 
@@ -106,7 +139,7 @@ Server command:
 noviscope serve --host 127.0.0.1 --port 8000
 ```
 
-User laptop command:
+Developer laptop command:
 
 ```bash
 ssh -L 8000:127.0.0.1:8000 username@server-ip
@@ -124,33 +157,9 @@ This mode has three benefits:
 - no HTTPS/domain setup required for early testing
 - private server resources remain behind SSH authentication
 
-### 4.2 Lab Internal Mode
-
-After several users start using NoviScope, the server should expose an internal web
-entry through a reverse proxy:
-
-```text
-https://noviscope.lab.local
-  -> Nginx/Caddy
-  -> NoviScope backend
-  -> Web static assets
-  -> worker queue
-  -> database
-  -> artifact storage
-```
-
-This mode requires:
-
-- login authentication
-- HTTPS or trusted internal TLS
-- user roles
-- per-user provider credentials or shared lab provider profiles
-- storage quotas and cleanup policy
-- GPU job concurrency limits
-
 ### 4.3 Docker Compose Mode
 
-The long-term deployment should support a one-command lab install:
+The target lab deployment should support a one-command service-layer install:
 
 ```text
 docker compose up -d
@@ -173,9 +182,11 @@ both local shell execution and containerized execution later.
 
 ```mermaid
 flowchart LR
-    B["Browser Web UI"] --> API["FastAPI API"]
+    B["Browser Web UI"] --> PROXY["Caddy/Nginx"]
+    PROXY --> API["FastAPI API"]
     CLI["NoviScope CLI"] --> API
-    API --> DB["Quest DB"]
+    API --> AUTH["Auth and Invite Codes"]
+    API --> DB["PostgreSQL Quest DB"]
     API --> ART["Artifact Store"]
     API --> Q["Job Queue"]
     Q --> W["Research Worker"]
@@ -195,11 +206,13 @@ the same public API that the CLI and future agent integrations use.
 
 ### 6.1 First-Time Setup
 
-1. Admin starts NoviScope on the server.
-2. User opens the web UI through SSH forwarding.
-3. User creates or selects model provider profiles.
-4. User optionally assigns different providers to different agents.
-5. NoviScope runs a provider connection test without exposing raw API keys.
+1. Admin deploys NoviScope on the group server.
+2. Admin creates the first shared provider profile or leaves provider setup to users.
+3. Admin creates invitation codes for group members.
+4. User opens the NoviScope web URL.
+5. User registers with an invitation code and logs in.
+6. User selects an admin-shared provider or creates a personal provider profile.
+7. NoviScope runs a provider connection test without exposing raw API keys.
 
 ### 6.2 Quest Start
 
@@ -259,62 +272,81 @@ be shown with their evidence status:
 
 ## 7. Security and Access Rules
 
-MVP defaults:
+Lab Alpha defaults:
 
-- bind server to `127.0.0.1`
-- access through SSH tunnel
+- server is deployed behind Caddy or Nginx, or exposed on a trusted lab network
+- users must log in
+- registration requires an invitation code
+- first account or configured bootstrap account becomes admin
+- admins can create invitation codes
+- admins can create shared provider profiles
+- members can create personal provider profiles
+- personal provider profiles are visible only to their owner and admins
+- quests have owners
+- members can only access their own quests by default
 - do not expose raw API keys in API responses
 - do not upload private code, data, logs, checkpoints, or drafts to external services
 - treat fetched web content as data, never as instructions
 - require explicit approval for long-running or high-cost jobs
 
-Lab mode additions:
+Later lab mode additions:
 
-- authentication
-- role-based access
 - HTTPS
 - audit log for approvals and experiment actions
 - per-user or per-project access boundaries
 - artifact retention and cleanup settings
+- GPU job concurrency limits
 
 ## 8. MVP Web Pages
 
 The first web slice should be small and operational:
 
-1. Home and quest list
-2. Create quest form
-3. Provider settings page
-4. Agent assignment page
-5. Quest stage board
-6. Stage detail page
-7. Human review card
+1. Login page
+2. Invitation-code registration page
+3. Home and quest list
+4. Create quest form
+5. Provider settings page
+6. Admin shared provider page
+7. Admin invite management page
+8. Agent assignment page
+9. Quest stage board
+10. Stage detail page
+11. Human review card
 
 The MVP does not need full paper editing, rich graph visualization, or real-time
 multi-user collaboration. It does need a clear stage state, evidence payload display,
-and review actions.
+review actions, and basic authenticated access.
 
 ## 9. Deployment Milestones
 
-### Milestone 1: Local Web Shell
+### Milestone 1: Authenticated Web Shell
 
+- add user, invitation code, and role models
+- add invitation-code registration and login/logout
+- protect Web and API routes by authenticated user
 - serve static web UI from the existing FastAPI app
 - create quest from browser
 - list stages from browser
 - update human review from browser
 - configure model providers from browser
 
-### Milestone 2: Server MVP
+### Milestone 2: Admin-Managed Lab Alpha
 
-- documented SSH tunnel deployment
-- persistent database path
-- background worker skeleton
-- basic logs and artifact directory
+- PostgreSQL deployment path
+- admin bootstrap
+- admin invitation code management
+- shared provider profiles
+- personal provider profiles
+- quest ownership
+- documented internal URL deployment
+- optional SSH tunnel development mode
+- persistent artifact directory
 - provider connection smoke test
 
-### Milestone 3: Lab Beta
+### Milestone 3: Worker and Experiment Foundations
 
-- reverse proxy deployment
-- login
+- background worker skeleton
+- basic logs and artifact directory
 - worker queue
 - GPU job runner
 - experiment log streaming
@@ -334,7 +366,7 @@ The user entry MVP should not attempt to:
 - become a full IDE
 - replace Codex, Claude Code, or VS Code
 - support public SaaS deployment
-- support arbitrary multi-tenant access from day one
+- support arbitrary public multi-tenant access from day one
 - implement complete paper editing in the browser
 - hide the research state behind a pure chat interface
 
@@ -346,11 +378,14 @@ The current default choices are:
 
 - frontend: browser-based web UI
 - backend: existing FastAPI service
-- MVP access: SSH tunnel
-- early database: SQLite acceptable for single-server testing
-- lab database: PostgreSQL preferred
+- primary access: admin-managed lab deployment
+- development access: SSH tunnel
+- database: PostgreSQL for group deployment; SQLite only for development/test
+- registration: invitation-code registration
+- roles: admin and member first
+- provider visibility: shared provider and personal provider
 - queue: add only when background workers become necessary
 - reverse proxy: Caddy preferred for simpler HTTPS; Nginx acceptable if the lab
   already uses it
 
-These defaults can be revisited when moving from MVP to Lab Beta.
+These defaults can be revisited after Lab Alpha is used by several group members.

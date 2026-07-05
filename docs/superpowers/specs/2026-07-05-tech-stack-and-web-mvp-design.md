@@ -2,23 +2,25 @@
 
 日期：2026-07-05  
 状态：设计/计划稿  
-范围：技术栈定稿、Web MVP 边界、前后端实现顺序  
+范围：技术栈定稿、Admin-managed Lab Alpha、Web MVP 边界、前后端实现顺序  
 
 ## 1. 结论
 
-NoviScope 的 MVP 技术栈应保持轻量，优先把科研任务创建、阶段推进、人工复核、证据展示和 provider 配置跑通。不要在 MVP 阶段过早引入完整前端组件库、复杂队列系统、完整 Docker 化实验环境或多人权限系统。
+NoviScope 的 MVP 技术栈应保持轻量，但主部署目标已经调整为组内多人使用：服务器管理员集中部署，用户通过邀请码注册登录。第一版需要把认证、邀请码、PostgreSQL、共享/个人 provider、科研任务创建、阶段推进、人工复核和证据展示跑通。不要在 MVP 阶段过早引入完整前端组件库、复杂队列系统、完整 Docker 化实验环境或自动 GPU 实验执行。
 
 MVP 技术栈：
 
 ```text
 Frontend: React + TypeScript + Vite + Tailwind CSS
 Backend: FastAPI + Pydantic + SQLModel
-Database: SQLite
+Database: PostgreSQL for lab deployment, SQLite only for development/test
+Auth: invite-code registration + login/session + admin/member roles
 Worker: DB-backed simple worker loop
 Model Gateway: httpx + OpenAI-compatible / Anthropic / custom adapter
+Provider Scope: admin-shared providers + user-personal providers
 Artifacts: local filesystem
 Experiment Runtime: host-level shell/tmux/conda/uv runner
-Deployment: Linux server + SSH tunnel
+Deployment: admin-managed Linux server, Caddy/Nginx, Docker Compose later
 ```
 
 Lab Beta 技术栈：
@@ -36,11 +38,12 @@ Experiment Runtime: host-level runner first, optional Docker runner later
 
 ## 2. 技术栈原则
 
-- 保持 MVP 可理解：先让少数用户在组内服务器上跑通完整使用路径。
+- 保持 MVP 可理解：先让组内成员通过登录系统跑通完整使用路径。
 - 保持后端连续性：沿用已经实现的 FastAPI、SQLModel、provider、quest、stage 基础。
 - 保持前端轻量：先做可用的研究任务界面，不做通用 IDE 或复杂设计系统。
 - 保持实验环境现实：CV baseline 依赖复杂，实验 runner 先使用宿主机环境，不强制 Docker 化。
-- 保持升级路径清晰：SQLite、simple worker、SSH tunnel 都是 MVP 选择，不是长期上限。
+- 保持部署职责清晰：管理员部署服务，普通用户只注册登录和使用 Web。
+- 保持升级路径清晰：simple worker、host runner、basic roles 都是 MVP 选择，不是长期上限。
 
 ## 3. 重新评估后的取舍
 
@@ -66,9 +69,9 @@ worker marks complete/blocked
 
 当出现并发任务、失败重试、任务取消、日志流和多 worker 调度需求时，再升级 Redis + RQ 或 Dramatiq。
 
-### 3.4 SQLite 仅用于 MVP 和单机测试
+### 3.4 PostgreSQL 作为组内部署数据库
 
-SQLite 适合开发和早期单机部署，但 Lab Beta 应切换到 PostgreSQL。原因是后续会有多人访问、任务并发、审计日志、artifact metadata、provider assignment、worker lease 和实验状态频繁更新。
+SQLite 仅用于开发和测试。组内 Alpha 从一开始就使用 PostgreSQL。原因是当前目标已经明确为多用户登录、邀请码注册、quest ownership、provider scope、审计日志和后续 worker 状态更新。继续把 SQLite 作为组内部署数据库会让后续迁移成本变高。
 
 ### 3.5 服务层可以 Docker 化，实验层先不强制 Docker 化
 
@@ -76,16 +79,50 @@ NoviScope 服务层最终可以用 Docker Compose 管理 API、Web、DB、Queue�
 
 ## 4. Web MVP 用户范围
 
-MVP 面向两类用户：
+MVP 面向三类用户：
 
-1. 普通科研用户：打开网页，配置模型，创建研究任务，查看阶段，做人工复核。
-2. 管理/开发用户：通过 CLI 启动服务、检查环境、运行 worker、导出任务产物。
+1. Admin：部署后管理邀请码、共享 provider、用户和系统配置。
+2. Member：通过邀请码注册登录，创建研究任务，查看阶段，做人工复核。
+3. 管理/开发用户：通过 CLI 启动服务、检查环境、运行 worker、导出任务产物。
 
-MVP 不要求普通用户理解数据库、worker、端口、队列或实验命令细节。
+MVP 不要求普通用户理解数据库、worker、端口、队列、SSH 或实验命令细节。
 
 ## 5. Web MVP 页面
 
-### 5.1 Home / Quest List
+### 5.1 Login
+
+目标：让已注册用户进入系统。
+
+字段：
+
+- email
+- password
+
+行为：
+
+- 登录成功后进入 quest list
+- 登录失败时显示明确错误
+- 未登录用户不能访问 quest、provider、admin 页面
+
+### 5.2 Invitation Registration
+
+目标：让组内成员通过邀请码注册。
+
+字段：
+
+- invite code
+- email
+- display name
+- password
+- confirm password
+
+行为：
+
+- 邀请码只能使用一次或按配置限制次数
+- 注册后默认角色为 member
+- 首个 bootstrap admin 由部署配置或 CLI 创建，不通过普通邀请码产生
+
+### 5.3 Home / Quest List
 
 目标：让用户看到当前所有研究任务。
 
@@ -103,7 +140,12 @@ MVP 不要求普通用户理解数据库、worker、端口、队列或实验命�
 - create quest
 - open quest
 
-### 5.2 Create Quest
+权限：
+
+- member 默认只看自己的 quest
+- admin 可以看全部 quest
+
+### 5.4 Create Quest
 
 目标：让用户用最少信息启动研究任务。
 
@@ -121,10 +163,11 @@ MVP 不要求普通用户理解数据库、worker、端口、队列或实验命�
 - 调用 `POST /quests`
 - 创建第一张 `demand_validator` stage card
 - 跳转到 quest stage board
+- quest 绑定当前登录用户为 owner
 
-### 5.3 Provider Settings
+### 5.5 Provider Settings
 
-目标：让用户配置模型 API。
+目标：让用户查看可用模型配置，并管理自己的 personal provider。
 
 字段：
 
@@ -140,15 +183,48 @@ MVP 不要求普通用户理解数据库、worker、端口、队列或实验命�
 - API key 只写入，不回显
 - 列表页显示 provider 是否可用
 - MVP 可先不做真实连接测试，后续补 `test_connection`
+- member 可见 admin-shared provider 和自己的 personal provider
+- member 不能查看其他用户的 personal provider
 
-### 5.4 Agent Assignment
+### 5.6 Admin Invite Management
+
+目标：让管理员创建和管理邀请码。
+
+显示：
+
+- invite code
+- status
+- max uses
+- used count
+- expires at
+- created by
+
+主要操作：
+
+- create invite
+- disable invite
+- copy invite code
+
+### 5.7 Admin Shared Provider Management
+
+目标：让管理员配置全组可用模型。
+
+行为：
+
+- admin 创建 shared provider
+- admin 可以禁用 shared provider
+- shared provider 可被所有 member 使用
+- shared provider 的 API key 仍然加密保存且不回显
+
+### 5.8 Agent Assignment
 
 目标：让用户选择单模型模式或高级 agent-to-model 绑定。
 
 MVP 默认：
 
 - single provider mode
-- 所有 agent 使用同一 provider
+- 所有 agent 使用一个可见 provider
+- 可见 provider 包括 admin-shared provider 和当前用户的 personal provider
 
 高级模式：
 
@@ -160,7 +236,7 @@ MVP 默认：
 
 高级模式可以后置，不阻塞 Web MVP 第一版。
 
-### 5.5 Quest Stage Board
+### 5.9 Quest Stage Board
 
 目标：让用户理解任务推进到哪里。
 
@@ -185,7 +261,7 @@ MVP 默认：
 - last updated time
 - blocking risk count
 
-### 5.6 Stage Detail
+### 5.10 Stage Detail
 
 目标：展示一个阶段的输入、输出、证据和操作。
 
@@ -210,7 +286,7 @@ MVP 默认：
 
 MVP 可以先把 stage update 作为人工操作，后续再接入真实 agent execution。
 
-### 5.7 Human Review Card
+### 5.11 Human Review Card
 
 目标：让用户在关键节点做清晰决策。
 
@@ -244,6 +320,8 @@ web/
     app.tsx
     api/
       client.ts
+      auth.ts
+      invites.ts
       providers.ts
       quests.ts
       agents.ts
@@ -256,9 +334,13 @@ web/
       table.tsx
       json-view.tsx
     pages/
+      login.tsx
+      register.tsx
       quest-list.tsx
       create-quest.tsx
       provider-settings.tsx
+      admin-invites.tsx
+      admin-shared-providers.tsx
       agent-assignment.tsx
       quest-board.tsx
       stage-detail.tsx
@@ -285,13 +367,30 @@ MVP Web 应优先复用已有 API：
 
 需要补充的后端 API：
 
+- `POST /auth/register`
+- `POST /auth/login`
+- `POST /auth/logout`
+- `GET /auth/me`
+- `POST /admin/invites`
+- `GET /admin/invites`
+- `PATCH /admin/invites/{invite_id}`
 - `GET /quests`
 - `GET /quests/{quest_id}`
 - `PATCH /quests/{quest_id}`
 - `GET /agent-assignments`
 - `PATCH /agent-assignments/{agent_key}`
+- provider scope and ownership fields for shared/personal providers
 
 Web MVP 可以先不实现真实 agent 自动执行。它先做人工 stage 操作和数据可视化，保证 quest/stage/provider 基础闭环可用。
+
+新增访问控制规则：
+
+- 未登录用户只能访问登录、注册和健康检查。
+- member 默认只能访问自己的 quest。
+- admin 可以访问所有 quest。
+- shared provider 对所有已登录用户可见。
+- personal provider 只对 owner 和 admin 可见。
+- API 响应永远不返回 provider API key 或密文。
 
 ## 8. Worker MVP
 
@@ -322,7 +421,6 @@ MVP 使用本地文件系统：
 
 ```text
 .noviscope/
-  noviscope.db
   artifacts/
     quests/
       <quest-id>/
@@ -369,7 +467,32 @@ no private upload by default
 
 ## 11. 实施计划
 
-### Phase 1: Web Shell
+### Phase 1: Auth and Lab Access
+
+目标：管理员部署后，用户可以通过邀请码注册登录。
+
+任务：
+
+- add PostgreSQL configuration path
+- add user model
+- add invite code model
+- add password hashing
+- add login/session or JWT
+- add admin/member roles
+- add bootstrap admin mechanism
+- add auth API tests
+- implement login page
+- implement invitation registration page
+
+验收：
+
+- admin can create invitation codes
+- user can register only with a valid invitation code
+- user can log in and log out
+- unauthenticated users cannot access protected APIs
+- password is never stored in plaintext
+
+### Phase 2: Web Shell
 
 目标：浏览器可操作已有后端核心对象。
 
@@ -390,11 +513,12 @@ no private upload by default
 - 用户能从浏览器创建 quest
 - 用户能查看 stage
 - 用户能更新 stage status、summary、evidence、review notes
+- quest 绑定当前登录用户
 - provider API key 不会在 UI 中回显
 
-### Phase 2: Backend Gaps for Web
+### Phase 3: Provider Scope and Backend Gaps
 
-目标：补齐 Web 需要但后端尚未提供的列表和详情接口。
+目标：补齐 Web 需要但后端尚未提供的列表、详情、权限和 provider scope。
 
 任务：
 
@@ -402,34 +526,43 @@ no private upload by default
 - add `GET /quests/{quest_id}`
 - add quest update endpoint if needed
 - add agent assignment read/update endpoints
+- add shared/personal provider scope
+- enforce provider visibility rules
+- add admin shared provider management endpoints
 - add API response tests
 
 验收：
 
 - quest list 页面不需要 mock 数据
 - agent assignment 页面可以读写真实后端数据
+- member can use shared provider
+- member can use own personal provider
+- member cannot read another user's personal provider
+- admin can manage shared provider
 - `pytest` 通过
 
-### Phase 3: Bundle and SSH Tunnel MVP
+### Phase 4: Admin-Managed Deployment
 
-目标：能在 Linux 服务器上启动一个服务，本机通过 SSH tunnel 访问。
+目标：管理员能在 Linux 服务器上部署，用户通过组内 Web 地址访问。
 
 任务：
 
 - build static frontend
 - mount static assets in FastAPI
 - add CLI command `noviscope serve`
-- document SSH tunnel startup
-- add `.env.example`
+- add `.env.example` for PostgreSQL, secret keys, bootstrap admin, artifacts
+- add service-layer Docker Compose or documented venv deployment
+- document Caddy/Nginx reverse proxy path
+- keep SSH tunnel as development mode documentation
 
 验收：
 
-- server runs on `127.0.0.1:8000`
-- user can open `http://127.0.0.1:8000` through SSH tunnel
+- admin can deploy NoviScope on the lab server
+- user can open the lab URL from a browser
 - refresh browser route works
 - `/api` endpoints still work
 
-### Phase 4: Simple Worker Skeleton
+### Phase 5: Simple Worker Skeleton
 
 目标：为后续自动 stage execution 做最小 worker 基础。
 
@@ -452,9 +585,11 @@ no private upload by default
 后端：
 
 - pytest for API endpoints
+- pytest for auth and invitation code flow
 - pytest for quest/stage transition rules
 - pytest for provider key redaction
 - pytest for agent assignment behavior
+- pytest for provider visibility rules
 
 前端：
 
@@ -464,13 +599,17 @@ no private upload by default
 
 人工验收：
 
+- register with invitation code
+- log in and log out
 - create provider
 - create quest
 - view quest board
 - open stage detail
 - approve/reject/revise a stage
 - confirm API key is never displayed
-- confirm SSH tunnel access works
+- confirm member cannot see another user's quest
+- confirm admin can create shared provider
+- confirm lab URL access works
 
 ## 13. 非目标
 
@@ -479,7 +618,7 @@ Web MVP 不做：
 - 完整论文编辑器
 - 复杂图数据库可视化
 - WebSocket 实时协作
-- 多租户权限系统
+- 复杂多租户权限系统
 - 公开 SaaS 部署
 - 自动 GPU 实验运行
 - 完整 agent 自动执行
@@ -491,15 +630,19 @@ Web MVP 不做：
 
 ### 风险：Web 页面过早复杂化
 
-缓解：第一版只做 7 个页面，优先使用表格、卡片和可折叠 JSON。
+缓解：第一版只做登录、注册、任务、provider、admin 管理和 stage 审核相关页面，优先使用表格、卡片和可折叠 JSON。
 
 ### 风险：用户被模型配置劝退
 
-缓解：默认单模型模式，只要求一个 provider。高级 agent assignment 后置。
+缓解：管理员先配置 shared provider，普通用户可以直接选择共享模型。个人 provider 和高级 agent assignment 后置。
 
-### 风险：SQLite 后续迁移成本
+### 风险：登录和权限让第一版变重
 
-缓解：数据库访问继续通过 service 层和 SQLModel 管理，不在前端或业务逻辑里依赖 SQLite 特性。
+缓解：只做 admin/member 两级角色和邀请码注册，不做组织、团队、项目级复杂 ACL。
+
+### 风险：PostgreSQL 增加部署门槛
+
+缓解：Docker Compose 或清晰的 `.env.example` 管理数据库配置；SQLite 继续保留为开发和测试路径。
 
 ### 风险：实验运行污染服务环境
 
@@ -514,7 +657,8 @@ Web MVP 不做：
 Web MVP 成功不是页面完整，而是用户可以完成一条可见的最小科研任务路径：
 
 ```text
-configure provider
+register/login
+-> configure provider
 -> create quest
 -> inspect demand_validator stage
 -> write evidence payload
