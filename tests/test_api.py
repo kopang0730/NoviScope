@@ -255,6 +255,29 @@ def test_provider_crud_endpoints_do_not_return_api_key(dev_admin_header_enabled:
         assert update_response.json()["default_model"] == "gpt-4.1-mini"
         assert update_response.json()["is_active"] is False
 
+        inactive_test_response = client.post(f"/providers/{provider_id}/test")
+        assert inactive_test_response.status_code == 200
+        inactive_test = inactive_test_response.json()
+        assert inactive_test["ok"] is False
+        assert inactive_test["model"] == "gpt-4.1-mini"
+        assert "api_key" not in inactive_test
+        assert "sk-realistic-test-key" not in str(inactive_test)
+
+        reactivate_response = client.patch(
+            f"/providers/{provider_id}",
+            json={"is_active": True},
+        )
+        assert reactivate_response.status_code == 200
+
+        test_response = client.post(f"/providers/{provider_id}/test")
+        assert test_response.status_code == 200
+        connection_test = test_response.json()
+        assert connection_test["ok"] is True
+        assert connection_test["provider_id"] == provider_id
+        assert connection_test["model"] == "gpt-4.1-mini"
+        assert "api_key" not in connection_test
+        assert "sk-realistic-test-key" not in str(connection_test)
+
         delete_response = client.delete(f"/providers/{provider_id}")
         assert delete_response.status_code == 204
 
@@ -293,12 +316,14 @@ def test_provider_routes_require_authentication(dev_admin_header_enabled: None):
             f"/providers/{provider['id']}",
             json={"default_model": "gpt-4.1-mini"},
         )
+        test_response = client.post(f"/providers/{provider['id']}/test")
         delete_response = client.delete(f"/providers/{provider['id']}")
 
         assert create_response.status_code == 401
         assert list_response.status_code == 401
         assert get_response.status_code == 401
         assert update_response.status_code == 401
+        assert test_response.status_code == 401
         assert delete_response.status_code == 401
 
 
