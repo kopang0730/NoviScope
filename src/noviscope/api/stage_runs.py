@@ -13,10 +13,10 @@ from noviscope.agents.demand_validation import (
 )
 from noviscope.agents.literature_scout import (
     LITERATURE_SCOUT_AGENT_ID,
-    LiteratureScoutRunError,
     LiteratureScoutStageRunner,
     get_literature_scout_runner,
 )
+from noviscope.agents.openalex_client import LiteratureScoutRunError
 from noviscope.agents.stage_runner import (
     ModelProviderCredentials,
     StageRunContext,

@@ -7,8 +7,10 @@ from pydantic import SecretStr
 from noviscope.agents.literature_scout import (
     LITERATURE_SCOUT_AGENT_ID,
     OPENALEX_SOURCE,
-    LiteratureScoutRunError,
     LiteratureScoutStageRunner,
+)
+from noviscope.agents.openalex_client import (
+    LiteratureScoutRunError,
     OpenAlexAuthor,
     OpenAlexAuthorship,
     OpenAlexClientConfig,
@@ -127,6 +129,9 @@ def test_literature_scout_scores_recent_openalex_papers_first() -> None:
     papers = result.output_payload["papers"]
     assert result.output_payload["source"] == OPENALEX_SOURCE
     assert result.output_payload["search_query"].startswith("Badminton action recognition")
+    assert result.output_payload["score_basis"] == (
+        "OpenAlex relevance_score with a 1.25x boost for papers from the last three years."
+    )
     assert isinstance(papers, list)
     assert papers[0]["openalex_id"] == "https://openalex.org/W2"
     assert papers[0]["relevance_score"] == 112.5
@@ -193,6 +198,24 @@ def test_openalex_client_blocks_without_api_key_before_http() -> None:
     )
     http_client = FakeHTTPClient(response)
     client = OpenAlexWorksClient(OpenAlexClientConfig(), http_client)
+
+    with pytest.raises(LiteratureScoutRunError) as exc_info:
+        client.search("badminton action recognition", current_year=2026)
+
+    assert str(exc_info.value) == (
+        "Configure NOVISCOPE_OPENALEX_API_KEY before running Literature Scout."
+    )
+    assert http_client.params == {}
+
+
+def test_openalex_client_blocks_blank_api_key_before_http() -> None:
+    response = httpx.Response(
+        200,
+        json={"results": []},
+        request=httpx.Request("GET", "https://api.openalex.org/works"),
+    )
+    http_client = FakeHTTPClient(response)
+    client = OpenAlexWorksClient(OpenAlexClientConfig(api_key=SecretStr("  ")), http_client)
 
     with pytest.raises(LiteratureScoutRunError) as exc_info:
         client.search("badminton action recognition", current_year=2026)

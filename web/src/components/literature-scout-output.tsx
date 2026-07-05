@@ -26,6 +26,7 @@ type LiteraturePaper = {
 
 type LiteratureScoutView = {
   readonly papers: readonly LiteraturePaper[];
+  readonly scoreBasis: string;
   readonly searchQuery: string;
   readonly source: string;
 };
@@ -102,6 +103,7 @@ function buildLiteratureScoutView(stage: StageCard): LiteratureScoutView | null 
   const paperValues = stage.output_payload.papers;
   return {
     papers: Array.isArray(paperValues) ? paperValues.map(readPaper).filter((paper): paper is LiteraturePaper => paper !== null) : [],
+    scoreBasis: readString(stage.output_payload, "score_basis"),
     searchQuery: readString(stage.output_payload, "search_query"),
     source: readString(stage.output_payload, "source"),
   };
@@ -205,6 +207,11 @@ export function LiteratureScoutOutput({ stage }: { readonly stage: StageCard }) 
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 lg:col-span-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t("searchQuery")}</p>
           <p className="mt-2 text-sm text-slate-700">{literatureScout.searchQuery || t("notAvailable")}</p>
+          {literatureScout.scoreBasis ? (
+            <p className="mt-2 text-xs text-slate-500">
+              {t("scoreBasis")}: {literatureScout.scoreBasis}
+            </p>
+          ) : null}
         </div>
       </div>
 
