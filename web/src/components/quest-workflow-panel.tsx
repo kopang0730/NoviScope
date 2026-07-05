@@ -34,14 +34,14 @@ export function QuestWorkflowPanel({
   const [viewMode, setViewMode] = useState<"canvas" | "list">("canvas");
 
   return (
-    <Card>
+    <Card className="min-w-0">
       <CardHeading description={t("workflowDescription")} title={t("workflowTitle")} />
       {!selectedQuestId ? <p className="mt-4 text-sm text-slate-500">{t("selectQuestForStages")}</p> : null}
       {detailError ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{detailError}</p> : null}
       {stageRunError ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{stageRunError}</p> : null}
       {detailLoading ? <p className="mt-4 text-sm text-slate-500">{t("loadingQuestDetail")}</p> : null}
       {selectedQuest ? (
-        <div className="mt-6 space-y-5">
+        <div className="mt-6 min-w-0 space-y-5">
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-start justify-between gap-3">
               <div>

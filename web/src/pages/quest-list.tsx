@@ -155,7 +155,7 @@ export function QuestListPage() {
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)]">
+    <div className="grid min-w-0 gap-4 xl:grid-cols-[260px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)]">
       <Card className="h-fit xl:sticky xl:top-4">
         <CardHeading
           action={
@@ -221,7 +221,7 @@ export function QuestListPage() {
         ) : null}
       </Card>
 
-      <div className="grid gap-4">
+      <div className="grid min-w-0 gap-4">
         <QuestWorkflowPanel
           detailError={detailError}
           detailLoading={detailLoading}

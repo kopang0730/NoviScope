@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, SecretStr
 from sqlmodel import Session
 
+from noviscope.agents.assignments import AgentAssignmentService
 from noviscope.agents.demand_validation import (
     DemandValidationRunError,
     DemandValidationRunner,
@@ -74,12 +75,14 @@ class ProviderSelectionContext:
     provider_service: ProviderService
     current_user: User
     provider_id: str | None
+    model_name: str | None
     runner: StageRunner
 
 
 @dataclass(frozen=True, slots=True)
 class ProviderSelection:
     provider: ModelProvider | None
+    model_name: str | None
     blocking_reason: str
     blocking_detail: str
 
@@ -122,25 +125,38 @@ def select_provider(context: ProviderSelectionContext) -> ProviderSelection:
             return ProviderSelection(
                 blocking_detail="Activate this provider before running the stage.",
                 blocking_reason="inactive_provider",
+                model_name=None,
                 provider=None,
             )
         if provider.kind not in context.runner.supported_provider_kinds:
             return ProviderSelection(
                 blocking_detail="Choose an OpenAI-compatible or custom provider for this stage.",
                 blocking_reason="unsupported_provider",
+                model_name=None,
                 provider=None,
             )
-        return ProviderSelection(blocking_detail="", blocking_reason="", provider=provider)
+        return ProviderSelection(
+            blocking_detail="",
+            blocking_reason="",
+            model_name=context.model_name,
+            provider=provider,
+        )
 
     for provider in context.provider_service.list_providers_for_user(context.current_user):
         if provider.is_active and provider.kind in context.runner.supported_provider_kinds:
-            return ProviderSelection(blocking_detail="", blocking_reason="", provider=provider)
+            return ProviderSelection(
+                blocking_detail="",
+                blocking_reason="",
+                model_name=None,
+                provider=provider,
+            )
 
     return ProviderSelection(
         blocking_detail=(
             "Configure an active OpenAI-compatible or custom provider before running this stage."
         ),
         blocking_reason="missing_provider",
+        model_name=None,
         provider=None,
     )
 
@@ -148,13 +164,14 @@ def select_provider(context: ProviderSelectionContext) -> ProviderSelection:
 def build_provider_credentials(
     provider: ModelProvider,
     provider_service: ProviderService,
+    model_name: str | None = None,
 ) -> ModelProviderCredentials:
     return ModelProviderCredentials(
         api_key=SecretStr(provider_service.decrypt_api_key(provider)),
         base_url=provider.base_url,
         id=provider.id,
         kind=provider.kind,
-        model=provider.default_model,
+        model=model_name or provider.default_model,
         name=provider.name,
     )
 
@@ -328,7 +345,11 @@ def build_runner_provider(
     selection = select_provider(selection_context)
     if selection.provider is None:
         return build_provider_block(selection)
-    return build_provider_credentials(selection.provider, selection_context.provider_service)
+    return build_provider_credentials(
+        selection.provider,
+        selection_context.provider_service,
+        model_name=selection.model_name,
+    )
 
 
 @router.post("/stages/{stage_id}/run", response_model=StageCardResponse)
@@ -341,6 +362,7 @@ def run_stage(
 ) -> StageCardResponse:
     quest_service = QuestService(session)
     provider_service = get_provider_service(session)
+    assignment_service = AgentAssignmentService(session)
     try:
         stage = quest_service.get_stage_card_for_user(stage_id, current_user)
         runner = registry.get_runner(stage.agent_id)
@@ -353,11 +375,22 @@ def run_stage(
         if dependency_block is not None:
             return apply_stage_block(quest_service, stage_id, dependency_block)
 
+        assignment = assignment_service.get_assignment(stage.agent_id)
+        configured_provider_id = assignment.provider_id if assignment is not None else None
+        configured_model_name = assignment.model_name if assignment is not None else None
+        effective_provider_id = (
+            request.provider_id if request.provider_id is not None else configured_provider_id
+        )
+        effective_model_name = (
+            None if request.provider_id is not None else configured_model_name
+        )
+
         provider_or_block = build_runner_provider(
             runner,
             ProviderSelectionContext(
                 current_user=current_user,
-                provider_id=request.provider_id,
+                model_name=effective_model_name,
+                provider_id=effective_provider_id,
                 provider_service=provider_service,
                 runner=runner,
             ),

@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from sqlmodel import Session, select
 
 from noviscope.agents.demand_validation import (
     DemandValidationOutput,
@@ -40,7 +41,9 @@ from noviscope.core.stage_policy import (
     NO_EXTERNAL_VERIFICATION_RISK,
     PAPER_MEETING_WRITER_AGENT_ID,
 )
+from noviscope.db.session import create_db_engine
 from noviscope.main import create_app
+from noviscope.models.user import User, UserRole
 
 DEV_ADMIN_HEADERS = {"X-NoviScope-Dev-Admin": "test-dev-admin-token-0123456789abcdef"}
 
@@ -249,6 +252,15 @@ def register_and_login(client: TestClient, invite_code: str, email: str) -> None
     assert login_response.status_code == 200
 
 
+def promote_user_to_admin(database_url: str, email: str) -> None:
+    engine = create_db_engine(database_url)
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.email == email)).one()
+        user.role = UserRole.ADMIN
+        session.add(user)
+        session.commit()
+
+
 def create_personal_provider(client: TestClient) -> None:
     response = client.post(
         "/providers",
@@ -262,6 +274,22 @@ def create_personal_provider(client: TestClient) -> None:
         },
     )
     assert response.status_code == 201
+
+
+def create_shared_provider(client: TestClient) -> str:
+    response = client.post(
+        "/providers",
+        json={
+            "api_key": "sk-shared",
+            "base_url": "https://api.example.com/v1",
+            "default_model": "example-chat",
+            "kind": "openai_compatible",
+            "name": "Shared Provider",
+            "scope": "shared",
+        },
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
 
 
 def create_quest(client: TestClient) -> str:
@@ -356,6 +384,39 @@ def test_run_demand_validation_stage_completes_with_provider(
     assert body["evidence_payload"]["provider_name"] == "Example Provider"
     assert body["evidence_payload"]["can_run"] is True
     assert body["input_payload"]["agent_id"] == "demand_validator"
+
+
+def test_run_demand_validation_uses_agent_default_provider_model(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    database_url = f"sqlite:///{tmp_path / 'stage-run-assignment.db'}"
+    app = create_app(database_url=database_url)
+    app.dependency_overrides[get_demand_validation_runner] = get_fake_runner
+
+    with TestClient(app) as client:
+        register_and_login(client, "RUN-ASSIGN-ADMIN", "admin@example.com")
+        promote_user_to_admin(database_url, "admin@example.com")
+        provider_id = create_shared_provider(client)
+        assignment_response = client.put(
+            "/agent-assignments/demand_validator",
+            json={"model_name": "assigned-model", "provider_id": provider_id},
+        )
+        assert assignment_response.status_code == 200
+        client.post("/auth/logout")
+
+        register_and_login(client, "RUN-ASSIGN-MEMBER", "member@example.com")
+        stage_id = create_quest(client)
+
+        response = client.post(f"/stages/{stage_id}/run", json={})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "complete"
+    assert body["input_payload"]["provider_id"] == provider_id
+    assert body["input_payload"]["provider_name"] == "Shared Provider"
+    assert body["input_payload"]["provider_model"] == "assigned-model"
+    assert body["evidence_payload"]["provider_model"] == "assigned-model"
 
 
 def test_run_demand_validation_stage_blocks_without_provider(

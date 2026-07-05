@@ -48,6 +48,17 @@ export interface InviteCode {
   updated_at: string;
 }
 
+export interface AgentAssignment {
+  agent_id: string;
+  display_name: string;
+  provider_id: string | null;
+  provider_name: string | null;
+  provider_kind: ProviderKind | null;
+  provider_is_active: boolean | null;
+  model_name: string | null;
+  effective_model: string | null;
+}
+
 export interface Quest {
   id: string;
   owner_user_id: string | null;
