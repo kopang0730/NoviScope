@@ -101,6 +101,11 @@ Each idea should include:
 - confidence.
 
 The user must select an idea before experiment planning continues.
+The frontend should use `POST /stages/{stage_id}/select-ideas` on the completed
+Gap & Hypothesis Generator stage. The request accepts `selected_idea_ids` and
+optional `review_notes`; the response marks the stage as human approved and sets
+`selection_status=selected_for_experiment_design`. Unknown idea ids are rejected
+instead of being stored as downstream experiment inputs.
 
 ### Experiment Planner
 
