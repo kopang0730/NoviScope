@@ -69,6 +69,7 @@ export function buildQuestReviewPacket(quest: Quest, stages: readonly StageCard[
   lines.push("");
   appendLine(lines, "Research direction", intake.direction || quest.initial_direction);
   appendLine(lines, "Real-world scenario / demand source", intake.scenario);
+  appendLine(lines, "Demand evidence sources to verify", intake.demandEvidenceSources);
   appendLine(lines, "Target user or customer", intake.targetUser);
   appendLine(lines, "Input and desired output", intake.target);
   appendLine(lines, "Current pain point or suspected gap", intake.painPoint);

@@ -182,6 +182,9 @@ def build_chat_completion_payload(request: DemandValidationRequest) -> ChatCompl
                     "target_user_or_customer, evidence_for_demand, missing_evidence, risks, "
                     "suggested_human_checklist, go_or_no_go_recommendation, next_step. "
                     "demand_assessment must be one of strong, plausible, weak, unclear. "
+                    "Treat user-provided demand evidence sources as unverified leads: use them "
+                    "to shape evidence_for_demand, missing_evidence, and the human checklist, "
+                    "but do not treat them as confirmed proof. "
                     "confidence must be one of high, medium, low. Because this MVP has not "
                     "performed external source verification, do not return high confidence."
                 ),

@@ -3,6 +3,7 @@ import { getWorkflowStageReadiness } from "./workflow-readiness";
 
 export type IntakeBrief = {
   readonly dataAssets: string;
+  readonly demandEvidenceSources: string;
   readonly direction: string;
   readonly expectedOutput: string;
   readonly knownWork: string;
@@ -104,6 +105,7 @@ function findSelectedIdeaTitle(stage: StageCard | undefined) {
 export function parseIntakeBrief(initialDirection: string): IntakeBrief {
   return {
     dataAssets: readLineValue(initialDirection, ["Data, code, or resources", "Data, code, or resources already available", "已有数据、代码或资源"]),
+    demandEvidenceSources: readLineValue(initialDirection, ["Demand evidence sources to verify", "待核验需求证据来源"]),
     direction: readLineValue(initialDirection, ["Research direction", "研究方向"]),
     expectedOutput: readLineValue(initialDirection, ["Expected research output", "期望科研产出"]),
     knownWork: readLineValue(initialDirection, ["Known papers / methods / baselines", "Known papers, methods, or baselines", "已知论文、方法或 baseline"]),
