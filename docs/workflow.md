@@ -4,6 +4,9 @@ NoviScope is organized around a quest. A quest starts as a rough research
 direction and moves through explicit stage cards. Each stage must either produce
 structured evidence or explain why it is blocked.
 
+All demand, literature, code, and web evidence used by a stage must follow the
+[Source Quality and Poisoning Policy](source-policy.md).
+
 ## User Flow
 
 1. Register with an invitation code.
@@ -58,6 +61,10 @@ Current source: OpenAlex. OpenAlex can be used without a model provider and
 without an API key; `NOVISCOPE_OPENALEX_API_KEY` is optional for deployments that
 want authenticated OpenAlex requests. If the source returns no useful papers, the
 UI should show that clearly rather than inventing citations.
+
+Literature results should be ranked with the source policy's evidence tiers,
+venue priority, and recency window. arXiv, GitHub, and blogs are useful leads,
+but they cannot independently support strong research claims.
 
 Each paper should include:
 

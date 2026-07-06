@@ -4,6 +4,9 @@ NoviScope separates the long-term agent registry from the currently executable
 stage runners. The registry describes the intended research team. The stage
 runner registry describes what the Web MVP can actually execute now.
 
+Agents that read web pages, papers, code repositories, or user-provided source
+leads must follow the [Source Quality and Poisoning Policy](source-policy.md).
+
 ## Shared Stage Contract
 
 Every persisted stage card has:
@@ -72,6 +75,7 @@ Agent outputs must follow these rules:
 - Keep raw model responses in payloads for audit.
 - Do not display raw responses as the primary UI.
 - Use `confidence` conservatively.
+- Apply source-policy confidence limits before writing claims into artifacts.
 - Put source identifiers, provider names, model names, and blocking reasons in
   `evidence_payload`.
 - Put user-facing structured content in `output_payload`.
