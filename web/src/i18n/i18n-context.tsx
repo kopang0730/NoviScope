@@ -140,6 +140,11 @@ const en = {
   ideaListDescription: "Each idea includes its hypothesis, evidence, feasibility, and review gate.",
   ideaListTitle: "Generated ideas",
   ideaSelectionGate: "Human selection gate",
+  ideaSelectionNextStepDescription:
+    "Open Experiment Planner next. Record the data path, baseline code repository, and environment notes before running the plan.",
+  ideaSelectionNextStepTitle: "Idea selected for experiment design",
+  ideaSelectionOpenExperimentPlanner: "Open Experiment Planner",
+  ideaSelectionOpenWorkflow: "Open workflow",
   ideaSelectionReviewPrefix: "Human selected idea:",
   ideaSelectionReviewSuffix: "Approved for experiment design.",
   ideaSelectionSaved: "Idea selection saved.",
@@ -618,6 +623,11 @@ const zh: Record<keyof typeof en, string> = {
   ideaListDescription: "每个 idea 都展示假设、证据、可行性和人工选择入口。",
   ideaListTitle: "生成的 ideas",
   ideaSelectionGate: "人工选择关卡",
+  ideaSelectionNextStepDescription:
+    "下一步打开 Experiment Planner。运行实验计划前，需要先记录数据路径、baseline 代码仓库和实验环境说明。",
+  ideaSelectionNextStepTitle: "已选择进入实验设计的 idea",
+  ideaSelectionOpenExperimentPlanner: "打开 Experiment Planner",
+  ideaSelectionOpenWorkflow: "打开工作流",
   ideaSelectionReviewPrefix: "人工已选择 idea：",
   ideaSelectionReviewSuffix: "批准进入实验设计。",
   ideaSelectionSaved: "Idea 选择已保存。",
