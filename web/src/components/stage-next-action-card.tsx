@@ -1,4 +1,7 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { getErrorMessage } from "../api/client";
+import { runStage } from "../api/quests";
 import type { StageCard } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
@@ -9,7 +12,7 @@ import {
 } from "../lib/stage-run-gate";
 import { stageTone } from "../lib/status-tones";
 import { Badge } from "./badge";
-import { buttonClassName } from "./button";
+import { Button, buttonClassName } from "./button";
 import { Card, CardHeading } from "./card";
 
 function findNextWorkflowStage(stage: StageCard, stages: readonly StageCard[]) {
@@ -22,15 +25,20 @@ function findNextWorkflowStage(stage: StageCard, stages: readonly StageCard[]) {
 }
 
 export function StageNextActionCard({
+  onStageChange,
   providerReadinessData,
   stage,
   stages,
 }: {
+  readonly onStageChange?: (stage: StageCard) => void;
   readonly providerReadinessData: ProviderReadinessData;
   readonly stage: StageCard;
   readonly stages: readonly StageCard[];
 }) {
   const { t } = useI18n();
+  const navigate = useNavigate();
+  const [runError, setRunError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
 
   if (stage.status !== "complete") {
     return null;
@@ -62,11 +70,35 @@ export function StageNextActionCard({
   });
   const nextStageHref = `/stages/${nextStage.id}?quest=${nextStage.quest_id}`;
 
+  async function handleRunNextStage(stageToRun: StageCard) {
+    setRunError(null);
+    setRunning(true);
+
+    try {
+      const updatedStage = await runStage(stageToRun.id);
+      onStageChange?.(updatedStage);
+      navigate(`/stages/${updatedStage.id}?quest=${updatedStage.quest_id}`);
+    } catch (error) {
+      if (error instanceof Error) {
+        setRunError(getErrorMessage(error));
+        return;
+      }
+      throw error;
+    } finally {
+      setRunning(false);
+    }
+  }
+
   return (
     <Card className="border-teal-200 bg-teal-50/50">
       <CardHeading
         action={
           <div className="flex flex-wrap gap-2">
+            {nextGate.canRun ? (
+              <Button loading={running} onClick={() => void handleRunNextStage(nextStage)} size="sm" type="button">
+                {t("stageNextActionRunNextStage")}
+              </Button>
+            ) : null}
             <Link className={buttonClassName({ size: "sm", variant: "primary" })} to={nextStageHref}>
               {t("stageNextActionOpenNextStage")}
             </Link>
@@ -95,6 +127,12 @@ export function StageNextActionCard({
             </Badge>
           </div>
         </div>
+
+        {runError ? (
+          <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            {runError}
+          </p>
+        ) : null}
 
         <div className="mt-4 grid gap-2 text-xs text-slate-500 sm:grid-cols-2">
           <p>

@@ -227,6 +227,7 @@ export function StageDetailPage() {
           />
 
           <StageNextActionCard
+            onStageChange={handleStageChange}
             providerReadinessData={providerReadinessData}
             stage={stage}
             stages={workflowStages}
