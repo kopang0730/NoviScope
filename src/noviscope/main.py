@@ -11,6 +11,7 @@ from noviscope.api.experiment_setup import router as experiment_setup_router
 from noviscope.api.idea_selection import router as idea_selection_router
 from noviscope.api.provider_tests import router as provider_tests_router
 from noviscope.api.routes import router
+from noviscope.api.stage_display_output import router as stage_display_output_router
 from noviscope.api.stage_literature_papers import router as stage_literature_papers_router
 from noviscope.api.stage_readiness import router as stage_readiness_router
 from noviscope.api.stage_runs import router as stage_runs_router
@@ -37,6 +38,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
     app.include_router(experiment_setup_router)
     app.include_router(idea_selection_router)
     app.include_router(provider_tests_router)
+    app.include_router(stage_display_output_router)
     app.include_router(stage_literature_papers_router)
     app.include_router(stage_readiness_router)
     app.include_router(stage_runs_router)
