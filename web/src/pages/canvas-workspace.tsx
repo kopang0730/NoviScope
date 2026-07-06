@@ -5,29 +5,19 @@ import { getQuest, getQuestStages, getQuests, runStage } from "../api/quests";
 import type { Quest, StageCard } from "../api/types";
 import { useAuth } from "../auth/auth-context";
 import { Badge } from "../components/badge";
-import { Button, buttonClassName } from "../components/button";
+import { buttonClassName } from "../components/button";
+import { CanvasReviewPacketButton } from "../components/canvas-review-packet-button";
 import { Card, CardHeading } from "../components/card";
 import { Input } from "../components/input";
 import { ResearchCanvas } from "../components/research-canvas";
 import { useI18n } from "../i18n/i18n-context";
-import { downloadTextFile } from "../lib/download-file";
 import { formatDateTime, labelFromEnum } from "../lib/format";
 import { useProviderReadinessData } from "../lib/provider-readiness-data";
-import { buildQuestReviewPacket } from "../lib/quest-review-export";
 import { questTone } from "../lib/status-tones";
 
 function directionSummary(value: string) {
   const normalized = value.replace(/\s+/g, " ").trim();
   return normalized.length > 150 ? `${normalized.slice(0, 150)}...` : normalized;
-}
-
-function downloadQuestReviewPacket(quest: Quest, stages: readonly StageCard[]) {
-  const packet = buildQuestReviewPacket(quest, stages);
-  downloadTextFile({
-    content: packet.content,
-    filename: packet.filename,
-    mimeType: "text/markdown;charset=utf-8",
-  });
 }
 
 export function CanvasWorkspacePage() {
@@ -64,7 +54,7 @@ export function CanvasWorkspacePage() {
     try {
       setQuests(await getQuests());
     } catch (error) {
-      setQuestsError(getErrorMessage(error));
+      setQuestsError(error instanceof Error ? getErrorMessage(error) : "Unexpected error");
     } finally {
       setQuestsLoading(false);
     }
@@ -147,7 +137,7 @@ export function CanvasWorkspacePage() {
         currentStages.map((stage) => (stage.id === updatedStage.id ? updatedStage : stage)),
       );
     } catch (error) {
-      setStageRunError(getErrorMessage(error));
+      setStageRunError(error instanceof Error ? getErrorMessage(error) : "Unexpected error");
     } finally {
       setRunningStageId(null);
     }
@@ -220,19 +210,7 @@ export function CanvasWorkspacePage() {
       <div className="min-w-0 space-y-4">
         <Card className="overflow-hidden">
           <CardHeading
-            action={
-              selectedQuest ? (
-                <Button
-                  disabled={stages.length === 0}
-                  onClick={() => downloadQuestReviewPacket(selectedQuest, stages)}
-                  size="sm"
-                  type="button"
-                  variant="secondary"
-                >
-                  {t("downloadReviewPacket")}
-                </Button>
-              ) : null
-            }
+            action={<CanvasReviewPacketButton quest={selectedQuest} stages={stages} />}
             description={t("canvasWorkspaceMainDescription")}
             title={t("researchCanvasTitle")}
           />
