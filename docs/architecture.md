@@ -64,7 +64,8 @@ implementations. Runners return structured `StageRunResult` values containing
 
 FastAPI route modules. `routes.py` owns auth, providers, agents, quests, and
 manual stage updates. `stage_runs.py` owns executable stage transitions and
-dependency gates.
+dependency gates. `literature_exports.py` owns Literature Scout citation review
+downloads.
 
 `src/noviscope/quests`
 
@@ -164,6 +165,7 @@ Implemented now:
 - five-stage workflow creation;
 - demand validation through an OpenAI-compatible/custom provider;
 - literature scouting through OpenAlex;
+- Literature Scout Markdown citation review downloads;
 - evidence-linked idea generation through a model provider;
 - experiment planning through a model provider;
 - paper/meeting Markdown artifact generation through a model provider;

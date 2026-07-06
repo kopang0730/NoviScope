@@ -69,6 +69,11 @@ Each paper should include:
 - why it is relevant;
 - limitations.
 
+`GET /stages/{stage_id}/literature-citations/download` returns a Markdown
+citation review list for a completed Literature Scout stage. It serializes saved
+metadata and reliability notes; users still need to verify primary papers before
+formal submission.
+
 ### Gap & Hypothesis Generator
 
 Purpose: generate candidate research ideas based on demand and literature
