@@ -6,6 +6,7 @@ import {
   buildPaperMeetingWriterView,
   type MarkdownArtifact,
 } from "../lib/paper-meeting-view";
+import { downloadTextFile } from "../lib/download-file";
 import { Badge } from "./badge";
 import { Button } from "./button";
 
@@ -41,16 +42,6 @@ function DetailBlock({
   );
 }
 
-function downloadMarkdown(artifact: MarkdownArtifact) {
-  const blob = new Blob([artifact.content], { type: "text/markdown;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = artifact.filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
-
 function ArtifactCard({ artifact }: { readonly artifact: MarkdownArtifact }) {
   const { t } = useI18n();
   const hasContent = artifact.content.trim().length > 0;
@@ -65,7 +56,13 @@ function ArtifactCard({ artifact }: { readonly artifact: MarkdownArtifact }) {
         </div>
         <Button
           disabled={!hasContent}
-          onClick={() => downloadMarkdown(artifact)}
+          onClick={() =>
+            downloadTextFile({
+              content: artifact.content,
+              filename: artifact.filename,
+              mimeType: "text/markdown;charset=utf-8",
+            })
+          }
           size="sm"
           type="button"
           variant="secondary"

@@ -12,12 +12,17 @@ import { StageEditor } from "../components/stage-editor";
 import { StageOutputPanel } from "../components/stage-output-summary";
 import { StageReviewGateCard } from "../components/stage-review-gate-card";
 import { useI18n } from "../i18n/i18n-context";
+import { downloadTextFile } from "../lib/download-file";
 import { formatDateTime, labelFromEnum } from "../lib/format";
 import { useProviderReadinessData } from "../lib/provider-readiness-data";
 import {
   getLocalizedStageRunGateReason,
   getStageRunGate,
 } from "../lib/stage-run-gate";
+import {
+  buildStageReviewPacketFilename,
+  buildStageReviewPacketMarkdown,
+} from "../lib/stage-review-packet";
 
 function stageTone(status: StageStatus) {
   if (status === "complete") {
@@ -134,6 +139,14 @@ export function StageDetailPage() {
     }
   }
 
+  function handleDownloadReviewPacket(currentStage: StageCard) {
+    downloadTextFile({
+      content: buildStageReviewPacketMarkdown(currentStage, t),
+      filename: buildStageReviewPacketFilename(currentStage),
+      mimeType: "text/markdown;charset=utf-8",
+    });
+  }
+
   if (!questId) {
     return (
       <Card>
@@ -168,6 +181,11 @@ export function StageDetailPage() {
             {stage && stageRunGate?.canRun ? (
               <Button loading={runningStage} onClick={() => void handleRunStage()} size="sm">
                 {t("runStage")}
+              </Button>
+            ) : null}
+            {stage ? (
+              <Button onClick={() => handleDownloadReviewPacket(stage)} size="sm" type="button" variant="secondary">
+                {t("downloadReviewPacket")}
               </Button>
             ) : null}
             <Link className={buttonClassName({ variant: "secondary", size: "sm" })} to={workflowBackLink}>
