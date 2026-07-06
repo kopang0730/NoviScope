@@ -136,6 +136,20 @@ that affect downstream work:
 - confirm experiment readiness;
 - approve generated writing only after checking sources and claims.
 
+The read-only endpoint `GET /stages/{stage_id}/review-guidance` gives the web UI
+a structured review card:
+
+- `approval_state`: pending stage completion, ready for review, approved, or
+  rejected;
+- `review_required` and `can_approve`;
+- `blocking_reason` when approval is not actionable;
+- `checklist` built from structured review, missing evidence, risk, and
+  human-review fields;
+- `evidence_summary`, `warnings`, and normalized `confidence`.
+
+This endpoint does not approve or reject a stage. It only explains what a human
+should inspect before using `human_approved` and `review_notes`.
+
 Do not use review notes as a place to store secrets, private dataset paths that
 should not be visible to other users, or unpublished paper text that should not
 be committed.

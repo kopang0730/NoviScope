@@ -64,7 +64,8 @@ implementations. Runners return structured `StageRunResult` values containing
 
 FastAPI route modules. `routes.py` owns auth, providers, agents, quests, and
 manual stage updates. `stage_runs.py` owns executable stage transitions and
-dependency gates.
+dependency gates. `stage_review_guidance.py` owns read-only human-review
+guidance for stage detail and canvas review cards.
 
 `src/noviscope/quests`
 
@@ -111,6 +112,8 @@ forms, and overview cards.
 7. The runner writes structured payloads back to the stage card.
 8. Human review fields remain explicit through `human_approved` and
    `review_notes`.
+9. The web app can call `GET /stages/{stage_id}/review-guidance` to display a
+   stable review card contract without mutating the stage.
 
 ## Stage State Model
 
