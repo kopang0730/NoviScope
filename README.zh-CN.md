@@ -4,7 +4,8 @@
 
 [架构](docs/architecture.md) · [工作流](docs/workflow.md) ·
 [智能体契约](docs/agent-contracts.md) · [部署](docs/deployment.md) ·
-[贡献指南](CONTRIBUTING.md) · [协作规范](docs/COLLABORATION.md) · [许可证](LICENSE)
+[贡献指南](CONTRIBUTING.md) · [协作规范](docs/COLLABORATION.md) ·
+[功能状态](docs/feature-status.md) · [许可证](LICENSE)
 
 面向机器视觉科研小组的证据驱动型数字科研工作流：把模糊研究方向转化为可验证实验、可追踪证据链和论文草稿。
 
@@ -118,6 +119,7 @@ NoviScope 把科研流程拆成 9 个智能体。当前基础版本已经实现�
 - [智能体契约](docs/agent-contracts.md)：当前可执行阶段、provider 规则、输出规则，以及如何新增 runner。
 - [部署](docs/deployment.md)：单服务器课题组部署、首个 admin 初始化、provider 配置和更新流程。
 - [协作规范](docs/COLLABORATION.md)：多人协作和 AI 辅助开发规则。
+- [功能状态](docs/feature-status.md)：哪些能力已经实现、部分实现、仍在规划中，以及对应的可信度 gate。
 
 ## 面向课题组共享部署的 Lab Alpha
 
