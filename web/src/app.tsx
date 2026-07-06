@@ -73,11 +73,11 @@ function WorkspaceLayout() {
       <div className="mx-auto grid max-w-[1440px] gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="h-fit rounded-lg border border-slate-200 bg-white p-3 shadow-panel">
           <nav className="flex flex-col gap-1 md:gap-2">
-            <NavLink className={({ isActive }) => navLinkClassName(isActive)} to="/">
-              {t("navQuests")}
-            </NavLink>
-            <NavLink className={({ isActive }) => navLinkClassName(isActive)} to="/canvas">
+            <NavLink className={({ isActive }) => navLinkClassName(isActive)} end to="/canvas">
               {t("navCanvas")}
+            </NavLink>
+            <NavLink className={({ isActive }) => navLinkClassName(isActive)} end to="/quests">
+              {t("navQuests")}
             </NavLink>
             <NavLink className={({ isActive }) => navLinkClassName(isActive)} to="/quests/new">
               {t("navNewQuest")}
@@ -182,6 +182,11 @@ function ProtectedWorkspaceLayout() {
   return <WorkspaceLayout />;
 }
 
+function CanvasRedirect() {
+  const location = useLocation();
+  return <Navigate replace to={`/canvas${location.search}${location.hash}`} />;
+}
+
 export function App() {
   return (
     <Routes>
@@ -202,8 +207,9 @@ export function App() {
         }
       />
       <Route element={<ProtectedWorkspaceLayout />}>
-        <Route path="/" element={<QuestListPage />} />
+        <Route path="/" element={<CanvasRedirect />} />
         <Route path="/canvas" element={<CanvasWorkspacePage />} />
+        <Route path="/quests" element={<QuestListPage />} />
         <Route path="/quests/new" element={<CreateQuestPage />} />
         <Route path="/providers" element={<ProviderSettingsPage />} />
         <Route path="/admin/invites" element={<AdminInvitesPage />} />
