@@ -48,6 +48,10 @@ User-provided demand evidence sources from Quest intake are treated as
 unverified leads until a human records the review result.
 Humans should review the scenario before continuing to expensive experiment
 planning.
+The frontend should use `POST /stages/{stage_id}/demand-review` on the completed
+Demand Validation stage. `verified` and `plausible` verdicts require at least
+one human evidence source; `unclear` and `rejected` keep the stage from being
+treated as approved for downstream work.
 
 ### Literature Scout
 
