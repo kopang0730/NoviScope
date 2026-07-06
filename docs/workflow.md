@@ -188,6 +188,12 @@ coordinates, core-flow ids, planned-extension nodes, and edge labels. It does
 not contain user quest state; combine it with the quest workflow graph when
 rendering a selected quest.
 
+For feature gating and empty states, the frontend can call
+`GET /workflow/capabilities`. This endpoint lists every registered workflow
+agent and separates implemented stage runners from planned-only agents. Use it
+to avoid presenting future automation, such as code execution or evidence
+auditing, as if it were already available.
+
 ## Review Rules
 
 Human approval has meaning. Use `human_approved` and `review_notes` for decisions
