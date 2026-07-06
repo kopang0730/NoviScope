@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Annotated, assert_never
+from typing import Annotated, Final, assert_never
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from pydantic import BaseModel, ConfigDict
 from sqlmodel import Session
 
 from noviscope.api.dependencies import get_session
@@ -20,6 +21,18 @@ class MarkdownArtifactKey(StrEnum):
     ENGLISH_RESEARCH_BRIEF = "english_research_brief_markdown"
     MEETING_OUTLINE = "meeting_outline_markdown"
     IEEE_PAPER_SKELETON = "ieee_paper_skeleton_markdown"
+
+
+MARKDOWN_ARTIFACT_KEYS: Final = (
+    MarkdownArtifactKey.CHINESE_RESEARCH_BRIEF,
+    MarkdownArtifactKey.ENGLISH_RESEARCH_BRIEF,
+    MarkdownArtifactKey.MEETING_OUTLINE,
+    MarkdownArtifactKey.IEEE_PAPER_SKELETON,
+)
+MARKDOWN_MEDIA_TYPE: Final = "text/markdown"
+STAGE_INCOMPLETE_REASON: Final = (
+    "Paper & Meeting Writer must complete before Markdown artifacts can be downloaded."
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +56,25 @@ class MarkdownArtifactUnavailable(Exception):
         return self.detail
 
 
+class MarkdownArtifactManifestItem(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    key: MarkdownArtifactKey
+    title: str
+    filename: str
+    media_type: str
+    available: bool
+    download_url: str
+    missing_reason: str
+
+
+class MarkdownArtifactManifestResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    stage_id: str
+    artifacts: list[MarkdownArtifactManifestItem]
+
+
 def get_artifact_context(
     session: Annotated[Session, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_user)],
@@ -64,21 +96,82 @@ def artifact_filename(key: MarkdownArtifactKey) -> str:
             assert_never(unreachable)
 
 
-def read_markdown_artifact(stage: StageCard, key: MarkdownArtifactKey) -> MarkdownArtifact:
+def artifact_title(key: MarkdownArtifactKey) -> str:
+    match key:
+        case MarkdownArtifactKey.CHINESE_RESEARCH_BRIEF:
+            return "Chinese research brief"
+        case MarkdownArtifactKey.ENGLISH_RESEARCH_BRIEF:
+            return "English research brief"
+        case MarkdownArtifactKey.MEETING_OUTLINE:
+            return "Meeting outline"
+        case MarkdownArtifactKey.IEEE_PAPER_SKELETON:
+            return "IEEE paper skeleton"
+        case unreachable:
+            assert_never(unreachable)
+
+
+def artifact_download_url(stage_id: str, key: MarkdownArtifactKey) -> str:
+    return f"/stages/{stage_id}/artifacts/{key.value}/download"
+
+
+def ensure_paper_writer_stage(stage: StageCard) -> None:
     if stage.agent_id != PAPER_MEETING_WRITER_AGENT_ID:
         raise MarkdownArtifactUnavailable(
             detail="This stage does not expose downloadable Markdown artifacts.",
             status_code=status.HTTP_404_NOT_FOUND,
         )
+
+
+def stage_incomplete_reason(stage: StageCard) -> str:
+    match stage.status:
+        case StageStatus.COMPLETE:
+            return ""
+        case StageStatus.PENDING | StageStatus.RUNNING | StageStatus.BLOCKED:
+            return STAGE_INCOMPLETE_REASON
+        case unreachable:
+            assert_never(unreachable)
+
+
+def artifact_missing_reason(stage: StageCard, key: MarkdownArtifactKey) -> str:
+    incomplete_reason = stage_incomplete_reason(stage)
+    if incomplete_reason:
+        return incomplete_reason
+
+    content = stage.output_payload.get(key.value)
+    if not isinstance(content, str) or not content.strip():
+        return "The requested Markdown artifact is not available on this stage."
+    return ""
+
+
+def build_manifest_item(stage: StageCard, key: MarkdownArtifactKey) -> MarkdownArtifactManifestItem:
+    missing_reason = artifact_missing_reason(stage, key)
+    return MarkdownArtifactManifestItem(
+        available=not missing_reason,
+        download_url=artifact_download_url(stage.id, key),
+        filename=artifact_filename(key),
+        key=key,
+        media_type=MARKDOWN_MEDIA_TYPE,
+        missing_reason=missing_reason,
+        title=artifact_title(key),
+    )
+
+
+def build_artifact_manifest(stage: StageCard) -> MarkdownArtifactManifestResponse:
+    ensure_paper_writer_stage(stage)
+    return MarkdownArtifactManifestResponse(
+        artifacts=[build_manifest_item(stage, key) for key in MARKDOWN_ARTIFACT_KEYS],
+        stage_id=stage.id,
+    )
+
+
+def read_markdown_artifact(stage: StageCard, key: MarkdownArtifactKey) -> MarkdownArtifact:
+    ensure_paper_writer_stage(stage)
     match stage.status:
         case StageStatus.COMPLETE:
             pass
         case StageStatus.PENDING | StageStatus.RUNNING | StageStatus.BLOCKED:
             raise MarkdownArtifactUnavailable(
-                detail=(
-                    "Paper & Meeting Writer must complete before Markdown artifacts can be "
-                    "downloaded."
-                ),
+                detail=STAGE_INCOMPLETE_REASON,
                 status_code=status.HTTP_409_CONFLICT,
             )
         case unreachable:
@@ -91,6 +184,23 @@ def read_markdown_artifact(stage: StageCard, key: MarkdownArtifactKey) -> Markdo
             status_code=status.HTTP_404_NOT_FOUND,
         )
     return MarkdownArtifact(content=content, filename=artifact_filename(key))
+
+
+@router.get("/stages/{stage_id}/artifacts", response_model=MarkdownArtifactManifestResponse)
+def list_markdown_artifacts(
+    stage_id: str,
+    context: Annotated[ArtifactRequestContext, Depends(get_artifact_context)],
+) -> MarkdownArtifactManifestResponse:
+    service = QuestService(context.session)
+    try:
+        stage = service.get_stage_card_for_user(stage_id, context.current_user)
+        return build_artifact_manifest(stage)
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except MarkdownArtifactUnavailable as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.get("/stages/{stage_id}/artifacts/{artifact_key}/download")
