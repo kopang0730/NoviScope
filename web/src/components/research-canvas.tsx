@@ -13,6 +13,7 @@ import { getStageRunGate } from "../lib/stage-run-gate";
 import { stageTone } from "../lib/status-tones";
 import { Badge } from "./badge";
 import { ResearchCanvasInspector } from "./research-canvas-inspector";
+import { ResearchCanvasOverview } from "./research-canvas-overview";
 import { CanvasStageNode } from "./research-canvas-stage-node";
 
 const canvasStageFilters = [
@@ -67,6 +68,16 @@ export function ResearchCanvas({
     () => stages.filter((stage) => stageMatchesFilter(stage, stageFilter, nextActionStage)),
     [nextActionStage, stageFilter, stages],
   );
+  const stageRunGates = useMemo(
+    () =>
+      new Map(
+        stages.map((stage) => [
+          stage.id,
+          getStageRunGate({ providerReadinessData, stage, stages }),
+        ]),
+      ),
+    [providerReadinessData, stages],
+  );
   const selectedStage =
     visibleStages.find((stage) => stage.id === selectedStageId) ??
     (stageFilter === "all" ? nextActionStage : null) ??
@@ -86,6 +97,11 @@ export function ResearchCanvas({
     }
     setSelectedStageId(selectedStage.id);
   }, [selectedStage, selectedStageId]);
+
+  function selectStageFromOverview(stageId: string) {
+    setStageFilter("all");
+    setSelectedStageId(stageId);
+  }
 
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -131,6 +147,14 @@ export function ResearchCanvas({
           )}
         </div>
       </div>
+
+      <ResearchCanvasOverview
+        nextActionStage={nextActionStage}
+        onSelectStage={selectStageFromOverview}
+        selectedStage={selectedStage}
+        stageRunGates={stageRunGates}
+        stages={stages}
+      />
 
       <div className="mt-4 grid gap-4 2xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -179,7 +203,7 @@ export function ResearchCanvas({
                     runningStageId={runningStageId}
                     selectedQuest={selectedQuest}
                     stage={stage}
-                    stageRunGate={getStageRunGate({ providerReadinessData, stage, stages })}
+                    stageRunGate={stageRunGates.get(stage.id) ?? getStageRunGate({ providerReadinessData, stage, stages })}
                     total={stages.length}
                   />
                 ))}
@@ -199,7 +223,7 @@ export function ResearchCanvas({
             runningStageId={runningStageId}
             selectedQuest={selectedQuest}
             stage={selectedStage}
-            stageRunGate={getStageRunGate({ providerReadinessData, stage: selectedStage, stages })}
+            stageRunGate={stageRunGates.get(selectedStage.id) ?? getStageRunGate({ providerReadinessData, stage: selectedStage, stages })}
             />
         ) : null}
       </div>
