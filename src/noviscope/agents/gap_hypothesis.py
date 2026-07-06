@@ -1,11 +1,16 @@
 import json
 from dataclasses import dataclass
-from typing import Literal, Protocol, TypedDict, assert_never
+from typing import Literal, Protocol, assert_never
 
-import httpx
 from pydantic import BaseModel, ConfigDict, SecretStr, ValidationError, field_validator
 
 from noviscope.agents.literature_scout import LITERATURE_SCOUT_AGENT_ID
+from noviscope.agents.provider_chat import (
+    ChatCompletionPayload,
+    ProviderChatClient,
+    ProviderChatRequest,
+    ProviderChatRunError,
+)
 from noviscope.agents.stage_runner import StageRunContext, StageRunner, StageRunResult
 from noviscope.core.json_types import JsonObject
 from noviscope.core.stage_policy import DEMAND_VALIDATOR_AGENT_ID, IDEA_GENERATOR_AGENT_ID
@@ -97,72 +102,32 @@ class GapHypothesisRunError(Exception):
         return self.reason
 
 
-class ChatMessage(TypedDict):
-    role: Literal["system", "user"]
-    content: str
-
-
-class ChatCompletionPayload(TypedDict):
-    model: str
-    messages: list[ChatMessage]
-    temperature: float
-
-
-class ChatCompletionMessage(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    content: str
-
-
-class ChatCompletionChoice(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    message: ChatCompletionMessage
-
-
-class ChatCompletionResponse(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    choices: list[ChatCompletionChoice]
-
-
 class OpenAICompatibleGapHypothesisRunner:
+    def __init__(self, chat_client: ProviderChatClient | None = None) -> None:
+        self._chat_client = chat_client or ProviderChatClient()
+
     def run(self, request: GapHypothesisRequest) -> GapHypothesisOutput:
         match request.provider_kind:
-            case ProviderKind.OPENAI_COMPATIBLE | ProviderKind.CUSTOM:
-                return self._run_openai_compatible(request)
-            case ProviderKind.ANTHROPIC:
-                raise GapHypothesisRunError(
-                    "Anthropic provider execution is not implemented for Gap/Hypothesis "
-                    "in this MVP."
-                )
+            case ProviderKind.OPENAI_COMPATIBLE | ProviderKind.CUSTOM | ProviderKind.ANTHROPIC:
+                return self._run_provider_chat(request)
             case unreachable:
                 assert_never(unreachable)
 
-    def _run_openai_compatible(self, request: GapHypothesisRequest) -> GapHypothesisOutput:
-        endpoint = f"{request.base_url.rstrip('/')}/chat/completions"
+    def _run_provider_chat(self, request: GapHypothesisRequest) -> GapHypothesisOutput:
         payload = build_chat_completion_payload(request)
-        headers = {
-            "Authorization": f"Bearer {request.api_key.get_secret_value()}",
-            "Content-Type": "application/json",
-        }
-
         try:
-            with httpx.Client(timeout=90.0, follow_redirects=True) as client:
-                response = client.post(endpoint, json=payload, headers=headers)
-                response.raise_for_status()
-        except httpx.HTTPError as exc:
-            raise GapHypothesisRunError(f"Model provider request failed: {exc}") from exc
-
-        try:
-            completion = ChatCompletionResponse.model_validate(response.json())
-        except (ValueError, ValidationError) as exc:
-            raise GapHypothesisRunError(
-                "Model provider returned an invalid chat completion response."
-            ) from exc
-        if not completion.choices:
-            raise GapHypothesisRunError("Model provider returned no choices.")
-        raw_content = completion.choices[0].message.content
+            raw_content = self._chat_client.complete(
+                ProviderChatRequest(
+                    api_key=request.api_key,
+                    base_url=request.base_url,
+                    messages=payload["messages"],
+                    model=request.model,
+                    provider_kind=request.provider_kind,
+                    temperature=payload["temperature"],
+                )
+            )
+        except ProviderChatRunError as exc:
+            raise GapHypothesisRunError(str(exc)) from exc
         return parse_gap_hypothesis_output(raw_content, request)
 
 
@@ -176,7 +141,9 @@ class GapHypothesisStageRunner(StageRunner):
 
     @property
     def supported_provider_kinds(self) -> frozenset[ProviderKind]:
-        return frozenset({ProviderKind.OPENAI_COMPATIBLE, ProviderKind.CUSTOM})
+        return frozenset(
+            {ProviderKind.ANTHROPIC, ProviderKind.OPENAI_COMPATIBLE, ProviderKind.CUSTOM}
+        )
 
     def build_input_payload(self, context: StageRunContext) -> JsonObject:
         demand_stage = find_stage(context.workflow_stages, DEMAND_VALIDATOR_AGENT_ID)
