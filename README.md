@@ -178,6 +178,8 @@ Shared deployment should set:
 - `NOVISCOPE_ARTIFACT_ROOT` to a persistent artifact directory
 - `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=false` by default
 - `NOVISCOPE_DEV_ADMIN_TOKEN` only when temporarily enabling the bootstrap header
+- `NOVISCOPE_GITHUB_REPO=kopang0730/NoviScope` for admin update checks
+- `NOVISCOPE_GITHUB_BRANCH=main` as the GitHub branch to compare against
 
 If `NOVISCOPE_DATABASE_URL` is non-SQLite, NoviScope now refuses to start while
 provider/session secrets are placeholders, too short, or low-entropy. If
@@ -282,6 +284,35 @@ If you temporarily test on plain HTTP inside a trusted lab network, set
 `NOVISCOPE_SESSION_COOKIE_SECURE=false`; do not use that setting for an exposed
 shared deployment.
 
+### Version notice and update builds
+
+The web header shows the deployed NoviScope version under the brand mark.
+Guests and members only see the public version number from `GET /version`. After
+an admin logs in, the web app calls the read-only `GET /admin/version` endpoint
+to compare the running commit against the configured GitHub branch and show an
+update notice when the running commit is behind that branch.
+
+The browser never executes server commands. A non-root server user can run the
+local update/build script instead:
+
+```bash
+./scripts/update-and-build.sh
+```
+
+The script requires a clean worktree, checks `origin/main`, fast-forwards when an
+update exists, reinstalls the editable backend package when `.venv/bin/python`
+exists, and rebuilds `web/dist`. To run a restart command after a successful
+build:
+
+```bash
+NOVISCOPE_RESTART_COMMAND='./restart-noviscope.sh' \
+./scripts/update-and-build.sh
+```
+
+If the app is managed by tmux, systemd, Supervisor, or another runner, point
+`NOVISCOPE_RESTART_COMMAND` at your own restart command or restart the service
+manually after the script completes.
+
 Once deployed, the normal lab flow is:
 
 1. The server admin creates invitation codes and shared providers.
@@ -314,6 +345,18 @@ List the built-in agent contracts:
 
 ```bash
 curl -s http://127.0.0.1:8000/agents
+```
+
+Check the public deployment version:
+
+```bash
+curl -s http://127.0.0.1:8000/version
+```
+
+Check GitHub update status with an admin session:
+
+```bash
+curl -s -b cookies.txt http://127.0.0.1:8000/admin/version
 ```
 
 Create a bootstrap invite for testing or initial setup only:

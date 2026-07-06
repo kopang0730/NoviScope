@@ -10,6 +10,10 @@ MIN_SHARED_SECRET_LENGTH = 32
 MIN_SHARED_SECRET_UNIQUE_CHARS = 12
 
 
+class DeploymentSettingsError(ValueError):
+    pass
+
+
 class Settings(BaseSettings):
     app_name: str = "NoviScope"
     database_url: str = Field(default="sqlite:///./noviscope.db")
@@ -23,6 +27,11 @@ class Settings(BaseSettings):
     artifact_root: str = Field(default=".noviscope/artifacts")
     openalex_email: str | None = Field(default=None)
     openalex_api_key: SecretStr | None = Field(default=None, repr=False)
+    github_repo: str = Field(default="kopang0730/NoviScope")
+    github_branch: str = Field(default="main")
+    version_check_timeout_seconds: float = Field(default=3.0)
+    build_version: str | None = Field(default=None)
+    build_commit: str | None = Field(default=None)
 
     model_config = SettingsConfigDict(env_prefix="NOVISCOPE_", env_file=".env")
 
@@ -70,7 +79,7 @@ def validate_deployment_settings(
 
     if weak_env_vars:
         env_var_list = ", ".join(weak_env_vars)
-        raise ValueError(
+        raise DeploymentSettingsError(
             "Non-SQLite/shared deployments require non-placeholder, high-entropy "
             f"secrets of at least {MIN_SHARED_SECRET_LENGTH} characters for "
             f"{env_var_list} before startup."

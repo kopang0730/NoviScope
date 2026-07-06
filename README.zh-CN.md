@@ -140,6 +140,8 @@ cp .env.example .env
 - `NOVISCOPE_ARTIFACT_ROOT`：持久化 artifact 目录
 - `NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=false`：共享部署默认应关闭
 - `NOVISCOPE_DEV_ADMIN_TOKEN`：仅在临时开启 bootstrap 请求头时设置
+- `NOVISCOPE_GITHUB_REPO=kopang0730/NoviScope`：用于管理员更新检查
+- `NOVISCOPE_GITHUB_BRANCH=main`：用于对比的 GitHub 分支
 
 如果 `NOVISCOPE_DATABASE_URL` 不是 SQLite，且 provider/session secret 仍然是
 占位值、过短或字符多样性太低，NoviScope 会在启动阶段直接拒绝运行。如果
@@ -240,6 +242,29 @@ server {
 如果只是临时在可信实验室内网用 HTTP 测试，可以设置
 `NOVISCOPE_SESSION_COOKIE_SECURE=false`；不要在可暴露的共享部署中使用这个设置。
 
+### 版本提示与更新构建
+
+Web 左上角会在 NoviScope 品牌名下显示当前部署版本。未登录用户和普通成员只会看到
+`GET /version` 返回的公开版本号。管理员登录后，Web 会调用只读的
+`GET /admin/version`，对比当前运行 commit 和配置的 GitHub 分支；只有运行版本落后时才显示更新提示。
+
+浏览器不会执行服务器命令。服务器上的普通用户可以运行本地更新/构建脚本：
+
+```bash
+./scripts/update-and-build.sh
+```
+
+脚本会要求工作区干净，检查 `origin/main`，有更新时执行 fast-forward，检测到
+`.venv/bin/python` 时重新安装 editable 后端包，并重新构建 `web/dist`。如果希望构建成功后自动重启：
+
+```bash
+NOVISCOPE_RESTART_COMMAND='./restart-noviscope.sh' \
+./scripts/update-and-build.sh
+```
+
+如果服务由 tmux、systemd、Supervisor 或其他方式托管，可以把
+`NOVISCOPE_RESTART_COMMAND` 指向自己的重启命令，或者脚本完成后手动重启服务。
+
 部署完成后的正常使用流程：
 
 1. 服务器管理员创建邀请码和 shared provider。
@@ -271,6 +296,18 @@ curl -s http://127.0.0.1:8000/health
 
 ```bash
 curl -s http://127.0.0.1:8000/agents
+```
+
+查看公开部署版本：
+
+```bash
+curl -s http://127.0.0.1:8000/version
+```
+
+使用 admin session 查看 GitHub 更新状态：
+
+```bash
+curl -s -b cookies.txt http://127.0.0.1:8000/admin/version
 ```
 
 仅用于测试或初始化的 bootstrap invite 创建：

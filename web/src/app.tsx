@@ -4,6 +4,7 @@ import { useAuth } from "./auth/auth-context";
 import { buttonClassName } from "./components/button";
 import { Card } from "./components/card";
 import { LanguageToggle } from "./components/language-toggle";
+import { VersionStatus } from "./components/version-status";
 import { useI18n } from "./i18n/i18n-context";
 import { AdminInvitesPage } from "./pages/admin-invites";
 import { CanvasWorkspacePage } from "./pages/canvas-workspace";
@@ -38,6 +39,7 @@ function WorkspaceLayout() {
             <div>
               <p className="text-lg font-semibold">NoviScope</p>
               <p className="text-xs text-slate-500">{t("workspaceSubtitle")}</p>
+              <VersionStatus userRole={currentUser?.role} />
             </div>
           </div>
           <div className="flex min-w-0 flex-wrap items-center gap-3 self-stretch sm:self-auto sm:justify-end">
@@ -129,6 +131,7 @@ function AuthLayout({ children }: { children: ReactNode }) {
               <div>
                 <p className="text-xl font-semibold text-slate-900">NoviScope</p>
                 <p className="text-sm text-slate-500">{t("authWorkspaceSubtitle")}</p>
+                <VersionStatus />
               </div>
             </div>
             <LanguageToggle />
