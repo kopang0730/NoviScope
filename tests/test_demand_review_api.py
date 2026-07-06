@@ -40,9 +40,7 @@ def create_quest_with_demand_stage(client: TestClient) -> str:
     stages_response = client.get(f"/quests/{quest_id}/stages")
     assert stages_response.status_code == 200
     stages = stages_response.json()["stages"]
-    demand_stage = next(
-        stage for stage in stages if stage["agent_id"] == DEMAND_VALIDATOR_AGENT_ID
-    )
+    demand_stage = next(stage for stage in stages if stage["agent_id"] == DEMAND_VALIDATOR_AGENT_ID)
     return demand_stage["id"]
 
 
