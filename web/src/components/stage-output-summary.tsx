@@ -23,15 +23,19 @@ export function StageOutputPanel({
   onStageChange,
   stage,
   stageRunGate,
+  workflowStages = [],
 }: {
   readonly onStageChange?: (stage: StageCard) => void;
   readonly stage: StageCard;
   readonly stageRunGate?: StageRunGate;
+  readonly workflowStages?: readonly StageCard[];
 }) {
   const { t } = useI18n();
   const runStateDescription = stageRunGate
     ? getLocalizedStageRunGateReason(stageRunGate, t)
     : getStageRunAvailability(stage).reason;
+  const experimentPlannerStage =
+    workflowStages.find((candidate) => candidate.agent_id === experimentPlannerAgentId) ?? null;
 
   if (stage.agent_id === "literature_scout" && stage.status === "complete") {
     return (
@@ -55,7 +59,11 @@ export function StageOutputPanel({
           <StageRunSummary stage={stage} stageRunGate={stageRunGate} />
         </div>
         <div className="mt-5">
-          <GapHypothesisOutput onStageChange={onStageChange} stage={stage} />
+          <GapHypothesisOutput
+            experimentPlannerStage={experimentPlannerStage}
+            onStageChange={onStageChange}
+            stage={stage}
+          />
         </div>
       </Card>
     );
