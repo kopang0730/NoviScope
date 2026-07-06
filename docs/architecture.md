@@ -64,7 +64,8 @@ implementations. Runners return structured `StageRunResult` values containing
 
 FastAPI route modules. `routes.py` owns auth, providers, agents, quests, and
 manual stage updates. `stage_runs.py` owns executable stage transitions and
-dependency gates.
+dependency gates. `quest_review_packets.py` owns quest-level Markdown review
+packet downloads.
 
 `src/noviscope/quests`
 
@@ -167,6 +168,7 @@ Implemented now:
 - evidence-linked idea generation through a model provider;
 - experiment planning through a model provider;
 - paper/meeting Markdown artifact generation through a model provider;
+- quest-level Markdown review packet downloads;
 - structured web views for the core stage outputs.
 
 Planned:

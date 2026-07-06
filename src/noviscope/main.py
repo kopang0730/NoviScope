@@ -7,6 +7,7 @@ from sqlmodel import Session
 from noviscope.api.artifacts import router as artifacts_router
 from noviscope.api.dependencies import get_session
 from noviscope.api.provider_tests import router as provider_tests_router
+from noviscope.api.quest_review_packets import router as quest_review_packets_router
 from noviscope.api.routes import router
 from noviscope.api.stage_runs import router as stage_runs_router
 from noviscope.api.version_routes import router as version_router
@@ -29,6 +30,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
     app.include_router(router)
     app.include_router(artifacts_router)
     app.include_router(provider_tests_router)
+    app.include_router(quest_review_packets_router)
     app.include_router(stage_runs_router)
     app.include_router(version_router)
 
