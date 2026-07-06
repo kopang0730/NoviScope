@@ -102,6 +102,63 @@ def test_download_paper_markdown_artifact_returns_attachment(
     )
 
 
+def test_list_paper_markdown_artifacts_returns_download_manifest(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'artifact-manifest.db'}")
+
+    with TestClient(app) as client:
+        register_and_login(client, "ARTIFACT-MANIFEST", "manifest@example.com")
+        paper_stage_id = create_quest_with_paper_stage(client)
+        complete_paper_stage_with_artifacts(client, paper_stage_id)
+
+        response = client.get(f"/stages/{paper_stage_id}/artifacts")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["stage_id"] == paper_stage_id
+    assert [artifact["key"] for artifact in body["artifacts"]] == [
+        "chinese_research_brief_markdown",
+        "english_research_brief_markdown",
+        "meeting_outline_markdown",
+        "ieee_paper_skeleton_markdown",
+    ]
+    first_artifact = body["artifacts"][0]
+    assert first_artifact == {
+        "available": True,
+        "download_url": (
+            f"/stages/{paper_stage_id}/artifacts/"
+            "chinese_research_brief_markdown/download"
+        ),
+        "filename": "noviscope-chinese-research-brief.md",
+        "key": "chinese_research_brief_markdown",
+        "media_type": "text/markdown",
+        "missing_reason": "",
+        "title": "Chinese research brief",
+    }
+
+
+def test_list_paper_markdown_artifacts_marks_incomplete_stage_unavailable(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'artifact-manifest-block.db'}")
+
+    with TestClient(app) as client:
+        register_and_login(client, "ARTIFACT-MANIFEST-BLOCK", "manifest-block@example.com")
+        paper_stage_id = create_quest_with_paper_stage(client)
+
+        response = client.get(f"/stages/{paper_stage_id}/artifacts")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert {artifact["available"] for artifact in body["artifacts"]} == {False}
+    assert {artifact["missing_reason"] for artifact in body["artifacts"]} == {
+        "Paper & Meeting Writer must complete before Markdown artifacts can be downloaded.",
+    }
+
+
 def test_download_paper_markdown_artifact_blocks_until_stage_complete(
     tmp_path,
     dev_admin_header_enabled: None,
