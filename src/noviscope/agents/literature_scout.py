@@ -1,8 +1,10 @@
 import re
 from dataclasses import dataclass
 from datetime import date
+from typing import Literal, TypeAlias, assert_never
 
 from noviscope.agents.openalex_client import (
+    FIVE_YEAR_LOOKBACK,
     OpenAlexClientConfig,
     OpenAlexSearchClient,
     OpenAlexWork,
@@ -18,14 +20,31 @@ OPENALEX_SOURCE = "openalex_works_api"
 RECENT_YEAR_WINDOW = 3
 ABSTRACT_SUMMARY_CHARS = 420
 QUERY_CHARS = 240
+RecencyBucket: TypeAlias = Literal[
+    "last_5_years",
+    "older_than_5_years",
+    "recent_3_years",
+    "unknown_year",
+]
 
 TOP_VENUE_MARKERS = frozenset("acl cvpr eccv emnlp iccv iclr icml ijcai kdd neurips".split())
 PEER_REVIEWED_WORK_TYPES = frozenset(
     "article book-chapter journal-article proceedings-article".split()
 )
+PEER_REVIEWED_SOURCE_TYPES = frozenset({"conference", "journal"})
 QUERY_STOP_WORDS = frozenset(
     {"about", "and", "for", "from", "into", "noviscope", "quest", "research", "the", "with"}
 )
+
+
+@dataclass(frozen=True, slots=True)
+class SourceQualityContext:
+    publication_type: str
+    publication_year: int | None
+    recency_bucket: RecencyBucket
+    source_type: str
+    top_venue_marker: str
+
 
 @dataclass(frozen=True, slots=True)
 class LiteratureScoutStageRunner(StageRunner):
@@ -102,6 +121,7 @@ def extract_query_terms(query: str) -> list[str]:
 
 def build_paper(work: OpenAlexWork, query_terms: list[str], current_year: int) -> JsonObject:
     venue = work_venue(work)
+    source_quality = build_source_quality(work, venue, current_year)
     abstract = abstract_summary(work.abstract_inverted_index)
     return {
         "abstract_summary": abstract,
@@ -109,8 +129,12 @@ def build_paper(work: OpenAlexWork, query_terms: list[str], current_year: int) -
         "doi": work.doi,
         "limitations": ["OpenAlex metadata only; verify the full paper before citing."],
         "openalex_id": work.id,
+        "publication_type": source_quality.publication_type,
+        "recency_bucket": source_quality.recency_bucket,
         "relevance_score": relevance_score(work, current_year),
-        "reliability_level": reliability_level(work, venue),
+        "reliability_level": reliability_level(work, venue, source_quality),
+        "source_quality_signals": source_quality_signals(source_quality),
+        "source_type": source_quality.source_type,
         "title": work.title or work.display_name or "Untitled OpenAlex work",
         "url": work_url(work),
         "venue": venue,
@@ -124,6 +148,11 @@ def work_venue(work: OpenAlexWork) -> str:
     if source is not None and source.display_name:
         return source.display_name
     return "Unknown venue"
+
+
+def work_source_type(work: OpenAlexWork) -> str:
+    source = work.primary_location.source if work.primary_location is not None else None
+    return source.type if source is not None and source.type else "unknown"
 
 
 def work_authors(work: OpenAlexWork) -> list[str]:
@@ -161,17 +190,90 @@ def relevance_score(work: OpenAlexWork, current_year: int) -> float:
     return round(score, 3)
 
 
-def reliability_level(work: OpenAlexWork, venue: str) -> str:
-    source_type = None
-    if work.primary_location is not None and work.primary_location.source is not None:
-        source_type = work.primary_location.source.type
+def recency_bucket(work: OpenAlexWork, current_year: int) -> RecencyBucket:
+    if work.publication_year is None:
+        return "unknown_year"
+    recent_start_year = current_year - RECENT_YEAR_WINDOW + 1
+    if work.publication_year >= recent_start_year:
+        return "recent_3_years"
+    five_year_start = current_year - FIVE_YEAR_LOOKBACK
+    if work.publication_year >= five_year_start:
+        return "last_5_years"
+    return "older_than_5_years"
+
+
+def build_source_quality(
+    work: OpenAlexWork,
+    venue: str,
+    current_year: int,
+) -> SourceQualityContext:
+    return SourceQualityContext(
+        publication_type=work.type or "unknown",
+        publication_year=work.publication_year,
+        recency_bucket=recency_bucket(work, current_year),
+        source_type=work_source_type(work),
+        top_venue_marker=top_venue_marker(venue),
+    )
+
+
+def top_venue_marker(venue: str) -> str:
+    normalized_venue = venue.lower()
+    for marker in TOP_VENUE_MARKERS:
+        if re.search(rf"(^|[^a-z0-9]){re.escape(marker)}([^a-z0-9]|$)", normalized_venue):
+            return marker
+    return ""
+
+
+def reliability_level(
+    work: OpenAlexWork,
+    venue: str,
+    source_quality: SourceQualityContext,
+) -> str:
     if "arxiv" in venue.lower() or work.type == "posted-content":
         return "arxiv_preprint"
-    if any(marker in venue.lower() for marker in TOP_VENUE_MARKERS):
+    if source_quality.top_venue_marker:
         return "top_conference_or_journal"
-    if work.type in PEER_REVIEWED_WORK_TYPES or source_type in {"conference", "journal"}:
+    if (
+        source_quality.publication_type in PEER_REVIEWED_WORK_TYPES
+        or source_quality.source_type in PEER_REVIEWED_SOURCE_TYPES
+    ):
         return "peer_reviewed"
     return "unknown"
+
+
+def source_quality_signals(source_quality: SourceQualityContext) -> list[str]:
+    signals: list[str] = []
+    if source_quality.top_venue_marker:
+        signals.append(
+            f"Venue matched a top AI/CV venue marker: {source_quality.top_venue_marker}."
+        )
+    signals.append(f"OpenAlex source type is {source_quality.source_type}.")
+    signals.append(f"OpenAlex work type is {source_quality.publication_type}.")
+    match source_quality.recency_bucket:
+        case "recent_3_years":
+            if source_quality.publication_year is not None:
+                signals.append(
+                    "Publication year "
+                    f"{source_quality.publication_year} is within the recent "
+                    "3-year priority window."
+                )
+        case "last_5_years":
+            if source_quality.publication_year is not None:
+                signals.append(
+                    f"Publication year {source_quality.publication_year} "
+                    "is within the 5-year search window."
+                )
+        case "older_than_5_years":
+            if source_quality.publication_year is not None:
+                signals.append(
+                    f"Publication year {source_quality.publication_year} "
+                    "is outside the 5-year search window."
+                )
+        case "unknown_year":
+            signals.append("Publication year is unavailable in OpenAlex metadata.")
+        case unreachable:
+            assert_never(unreachable)
+    return signals
 
 
 def why_relevant(title: str, abstract: str, query_terms: list[str]) -> str:

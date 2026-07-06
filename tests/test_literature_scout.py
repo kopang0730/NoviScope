@@ -134,8 +134,17 @@ def test_literature_scout_scores_recent_openalex_papers_first() -> None:
     )
     assert isinstance(papers, list)
     assert papers[0]["openalex_id"] == "https://openalex.org/W2"
+    assert papers[0]["publication_type"] == "proceedings-article"
+    assert papers[0]["recency_bucket"] == "recent_3_years"
     assert papers[0]["relevance_score"] == 112.5
     assert papers[0]["reliability_level"] == "top_conference_or_journal"
+    assert papers[0]["source_type"] == "conference"
+    assert papers[0]["source_quality_signals"] == [
+        "Venue matched a top AI/CV venue marker: cvpr.",
+        "OpenAlex source type is conference.",
+        "OpenAlex work type is proceedings-article.",
+        "Publication year 2025 is within the recent 3-year priority window.",
+    ]
     assert papers[0]["limitations"] == [
         "OpenAlex metadata only; verify the full paper before citing."
     ]
@@ -145,8 +154,12 @@ def test_literature_scout_scores_recent_openalex_papers_first() -> None:
         "doi",
         "limitations",
         "openalex_id",
+        "publication_type",
+        "recency_bucket",
         "relevance_score",
         "reliability_level",
+        "source_quality_signals",
+        "source_type",
         "title",
         "url",
         "venue",
