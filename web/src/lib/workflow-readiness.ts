@@ -31,13 +31,20 @@ export type WorkflowStageReadiness = {
   readonly blockingStages: readonly WorkflowBlockingStage[];
   readonly blockingStageTitles: readonly string[];
   readonly canRun: boolean;
-  readonly missingExperimentInputs: readonly string[];
+  readonly missingExperimentInputs: readonly ExperimentSetupInputKey[];
   readonly reason: WorkflowReadinessReason;
 };
 
 type Translate = (key: TranslationKey) => string;
 
 const experimentSetupInputKeys = ["data_path", "code_repository", "environment_notes"] as const;
+type ExperimentSetupInputKey = (typeof experimentSetupInputKeys)[number];
+
+const experimentSetupInputLabelKeys: Record<ExperimentSetupInputKey, TranslationKey> = {
+  code_repository: "experimentCodeRepository",
+  data_path: "experimentDataPath",
+  environment_notes: "experimentEnvironmentNotes",
+};
 
 const readinessReasonKeys: Record<WorkflowReadinessReason, TranslationKey> = {
   demand_validation_required: "workflowReadinessDemandRequired",
@@ -150,7 +157,7 @@ function readyReadiness(): WorkflowStageReadiness {
 function blockedReadiness(
   reason: WorkflowReadinessReason,
   blockingStages: readonly WorkflowBlockingStage[] = [],
-  missingExperimentInputs: readonly string[] = [],
+  missingExperimentInputs: readonly ExperimentSetupInputKey[] = [],
 ): WorkflowStageReadiness {
   return {
     blockingStages,
@@ -176,6 +183,10 @@ function hasSelectedIdea(stage: StageCard | undefined) {
 
 function missingExperimentSetupInputs(stage: StageCard) {
   return experimentSetupInputKeys.filter((key) => readString(stage.input_payload, key) === "");
+}
+
+function localizedExperimentInputLabels(inputs: readonly ExperimentSetupInputKey[], t: Translate) {
+  return inputs.map((input) => t(experimentSetupInputLabelKeys[input])).join(", ");
 }
 
 function missingCompletedStages(stages: readonly StageCard[], agentIds: readonly string[]) {
@@ -261,7 +272,7 @@ export function getLocalizedWorkflowReadinessReason(
 ) {
   const baseReason = t(readinessReasonKeys[readiness.reason]);
   if (readiness.missingExperimentInputs.length > 0) {
-    return `${baseReason} ${t("workflowReadinessMissingInputs")}: ${readiness.missingExperimentInputs.join(", ")}`;
+    return `${baseReason} ${t("workflowReadinessMissingInputs")}: ${localizedExperimentInputLabels(readiness.missingExperimentInputs, t)}`;
   }
   if (readiness.blockingStageTitles.length > 0) {
     return `${baseReason} ${readiness.blockingStageTitles.join(", ")}`;
