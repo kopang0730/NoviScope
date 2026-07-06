@@ -108,10 +108,12 @@ def build_paper(work: OpenAlexWork, query_terms: list[str], current_year: int) -
     abstract = abstract_summary(work.abstract_inverted_index)
     return {
         "abstract_summary": abstract,
+        "arxiv_id": arxiv_id(work),
         "authors": work_authors(work),
         "doi": work.doi,
         "limitations": ["OpenAlex metadata only; verify the full paper before citing."],
         "openalex_id": work.id,
+        "paper_ref": work.id,
         "publication_type": source_quality.publication_type,
         "recency_bucket": source_quality.recency_bucket,
         "relevance_score": relevance_score(work, current_year),
@@ -145,6 +147,15 @@ def work_url(work: OpenAlexWork) -> str:
     if work.primary_location is not None and work.primary_location.landing_page_url:
         return work.primary_location.landing_page_url
     return work.doi or work.id
+
+
+def arxiv_id(work: OpenAlexWork) -> str:
+    if work.ids is None or work.ids.arxiv is None:
+        return ""
+    arxiv_url = work.ids.arxiv.strip()
+    if not arxiv_url:
+        return ""
+    return arxiv_url.rstrip("/").rsplit("/", 1)[-1]
 
 
 def abstract_summary(abstract_index: dict[str, list[int]] | None) -> str:
