@@ -12,6 +12,7 @@ import {
 import { getStageRunGate } from "../lib/stage-run-gate";
 import { stageTone } from "../lib/status-tones";
 import { Badge } from "./badge";
+import { ResearchCanvasDecisionBrief } from "./research-canvas-decision-brief";
 import { ResearchCanvasInspector } from "./research-canvas-inspector";
 import { ResearchCanvasOverview } from "./research-canvas-overview";
 import { CanvasStageNode } from "./research-canvas-stage-node";
@@ -146,6 +147,14 @@ export function ResearchCanvas({
             <p className="mt-1 text-sm font-semibold text-slate-950">{t("canvasNoNextAction")}</p>
           )}
         </div>
+      </div>
+
+      <div className="mt-4">
+        <ResearchCanvasDecisionBrief
+          nextActionStage={nextActionStage}
+          providerReadinessData={providerReadinessData}
+          stages={stages}
+        />
       </div>
 
       <ResearchCanvasOverview
