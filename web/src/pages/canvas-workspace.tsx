@@ -5,18 +5,29 @@ import { getQuest, getQuestStages, getQuests, runStage } from "../api/quests";
 import type { Quest, StageCard } from "../api/types";
 import { useAuth } from "../auth/auth-context";
 import { Badge } from "../components/badge";
-import { buttonClassName } from "../components/button";
+import { Button, buttonClassName } from "../components/button";
 import { Card, CardHeading } from "../components/card";
 import { Input } from "../components/input";
 import { ResearchCanvas } from "../components/research-canvas";
 import { useI18n } from "../i18n/i18n-context";
+import { downloadTextFile } from "../lib/download-file";
 import { formatDateTime, labelFromEnum } from "../lib/format";
 import { useProviderReadinessData } from "../lib/provider-readiness-data";
+import { buildQuestReviewPacket } from "../lib/quest-review-export";
 import { questTone } from "../lib/status-tones";
 
 function directionSummary(value: string) {
   const normalized = value.replace(/\s+/g, " ").trim();
   return normalized.length > 150 ? `${normalized.slice(0, 150)}...` : normalized;
+}
+
+function downloadQuestReviewPacket(quest: Quest, stages: readonly StageCard[]) {
+  const packet = buildQuestReviewPacket(quest, stages);
+  downloadTextFile({
+    content: packet.content,
+    filename: packet.filename,
+    mimeType: "text/markdown;charset=utf-8",
+  });
 }
 
 export function CanvasWorkspacePage() {
@@ -208,7 +219,23 @@ export function CanvasWorkspacePage() {
 
       <div className="min-w-0 space-y-4">
         <Card className="overflow-hidden">
-          <CardHeading description={t("canvasWorkspaceMainDescription")} title={t("researchCanvasTitle")} />
+          <CardHeading
+            action={
+              selectedQuest ? (
+                <Button
+                  disabled={stages.length === 0}
+                  onClick={() => downloadQuestReviewPacket(selectedQuest, stages)}
+                  size="sm"
+                  type="button"
+                  variant="secondary"
+                >
+                  {t("downloadReviewPacket")}
+                </Button>
+              ) : null
+            }
+            description={t("canvasWorkspaceMainDescription")}
+            title={t("researchCanvasTitle")}
+          />
           {!selectedQuestId ? <p className="mt-4 text-sm text-slate-500">{t("selectQuestForStages")}</p> : null}
           {detailError ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{detailError}</p> : null}
           {stageRunError ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{stageRunError}</p> : null}
