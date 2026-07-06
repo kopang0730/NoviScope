@@ -7,7 +7,8 @@ structured evidence or explain why it is blocked.
 ## User Flow
 
 1. Register with an invitation code.
-2. Create a quest from the research intake form.
+2. Create a quest from the research intake form, including any demand evidence
+   sources that a human can verify before experiments.
 3. Configure at least one model provider if running provider-backed stages.
 4. Run Demand Validation.
 5. Review the demand output and decide whether the problem is worth continuing.
@@ -40,6 +41,8 @@ Output must separate:
 - `go_or_no_go_recommendation`
 
 If the stage has no external evidence, high confidence is not appropriate.
+User-provided demand evidence sources from Quest intake are treated as
+unverified leads until a human records the review result.
 Humans should review the scenario before continuing to expensive experiment
 planning.
 

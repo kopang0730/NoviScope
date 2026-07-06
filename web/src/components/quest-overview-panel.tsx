@@ -157,6 +157,7 @@ export function QuestOverviewPanel({
             <p className="text-sm font-semibold text-slate-900">{t("overviewIntakeBrief")}</p>
             <div className="mt-3 grid gap-3 min-[1400px]:grid-cols-2">
               <BriefItem label={t("questScenario")} value={intake.scenario || t("notAvailable")} />
+              <BriefItem label={t("questDemandEvidenceSources")} value={intake.demandEvidenceSources || t("notAvailable")} />
               <BriefItem label={t("questTargetUser")} value={intake.targetUser || t("notAvailable")} />
               <BriefItem label={t("questTarget")} value={intake.target || t("notAvailable")} />
               <BriefItem label={t("questPainPoint")} value={intake.painPoint || t("notAvailable")} />
