@@ -48,9 +48,10 @@ planning.
 Purpose: retrieve real paper metadata and show it in a sortable, inspectable
 table.
 
-Current source: OpenAlex. OpenAlex can be used without a model provider. If the
-source returns no useful papers, the UI should show that clearly rather than
-inventing citations.
+Current source: OpenAlex. OpenAlex can be used without a model provider and
+without an API key; `NOVISCOPE_OPENALEX_API_KEY` is optional for deployments that
+want authenticated OpenAlex requests. If the source returns no useful papers, the
+UI should show that clearly rather than inventing citations.
 
 Each paper should include:
 

@@ -203,25 +203,23 @@ def test_openalex_client_uses_works_api_params_without_live_http() -> None:
     assert http_client.headers["User-Agent"] == "NoviScope/0.1 (mailto:researcher@example.com)"
 
 
-def test_openalex_client_blocks_without_api_key_before_http() -> None:
+def test_openalex_client_uses_public_works_api_without_api_key() -> None:
     response = httpx.Response(
         200,
-        json={"results": []},
+        json={"results": [{"id": "https://openalex.org/W1", "title": "Public paper"}]},
         request=httpx.Request("GET", "https://api.openalex.org/works"),
     )
     http_client = FakeHTTPClient(response)
     client = OpenAlexWorksClient(OpenAlexClientConfig(), http_client)
 
-    with pytest.raises(LiteratureScoutRunError) as exc_info:
-        client.search("badminton action recognition", current_year=2026)
+    works = client.search("badminton action recognition", current_year=2026)
 
-    assert str(exc_info.value) == (
-        "Configure NOVISCOPE_OPENALEX_API_KEY before running Literature Scout."
-    )
-    assert http_client.params == {}
+    assert works[0].id == "https://openalex.org/W1"
+    assert http_client.params["search"] == "badminton action recognition"
+    assert "api_key" not in http_client.params
 
 
-def test_openalex_client_blocks_blank_api_key_before_http() -> None:
+def test_openalex_client_omits_blank_api_key() -> None:
     response = httpx.Response(
         200,
         json={"results": []},
@@ -230,13 +228,11 @@ def test_openalex_client_blocks_blank_api_key_before_http() -> None:
     http_client = FakeHTTPClient(response)
     client = OpenAlexWorksClient(OpenAlexClientConfig(api_key=SecretStr("  ")), http_client)
 
-    with pytest.raises(LiteratureScoutRunError) as exc_info:
-        client.search("badminton action recognition", current_year=2026)
+    works = client.search("badminton action recognition", current_year=2026)
 
-    assert str(exc_info.value) == (
-        "Configure NOVISCOPE_OPENALEX_API_KEY before running Literature Scout."
-    )
-    assert http_client.params == {}
+    assert works == []
+    assert http_client.params["search"] == "badminton action recognition"
+    assert "api_key" not in http_client.params
 
 
 def test_openalex_errors_do_not_expose_api_key() -> None:

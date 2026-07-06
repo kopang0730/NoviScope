@@ -93,11 +93,6 @@ class OpenAlexWorksClient:
     http_client: OpenAlexHTTPClient | None = None
 
     def search(self, query: str, *, current_year: int) -> list[OpenAlexWork]:
-        api_key = openalex_api_key_value(self.config)
-        if api_key is None:
-            raise LiteratureScoutRunError(
-                "Configure NOVISCOPE_OPENALEX_API_KEY before running Literature Scout."
-            )
         params: OpenAlexQueryParams = {
             "filter": f"from_publication_date:{current_year - FIVE_YEAR_LOOKBACK}-01-01",
             "per_page": MAX_PAPER_RESULTS,
@@ -106,7 +101,8 @@ class OpenAlexWorksClient:
         }
         if self.config.email:
             params["mailto"] = self.config.email
-        params["api_key"] = api_key
+        if api_key := openalex_api_key_value(self.config):
+            params["api_key"] = api_key
         try:
             response = self._get(params)
             response.raise_for_status()
