@@ -3,6 +3,7 @@ import type { Quest, StageCard } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
 import type { CanvasDetail } from "../lib/research-canvas-data";
+import { readSourceStageIds } from "../lib/source-stage-ids";
 import {
   getLocalizedStageRunGateReason,
   type StageRunGate,
@@ -10,6 +11,7 @@ import {
 import { stageTone } from "../lib/status-tones";
 import { Badge, type BadgeTone } from "./badge";
 import { Button, buttonClassName } from "./button";
+import { SourceStageList } from "./source-stage-list";
 
 function reviewTone(stage: StageCard): BadgeTone {
   if (stage.human_approved === true) {
@@ -67,6 +69,8 @@ export function ResearchCanvasInspector({
   const { t } = useI18n();
   const runReason = getLocalizedStageRunGateReason(stageRunGate, t);
   const provider = providerLabel(stage);
+  const sourceStageIds = readSourceStageIds(stage.output_payload);
+  const sourceStageCount = Object.keys(sourceStageIds).length;
 
   return (
     <aside className="rounded-lg border border-slate-200 bg-white p-4">
@@ -95,7 +99,7 @@ export function ResearchCanvasInspector({
 
       <div className="mt-4 rounded-md border border-slate-200 bg-white px-3 py-2">
         <p className="text-xs font-semibold text-slate-900">{t("canvasTraceabilityTitle")}</p>
-        <dl className="mt-2 grid grid-cols-2 gap-2 text-xs">
+        <dl className="mt-2 grid grid-cols-3 gap-2 text-xs">
           <div className="rounded-md bg-slate-50 px-3 py-2">
             <dt className="font-semibold uppercase tracking-wide text-slate-500">{t("canvasOutputFields")}</dt>
             <dd className="mt-1 text-sm font-semibold text-slate-950">{payloadFieldCount(stage.output_payload)}</dd>
@@ -104,7 +108,16 @@ export function ResearchCanvasInspector({
             <dt className="font-semibold uppercase tracking-wide text-slate-500">{t("canvasEvidenceFields")}</dt>
             <dd className="mt-1 text-sm font-semibold text-slate-950">{payloadFieldCount(stage.evidence_payload)}</dd>
           </div>
+          <div className="rounded-md bg-slate-50 px-3 py-2">
+            <dt className="font-semibold uppercase tracking-wide text-slate-500">{t("sourceStages")}</dt>
+            <dd className="mt-1 text-sm font-semibold text-slate-950">{sourceStageCount}</dd>
+          </div>
         </dl>
+        {sourceStageCount > 0 ? (
+          <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+            <SourceStageList sourceStageIds={sourceStageIds} />
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-4">

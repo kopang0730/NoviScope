@@ -130,6 +130,13 @@ All spacing derives from 4px.
 - Accessibility: stage selection is a real button, while run/open actions remain separate controls.
 - Layout: map stacks above the inspector on narrow screens and uses a fixed-width scroll region for the five-stage workflow.
 
+### Source Stage List
+
+- Structure: compact key/value list using stage role labels and breakable stage IDs.
+- Usage: generated outputs that depend on upstream stage payloads, including gap, experiment, and writing artifacts.
+- States: empty state uses muted body text; populated state keeps labels bold and IDs selectable/readable.
+- Accessibility: list items remain text, not badges, because users may need to copy source IDs for audits.
+
 ## 6. Motion & Interaction
 
 | Type | Duration | Easing | Usage |

@@ -1,4 +1,5 @@
 import type { StageCard, StageConfidence } from "../api/types";
+import { readSourceStageIds, type SourceStageIds } from "./source-stage-ids";
 import { paperMeetingWriterAgentId } from "./stages";
 
 export type MarkdownArtifact = {
@@ -18,6 +19,7 @@ export type PaperMeetingWriterView = {
   readonly experimentResultsNotAvailable: readonly string[];
   readonly humanReviewRequired: readonly string[];
   readonly modelGeneratedHypotheses: readonly string[];
+  readonly sourceStageIds: SourceStageIds;
   readonly summary: string;
   readonly verifiedFacts: readonly string[];
   readonly warnings: readonly string[];
@@ -81,6 +83,7 @@ export function buildPaperMeetingWriterView(stage: StageCard): PaperMeetingWrite
     ),
     humanReviewRequired: readStringArray(stage.output_payload, "human_review_required"),
     modelGeneratedHypotheses: readStringArray(stage.output_payload, "model_generated_hypotheses"),
+    sourceStageIds: readSourceStageIds(stage.output_payload),
     summary: readString(stage.output_payload, "summary") || stage.summary,
     verifiedFacts: readStringArray(stage.output_payload, "verified_facts"),
     warnings: readStringArray(stage.output_payload, "warnings"),

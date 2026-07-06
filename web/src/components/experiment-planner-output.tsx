@@ -12,6 +12,7 @@ import {
 import { Badge } from "./badge";
 import { Button } from "./button";
 import { Input, TextArea } from "./input";
+import { SourceStageList } from "./source-stage-list";
 
 function BulletList({ emptyLabel, items }: { readonly emptyLabel: string; readonly items: readonly string[] }) {
   if (items.length === 0) {
@@ -87,7 +88,11 @@ export function ExperimentSetupForm({
       onStageChange?.(updatedStage);
       setSuccessMessage(t("experimentSetupSaved"));
     } catch (error) {
-      setSaveError(getErrorMessage(error));
+      if (error instanceof Error) {
+        setSaveError(getErrorMessage(error));
+        return;
+      }
+      throw error;
     } finally {
       setSaving(false);
     }
@@ -192,6 +197,9 @@ export function ExperimentPlannerOutput({
             </DetailBlock>
             <DetailBlock title={t("failureRisks")}>
               <BulletList emptyLabel={t("notAvailable")} items={view.failureRisks} />
+            </DetailBlock>
+            <DetailBlock title={t("sourceStages")}>
+              <SourceStageList sourceStageIds={view.sourceStageIds} />
             </DetailBlock>
           </div>
 
