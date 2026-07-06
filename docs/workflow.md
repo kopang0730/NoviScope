@@ -194,6 +194,14 @@ agent and separates implemented stage runners from planned-only agents. Use it
 to avoid presenting future automation, such as code execution or evidence
 auditing, as if it were already available.
 
+For source audit panels, the frontend can call
+`GET /quests/{quest_id}/evidence-ledger`. This endpoint returns one entry per
+workflow stage with saved source references, provider id, provider model,
+confidence, human approval state, review notes, output keys, and evidence keys.
+It does not create new citations or infer missing evidence. Stages without saved
+source references are counted as missing evidence and should remain visible as
+review gaps in canvas and timeline views.
+
 ## Review Rules
 
 Human approval has meaning. Use `human_approved` and `review_notes` for decisions

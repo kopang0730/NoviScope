@@ -68,6 +68,9 @@ dependency gates. `stage_literature_papers.py` exposes saved Literature Scout
 rows as filtered, sorted table and detail contracts for the web workspace.
 `stage_display_output.py` owns the default stage-output payload for frontend
 views and hides raw model/secret-like fields from the main display path.
+`evidence_ledger.py` exposes saved per-stage source references, provider/model
+metadata, confidence, review notes, and human approval states for quest-level
+audit views.
 `workflow_canvas.py` exposes the default static canvas template, including
 lanes, planned-extension nodes, and edge labels.
 `workflow_capabilities.py` exposes which registered agents have runnable stage
