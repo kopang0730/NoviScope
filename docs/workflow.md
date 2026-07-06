@@ -21,8 +21,10 @@ structured evidence or explain why it is blocked.
 10. Record experiment setup context: data path, code repository, and environment
    notes.
 11. Run Experiment Planner.
-12. Run Paper & Meeting Writer after experiment planning completes.
-13. Download or copy the generated Markdown artifacts after human review.
+12. Download the Experiment Planner runbook if a reproducible experiment handoff
+    is needed before paper drafting.
+13. Run Paper & Meeting Writer after experiment planning completes.
+14. Download or copy the generated Markdown artifacts after human review.
 
 ## Stage Gates
 
@@ -105,6 +107,15 @@ Expected output:
 
 If required data, code, or environment context is missing, the stage should be
 blocked or clearly marked as incomplete.
+
+Completed Experiment Planner stages expose:
+
+- `GET /stages/{stage_id}/experiment-runbook/download`
+
+The runbook is a Markdown attachment built from saved `output_payload`,
+`input_payload`, and `evidence_payload`. It is explicitly plan-only, includes
+the no-experiment-results boundary, and must not be interpreted as completed
+experiment evidence.
 
 ### Paper & Meeting Writer
 

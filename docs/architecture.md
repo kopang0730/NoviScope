@@ -64,7 +64,8 @@ implementations. Runners return structured `StageRunResult` values containing
 
 FastAPI route modules. `routes.py` owns auth, providers, agents, quests, and
 manual stage updates. `stage_runs.py` owns executable stage transitions and
-dependency gates.
+dependency gates. `experiment_runbooks.py` owns the plan-only Experiment Planner
+Markdown runbook download.
 
 `src/noviscope/quests`
 
@@ -111,6 +112,9 @@ forms, and overview cards.
 7. The runner writes structured payloads back to the stage card.
 8. Human review fields remain explicit through `human_approved` and
    `review_notes`.
+9. Completed Experiment Planner stages can be exported through
+   `GET /stages/{stage_id}/experiment-runbook/download`; the export is a
+   plan-only handoff and does not claim experiment results exist.
 
 ## Stage State Model
 
