@@ -45,6 +45,10 @@ function providerLabel(stage: StageCard) {
   return providerModel ? `${providerName} · ${providerModel}` : providerName;
 }
 
+function payloadFieldCount(payload: Readonly<Record<string, unknown>>) {
+  return Object.keys(payload).length;
+}
+
 export function ResearchCanvasInspector({
   details,
   onRunStage,
@@ -87,6 +91,20 @@ export function ResearchCanvasInspector({
       <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t("stageRunState")}</p>
         <p className="mt-1 text-xs leading-5 text-slate-700">{runReason}</p>
+      </div>
+
+      <div className="mt-4 rounded-md border border-slate-200 bg-white px-3 py-2">
+        <p className="text-xs font-semibold text-slate-900">{t("canvasTraceabilityTitle")}</p>
+        <dl className="mt-2 grid grid-cols-2 gap-2 text-xs">
+          <div className="rounded-md bg-slate-50 px-3 py-2">
+            <dt className="font-semibold uppercase tracking-wide text-slate-500">{t("canvasOutputFields")}</dt>
+            <dd className="mt-1 text-sm font-semibold text-slate-950">{payloadFieldCount(stage.output_payload)}</dd>
+          </div>
+          <div className="rounded-md bg-slate-50 px-3 py-2">
+            <dt className="font-semibold uppercase tracking-wide text-slate-500">{t("canvasEvidenceFields")}</dt>
+            <dd className="mt-1 text-sm font-semibold text-slate-950">{payloadFieldCount(stage.evidence_payload)}</dd>
+          </div>
+        </dl>
       </div>
 
       <div className="mt-4">

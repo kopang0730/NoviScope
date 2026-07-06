@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Quest, StageCard } from "../api/types";
-import { type TranslationKey, useI18n } from "../i18n/i18n-context";
+import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
 import type { ProviderReadinessData } from "../lib/provider-readiness-data";
 import {
   buildStageDetails,
   findNextActionStage,
   needsHumanReview,
-  phaseKeyForAgent,
 } from "../lib/research-canvas-data";
 import { getStageRunGate } from "../lib/stage-run-gate";
 import { stageTone } from "../lib/status-tones";
@@ -15,17 +14,10 @@ import { Badge } from "./badge";
 import { ResearchCanvasDecisionBrief } from "./research-canvas-decision-brief";
 import { ResearchCanvasInspector } from "./research-canvas-inspector";
 import { ResearchCanvasOverview } from "./research-canvas-overview";
-import { CanvasStageNode } from "./research-canvas-stage-node";
-
-const canvasStageFilters = [
-  { id: "all", labelKey: "canvasFilterAll" },
-  { id: "next_action", labelKey: "canvasFilterNextAction" },
-  { id: "blocked", labelKey: "canvasFilterBlocked" },
-  { id: "review", labelKey: "canvasFilterReview" },
-  { id: "complete", labelKey: "canvasFilterComplete" },
-] as const satisfies readonly { readonly id: string; readonly labelKey: TranslationKey }[];
-
-type CanvasStageFilter = (typeof canvasStageFilters)[number]["id"];
+import {
+  type CanvasStageFilter,
+  ResearchCanvasStageMap,
+} from "./research-canvas-stage-map";
 
 function stageMatchesFilter(stage: StageCard, filter: CanvasStageFilter, nextActionStage: StageCard | null) {
   switch (filter) {
@@ -166,64 +158,20 @@ export function ResearchCanvas({
       />
 
       <div className="mt-4 grid gap-4 2xl:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div className="flex flex-col gap-2 border-b border-slate-200 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold text-slate-900">{t("canvasMapTitle")}</p>
-              <p className="mt-1 text-sm text-slate-500">{t("canvasMapDescription")}</p>
-            </div>
-            <Badge tone={nextActionStage ? stageTone(nextActionStage.status) : "gray"}>
-              {nextActionStage ? t("canvasNextAction") : t("canvasNoNextAction")}
-            </Badge>
-          </div>
-          <div className="flex flex-wrap gap-2 border-b border-slate-200 px-4 py-3">
-            {canvasStageFilters.map((filter) => {
-              const isActive = stageFilter === filter.id;
-              return (
-                <button
-                  className={[
-                    "rounded-full border px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2",
-                    isActive
-                      ? "border-teal-600 bg-teal-600 text-white shadow-sm"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800",
-                  ].join(" ")}
-                  key={filter.id}
-                  onClick={() => setStageFilter(filter.id)}
-                  type="button"
-                >
-                  {t(filter.labelKey)} · {filterCounts[filter.id]}
-                </button>
-              );
-            })}
-          </div>
-          <div className="overflow-x-auto px-4 py-4">
-            {visibleStages.length > 0 ? (
-              <div className="grid w-max min-w-full auto-cols-[minmax(240px,1fr)] grid-flow-col gap-4">
-                {visibleStages.map((stage) => (
-                  <CanvasStageNode
-                    details={buildStageDetails(stage, t)}
-                    index={stages.findIndex((candidate) => candidate.id === stage.id)}
-                    isNextAction={nextActionStage?.id === stage.id}
-                    isSelected={selectedStage?.id === stage.id}
-                    key={stage.id}
-                    onRunStage={onRunStage}
-                    onSelectStage={setSelectedStageId}
-                    phaseLabel={t(phaseKeyForAgent(stage.agent_id))}
-                    runningStageId={runningStageId}
-                    selectedQuest={selectedQuest}
-                    stage={stage}
-                    stageRunGate={stageRunGates.get(stage.id) ?? getStageRunGate({ providerReadinessData, stage, stages })}
-                    total={stages.length}
-                  />
-                ))}
-              </div>
-            ) : (
-              <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-sm text-slate-500">
-                {t("canvasFilterEmpty")}
-              </p>
-            )}
-          </div>
-        </div>
+        <ResearchCanvasStageMap
+          filterCounts={filterCounts}
+          nextActionStage={nextActionStage}
+          onFilterChange={setStageFilter}
+          onRunStage={onRunStage}
+          onSelectStage={setSelectedStageId}
+          runningStageId={runningStageId}
+          selectedQuest={selectedQuest}
+          selectedStage={selectedStage}
+          stageFilter={stageFilter}
+          stageRunGates={stageRunGates}
+          stages={stages}
+          visibleStages={visibleStages}
+        />
 
         {selectedStage ? (
           <ResearchCanvasInspector

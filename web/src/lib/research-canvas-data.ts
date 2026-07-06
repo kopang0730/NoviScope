@@ -17,6 +17,11 @@ export type CanvasDetail = {
   readonly value: string;
 };
 
+export type CanvasStageFlow = {
+  readonly inputKey: TranslationKey;
+  readonly outputKey: TranslationKey;
+};
+
 type Translate = (key: TranslationKey) => string;
 
 function readString(payload: Readonly<Record<string, unknown>>, key: string) {
@@ -90,6 +95,43 @@ export function phaseKeyForAgent(agentId: string): TranslationKey {
     return "canvasPhaseWriting";
   }
   return "canvasPhaseWorkflow";
+}
+
+export function flowForAgent(agentId: string): CanvasStageFlow {
+  if (agentId === demandValidatorAgentId) {
+    return {
+      inputKey: "canvasFlowDemandInput",
+      outputKey: "canvasFlowDemandOutput",
+    };
+  }
+  if (agentId === literatureScoutAgentId) {
+    return {
+      inputKey: "canvasFlowDiscoveryInput",
+      outputKey: "canvasFlowDiscoveryOutput",
+    };
+  }
+  if (agentId === ideaGeneratorAgentId) {
+    return {
+      inputKey: "canvasFlowHypothesisInput",
+      outputKey: "canvasFlowHypothesisOutput",
+    };
+  }
+  if (agentId === experimentPlannerAgentId) {
+    return {
+      inputKey: "canvasFlowExperimentInput",
+      outputKey: "canvasFlowExperimentOutput",
+    };
+  }
+  if (agentId === paperMeetingWriterAgentId) {
+    return {
+      inputKey: "canvasFlowWritingInput",
+      outputKey: "canvasFlowWritingOutput",
+    };
+  }
+  return {
+    inputKey: "canvasFlowWorkflowInput",
+    outputKey: "canvasFlowWorkflowOutput",
+  };
 }
 
 export function buildStageDetails(stage: StageCard, t: Translate): CanvasDetail[] {
