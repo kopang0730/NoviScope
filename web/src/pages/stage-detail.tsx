@@ -9,6 +9,7 @@ import { Button, buttonClassName } from "../components/button";
 import { Card, CardHeading } from "../components/card";
 import { StageProviderReadinessCard } from "../components/stage-provider-readiness";
 import { StageEditor } from "../components/stage-editor";
+import { StageNextActionCard } from "../components/stage-next-action-card";
 import { StageOutputPanel } from "../components/stage-output-summary";
 import { StageReviewGateCard } from "../components/stage-review-gate-card";
 import { useI18n } from "../i18n/i18n-context";
@@ -223,6 +224,12 @@ export function StageDetailPage() {
             stage={stage}
             stageRunGate={stageRunGate ?? undefined}
             workflowStages={workflowStages}
+          />
+
+          <StageNextActionCard
+            providerReadinessData={providerReadinessData}
+            stage={stage}
+            stages={workflowStages}
           />
 
           {runError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{runError}</p> : null}
