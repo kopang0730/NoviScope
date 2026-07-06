@@ -74,7 +74,14 @@ def test_parse_gap_hypothesis_output_caps_confidence_and_removes_unknown_refs() 
     assert output.ideas[0].confidence == "medium"
     assert output.ideas[0].based_on_which_papers == ["https://openalex.org/W123"]
     assert output.selection_status == "pending_human_selection"
-    assert output.warnings
+    assert (
+        "Removed unrecognized supporting paper references from Fast motion gap; "
+        "verify citations."
+    ) in output.warnings
+    assert (
+        "Removed unrecognized paper references from idea_1; verify citations."
+        in output.warnings
+    )
 
 
 def test_gap_runner_executes_anthropic_messages_api() -> None:
