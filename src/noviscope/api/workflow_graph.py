@@ -3,12 +3,14 @@ from typing import Annotated, Final, Literal, TypeAlias
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict
-from sqlmodel import Session
 
 from noviscope.agents.literature_scout import LITERATURE_SCOUT_AGENT_ID
-from noviscope.api.dependencies import get_session
-from noviscope.api.stage_runs import build_dependency_block_if_needed
-from noviscope.auth.dependencies import get_current_user
+from noviscope.api.stage_readiness import (
+    StageReadinessBuildRequest,
+    StageReadinessRequestContext,
+    build_stage_readiness_response,
+    get_stage_readiness_context,
+)
 from noviscope.core.json_types import JsonObject
 from noviscope.core.stage_policy import (
     DEMAND_VALIDATOR_AGENT_ID,
@@ -19,8 +21,8 @@ from noviscope.core.stage_policy import (
     normalize_stage_output_payload,
     stage_confidence,
 )
+from noviscope.models.provider import ProviderKind, ProviderScope
 from noviscope.models.quest import Quest, QuestStatus, StageCard, StageStatus
-from noviscope.models.user import User
 from noviscope.quests.service import QuestService
 
 router = APIRouter()
@@ -48,6 +50,12 @@ class WorkflowDependency:
     target_agent_id: str
     relationship: str
     gate_required: bool
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowGraphBuildContext:
+    readiness_context: StageReadinessRequestContext
+    stages: list[StageCard]
 
 
 WORKFLOW_DEPENDENCIES: Final = (
@@ -105,11 +113,17 @@ class WorkflowNodeResponse(BaseModel):
     confidence: StageConfidence
     summary: str
     can_run: bool
-    blocking_reason: str | None
-    blocking_detail: str | None
+    blocking_reason: str
+    blocking_detail: str
     human_review_required: bool
     review_state: GateStatus
     human_approved: bool | None
+    provider_id: str | None
+    provider_name: str | None
+    provider_kind: ProviderKind | None
+    provider_model: str | None
+    provider_scope: ProviderScope | None
+    uses_server_managed_provider: bool
 
 
 class WorkflowEdgeResponse(BaseModel):
@@ -133,10 +147,20 @@ class WorkflowGraphResponse(BaseModel):
     edges: list[WorkflowEdgeResponse]
 
 
-def build_workflow_graph(quest: Quest, stages: list[StageCard]) -> WorkflowGraphResponse:
+def build_workflow_graph(
+    quest: Quest,
+    stages: list[StageCard],
+    readiness_context: StageReadinessRequestContext,
+) -> WorkflowGraphResponse:
+    graph_context = WorkflowGraphBuildContext(
+        readiness_context=readiness_context,
+        stages=stages,
+    )
     return WorkflowGraphResponse(
         edges=build_edges(stages),
-        nodes=[build_node(stage, stages, order) for order, stage in enumerate(stages, start=1)],
+        nodes=[
+            build_node(stage, graph_context, order) for order, stage in enumerate(stages, start=1)
+        ],
         quest=WorkflowQuestResponse(
             id=quest.id,
             initial_direction=quest.initial_direction,
@@ -146,18 +170,25 @@ def build_workflow_graph(quest: Quest, stages: list[StageCard]) -> WorkflowGraph
     )
 
 
-def build_node(stage: StageCard, stages: list[StageCard], order: int) -> WorkflowNodeResponse:
+def build_node(
+    stage: StageCard,
+    graph_context: WorkflowGraphBuildContext,
+    order: int,
+) -> WorkflowNodeResponse:
     output_payload = normalize_stage_output_payload(stage.agent_id, stage.output_payload)
-    dependency_payload = dependency_block_payload(stage, stages)
-    can_run = (
-        stage.status not in {StageStatus.COMPLETE, StageStatus.RUNNING}
-        and not dependency_payload
+    readiness = build_stage_readiness_response(
+        StageReadinessBuildRequest(
+            provider_id=None,
+            stage=stage,
+            workflow_stages=graph_context.stages,
+        ),
+        graph_context.readiness_context,
     )
     return WorkflowNodeResponse(
         agent_id=stage.agent_id,
-        blocking_detail=payload_string(dependency_payload, "blocking_detail"),
-        blocking_reason=payload_string(dependency_payload, "blocking_reason"),
-        can_run=can_run,
+        blocking_detail=readiness.blocking_detail,
+        blocking_reason=readiness.blocking_reason,
+        can_run=readiness.can_run,
         confidence=stage_confidence(stage.agent_id, output_payload),
         human_approved=stage.human_approved,
         human_review_required=human_review_required(stage),
@@ -168,6 +199,12 @@ def build_node(stage: StageCard, stages: list[StageCard], order: int) -> Workflo
         status=stage.status,
         summary=stage.summary,
         title=stage.title,
+        provider_id=readiness.provider_id,
+        provider_kind=readiness.provider_kind,
+        provider_model=readiness.provider_model,
+        provider_name=readiness.provider_name,
+        provider_scope=readiness.provider_scope,
+        uses_server_managed_provider=readiness.uses_server_managed_provider,
     )
 
 
@@ -198,16 +235,6 @@ def build_edge(
         target_agent_id=target_stage.agent_id,
         target_stage_id=target_stage.id,
     )
-
-
-def dependency_block_payload(stage: StageCard, stages: list[StageCard]) -> JsonObject:
-    block = build_dependency_block_if_needed(stage, stages)
-    return block.evidence_payload if block is not None else {}
-
-
-def payload_string(payload: JsonObject, key: str) -> str | None:
-    value = payload.get(key)
-    return value if isinstance(value, str) and value else None
 
 
 def human_review_required(stage: StageCard) -> bool:
@@ -246,13 +273,12 @@ def has_selected_idea(output_payload: JsonObject) -> bool:
 @router.get("/quests/{quest_id}/workflow-graph", response_model=WorkflowGraphResponse)
 def get_quest_workflow_graph(
     quest_id: str,
-    session: Annotated[Session, Depends(get_session)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    context: Annotated[StageReadinessRequestContext, Depends(get_stage_readiness_context)],
 ) -> WorkflowGraphResponse:
-    service = QuestService(session)
+    service = QuestService(context.session)
     try:
-        quest = service.get_quest_for_user(quest_id, current_user)
-        return build_workflow_graph(quest, service.list_stage_cards(quest.id))
+        quest = service.get_quest_for_user(quest_id, context.current_user)
+        return build_workflow_graph(quest, service.list_stage_cards(quest.id), context)
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except PermissionError as exc:

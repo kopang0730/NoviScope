@@ -31,6 +31,22 @@ def register_and_login(client: TestClient) -> None:
     assert login_response.status_code == 200
 
 
+def create_personal_provider(client: TestClient) -> dict[str, str]:
+    response = client.post(
+        "/providers",
+        json={
+            "api_key": "sk-test-workflow-graph",
+            "base_url": "https://api.example.com/v1",
+            "default_model": "example-chat",
+            "kind": "openai_compatible",
+            "name": "Example Provider",
+            "scope": "personal",
+        },
+    )
+    assert response.status_code == 201
+    return response.json()
+
+
 def test_get_quest_workflow_graph_returns_canvas_contract(
     dev_admin_header_enabled: None,
     tmp_path,
@@ -62,7 +78,9 @@ def test_get_quest_workflow_graph_returns_canvas_contract(
         "paper_meeting_writer",
     ]
     assert body["nodes"][0]["order"] == 1
-    assert body["nodes"][0]["can_run"] is True
+    assert body["nodes"][0]["can_run"] is False
+    assert body["nodes"][0]["blocking_reason"] == "missing_provider"
+    assert body["nodes"][0]["provider_id"] is None
     assert body["nodes"][0]["human_review_required"] is True
     assert body["nodes"][1]["can_run"] is False
     assert body["nodes"][1]["blocking_reason"] == "demand_validation_incomplete"
@@ -77,6 +95,37 @@ def test_get_quest_workflow_graph_returns_canvas_contract(
     assert body["edges"][0]["gate_status"] == "waiting_for_completion"
     assert body["edges"][2]["gate_required"] is False
     assert body["edges"][2]["gate_status"] == "not_required"
+
+
+def test_get_quest_workflow_graph_reports_selected_provider(
+    dev_admin_header_enabled: None,
+    tmp_path,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'workflow-graph-provider.db'}")
+    with TestClient(app) as client:
+        register_and_login(client)
+        provider = create_personal_provider(client)
+        create_response = client.post(
+            "/quests",
+            json={
+                "initial_direction": "Use computer vision for badminton training.",
+                "title": "Badminton training",
+            },
+        )
+        assert create_response.status_code == 201
+        quest_id = create_response.json()["id"]
+
+        response = client.get(f"/quests/{quest_id}/workflow-graph")
+
+    assert response.status_code == 200
+    first_node = response.json()["nodes"][0]
+    assert first_node["can_run"] is True
+    assert first_node["blocking_reason"] == ""
+    assert first_node["provider_id"] == provider["id"]
+    assert first_node["provider_kind"] == "openai_compatible"
+    assert first_node["provider_model"] == "example-chat"
+    assert first_node["provider_name"] == "Example Provider"
+    assert "sk-test-workflow-graph" not in str(first_node)
 
 
 def test_get_quest_workflow_graph_requires_authentication(tmp_path) -> None:

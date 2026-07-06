@@ -130,6 +130,28 @@ def test_stage_readiness_reports_model_provider_without_exposing_api_key(
     assert "sk-test-readiness" not in str(body)
 
 
+def test_stage_readiness_blocks_completed_stage_when_provider_exists(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'readiness-complete.db'}")
+
+    with TestClient(app) as client:
+        register_and_login(client, "READINESS-COMPLETE", "readiness-complete@example.com")
+        quest = create_quest(client)
+        create_personal_provider(client)
+        complete_demand_with_human_evidence(client, quest["first_stage"]["id"])
+
+        response = client.get(f"/stages/{quest['first_stage']['id']}/readiness")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["can_run"] is False
+    assert body["blocking_reason"] == "stage_already_complete"
+    assert body["blocking_detail"] == "Completed stages are locked until versioned reruns exist."
+    assert body["provider_id"] is None
+
+
 def test_stage_readiness_reports_server_managed_literature_provider(
     tmp_path,
     dev_admin_header_enabled: None,
