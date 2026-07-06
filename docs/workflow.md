@@ -126,6 +126,24 @@ The generated text must label:
 
 The writer must not present unrun experiments as completed results.
 
+## Stage Output Display
+
+Stage APIs still store complete `output_payload` values, including raw provider
+responses needed for debugging. Main web views should use
+`GET /stages/{stage_id}/display-output` instead of rendering full payloads by
+default.
+
+The display-output endpoint returns:
+
+- `display_payload`: structured output with raw model responses and
+  secret-like fields removed recursively;
+- `hidden_fields`: JSON paths that were hidden from the default view;
+- `output_available` and `raw_response_available`;
+- normalized `confidence`, `summary`, `status`, `agent_id`, and `stage_id`.
+
+This preserves traceability while keeping raw LLM text out of the normal review
+surface.
+
 ## Review Rules
 
 Human approval has meaning. Use `human_approved` and `review_notes` for decisions
