@@ -5,6 +5,7 @@ from sqlalchemy import JSON, Column
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field, SQLModel
 
+from noviscope.core.json_types import JsonObject
 from noviscope.models.common import new_id, utc_now
 
 
@@ -31,6 +32,7 @@ class Quest(SQLModel, table=True):
     owner_user_id: str | None = Field(default=None, foreign_key="user.id", index=True)
     title: str
     initial_direction: str
+    intake_payload: JsonObject = Field(default_factory=dict, sa_column=Column(JSON))
     status: QuestStatus = Field(
         default=QuestStatus.DRAFT,
         index=True,

@@ -1,4 +1,6 @@
+from dataclasses import dataclass
 from datetime import timedelta
+from typing import Final
 
 from sqlmodel import Session, select
 
@@ -13,6 +15,13 @@ from noviscope.core.stage_policy import (
 from noviscope.models.common import utc_now
 from noviscope.models.quest import Quest, QuestStatus, StageCard, StageStatus
 from noviscope.models.user import User, UserRole
+from noviscope.quests.intake import (
+    QuestCreateSpec,
+    QuestIntakeUpdateSpec,
+    quest_intake_payload,
+    resolve_initial_direction,
+    resolve_updated_initial_direction,
+)
 
 ALLOWED_STAGE_TRANSITIONS: dict[StageStatus, set[StageStatus]] = {
     StageStatus.PENDING: {StageStatus.RUNNING, StageStatus.BLOCKED},
@@ -20,6 +29,26 @@ ALLOWED_STAGE_TRANSITIONS: dict[StageStatus, set[StageStatus]] = {
     StageStatus.BLOCKED: {StageStatus.PENDING, StageStatus.RUNNING},
     StageStatus.COMPLETE: set(),
 }
+QUEST_STATUS_BY_COMPLETED_AGENT: Final[dict[str, tuple[QuestStatus, QuestStatus]]] = {
+    DEMAND_VALIDATOR_AGENT_ID: (QuestStatus.IDEA_SELECTION, QuestStatus.DEMAND_REVIEW),
+    EXPERIMENT_PLANNER_AGENT_ID: (
+        QuestStatus.FULL_EXPERIMENT,
+        QuestStatus.LIGHTWEIGHT_EXPERIMENT,
+    ),
+    IDEA_GENERATOR_AGENT_ID: (
+        QuestStatus.LIGHTWEIGHT_EXPERIMENT,
+        QuestStatus.IDEA_SELECTION,
+    ),
+    PAPER_MEETING_WRITER_AGENT_ID: (QuestStatus.WRITING, QuestStatus.FULL_EXPERIMENT),
+}
+
+
+@dataclass(frozen=True, slots=True)
+class StageTransitionError(ValueError):
+    reason: str
+
+    def __str__(self) -> str:
+        return self.reason
 
 
 class QuestService:
@@ -33,10 +62,20 @@ class QuestService:
         initial_direction: str,
         owner_user_id: str | None = None,
     ) -> Quest:
+        return self.create_quest_from_intake(
+            QuestCreateSpec(
+                initial_direction=initial_direction,
+                owner_user_id=owner_user_id,
+                title=title,
+            )
+        )
+
+    def create_quest_from_intake(self, spec: QuestCreateSpec) -> Quest:
         quest = Quest(
-            title=title,
-            initial_direction=initial_direction,
-            owner_user_id=owner_user_id,
+            intake_payload=quest_intake_payload(spec.intake),
+            initial_direction=resolve_initial_direction(spec),
+            owner_user_id=spec.owner_user_id,
+            title=spec.title,
         )
         stage_created_at = utc_now()
         demand_stage = StageCard(
@@ -113,6 +152,21 @@ class QuestService:
             raise PermissionError(f"Quest {quest_id} is not accessible")
         return quest
 
+    def update_quest_intake(self, spec: QuestIntakeUpdateSpec) -> Quest:
+        quest = self.session.get(Quest, spec.quest_id)
+        if quest is None:
+            raise LookupError(f"Quest {spec.quest_id} not found")
+        quest.intake_payload = quest_intake_payload(spec.intake)
+        quest.initial_direction = resolve_updated_initial_direction(
+            quest.initial_direction,
+            spec,
+        )
+        quest.updated_at = utc_now().isoformat()
+        self.session.add(quest)
+        self.session.commit()
+        self.session.refresh(quest)
+        return quest
+
     def list_stage_cards(self, quest_id: str) -> list[StageCard]:
         statement = (
             select(StageCard)
@@ -179,7 +233,9 @@ class QuestService:
         ):
             return
         if target not in ALLOWED_STAGE_TRANSITIONS[current]:
-            raise ValueError(f"Cannot transition stage from {current.value} to {target.value}")
+            raise StageTransitionError(
+                f"Cannot transition stage from {current.value} to {target.value}"
+            )
 
     def _sync_quest_after_stage_update(self, stage: StageCard) -> None:
         if stage.status != StageStatus.COMPLETE:
@@ -187,27 +243,10 @@ class QuestService:
         quest = self.session.get(Quest, stage.quest_id)
         if quest is None:
             return
-        if stage.agent_id == DEMAND_VALIDATOR_AGENT_ID:
-            quest.status = (
-                QuestStatus.IDEA_SELECTION if stage.human_approved else QuestStatus.DEMAND_REVIEW
-            )
-        elif stage.agent_id == IDEA_GENERATOR_AGENT_ID:
-            quest.status = (
-                QuestStatus.LIGHTWEIGHT_EXPERIMENT
-                if stage.human_approved
-                else QuestStatus.IDEA_SELECTION
-            )
-        elif stage.agent_id == EXPERIMENT_PLANNER_AGENT_ID:
-            quest.status = (
-                QuestStatus.FULL_EXPERIMENT
-                if stage.human_approved
-                else QuestStatus.LIGHTWEIGHT_EXPERIMENT
-            )
-        elif stage.agent_id == PAPER_MEETING_WRITER_AGENT_ID:
-            quest.status = (
-                QuestStatus.WRITING if stage.human_approved else QuestStatus.FULL_EXPERIMENT
-            )
-        else:
+        status_pair = QUEST_STATUS_BY_COMPLETED_AGENT.get(stage.agent_id)
+        if status_pair is None:
             return
+        approved_status, review_status = status_pair
+        quest.status = approved_status if stage.human_approved else review_status
         quest.updated_at = utc_now().isoformat()
         self.session.add(quest)
