@@ -71,6 +71,8 @@ views and hides raw model/secret-like fields from the main display path.
 `evidence_ledger.py` exposes saved per-stage source references, provider/model
 metadata, confidence, review notes, and human approval states for quest-level
 audit views.
+`stage_review_guidance.py` owns read-only human-review guidance for stage detail
+and canvas review cards.
 `workflow_canvas.py` exposes the default static canvas template, including
 lanes, planned-extension nodes, and edge labels.
 `workflow_capabilities.py` exposes which registered agents have runnable stage
@@ -126,6 +128,8 @@ forms, and overview cards.
 9. Stage detail views should call `GET /stages/{stage_id}/display-output` for
    default rendering. Full `output_payload` remains available through existing
    stage APIs for inspection and debugging.
+10. The web app can call `GET /stages/{stage_id}/review-guidance` to display a
+   stable review card contract without mutating the stage.
 
 ## Stage State Model
 
