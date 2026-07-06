@@ -70,6 +70,8 @@ rows as filtered, sorted table and detail contracts for the web workspace.
 views and hides raw model/secret-like fields from the main display path.
 `workflow_canvas.py` exposes the default static canvas template, including
 lanes, planned-extension nodes, and edge labels.
+`workflow_capabilities.py` exposes which registered agents have runnable stage
+runners and which are planned-only.
 `workflow_graph.py` exposes the selected quest's stage nodes, dependency edges,
 human gates, provider readiness, and blocking reasons for canvas/timeline views.
 
