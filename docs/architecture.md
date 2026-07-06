@@ -71,6 +71,8 @@ views and hides raw model/secret-like fields from the main display path.
 `evidence_ledger.py` exposes saved per-stage source references, provider/model
 metadata, confidence, review notes, and human approval states for quest-level
 audit views.
+`quest_exports.py` owns quest-level traceability export packages for canvas
+snapshots, review handoffs, and future downloadable bundles.
 `stage_review_guidance.py` owns read-only human-review guidance for stage detail
 and canvas review cards.
 `workflow_canvas.py` exposes the default static canvas template, including
@@ -186,6 +188,7 @@ Implemented now:
 - evidence-linked idea generation through a model provider;
 - experiment planning through a model provider;
 - paper/meeting Markdown artifact generation through a model provider;
+- quest-level traceability export packages;
 - structured web views for the core stage outputs.
 
 Planned:
