@@ -999,4 +999,3 @@ const zh: Record<keyof typeof en, string> = {
 export const translations: Record<Language, Record<keyof typeof en, string>> = { en, zh };
 
 export type TranslationKey = keyof typeof en;
-
