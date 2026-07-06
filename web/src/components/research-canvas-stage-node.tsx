@@ -2,7 +2,11 @@ import { Link } from "react-router-dom";
 import type { Quest, StageCard, StageStatus } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
 import { labelFromEnum } from "../lib/format";
-import { isHumanGateStage, type CanvasDetail } from "../lib/research-canvas-data";
+import {
+  flowForAgent,
+  isHumanGateStage,
+  type CanvasDetail,
+} from "../lib/research-canvas-data";
 import {
   getLocalizedStageRunGateReason,
   type StageRunGate,
@@ -91,6 +95,7 @@ export function CanvasStageNode({
 }: CanvasStageNodeProps) {
   const { t } = useI18n();
   const connectorClass = connectorClassName(stage.status);
+  const flow = flowForAgent(stage.agent_id);
   const signal = buildStageSignal(stage, t, stageRunGate);
   const runReason = getLocalizedStageRunGateReason(stageRunGate, t);
 
@@ -132,6 +137,20 @@ export function CanvasStageNode({
           <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{stage.agent_id}</p>
           <h3 className="mt-1 line-clamp-2 text-sm font-semibold text-slate-950">{stage.title}</h3>
           <p className="mt-2 line-clamp-3 text-xs text-slate-600">{stage.summary || t("noSummaryYet")}</p>
+        </div>
+
+        <div className="mt-4 grid grid-cols-[minmax(0,1fr)_24px_minmax(0,1fr)] items-stretch gap-2">
+          <div className="rounded-md border border-white/70 bg-white/80 px-3 py-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t("canvasFlowInput")}</p>
+            <p className="mt-1 line-clamp-2 text-xs font-medium text-slate-800">{t(flow.inputKey)}</p>
+          </div>
+          <div className="flex items-center justify-center text-xs font-semibold text-slate-400" aria-hidden="true">
+            &gt;
+          </div>
+          <div className="rounded-md border border-white/70 bg-white/80 px-3 py-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t("canvasFlowOutput")}</p>
+            <p className="mt-1 line-clamp-2 text-xs font-medium text-slate-800">{t(flow.outputKey)}</p>
+          </div>
         </div>
 
         <div className="mt-4 grid gap-2">

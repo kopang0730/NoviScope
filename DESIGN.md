@@ -125,6 +125,8 @@ All spacing derives from 4px.
 - Structure: compact summary counters, horizontally scrollable stage map, and a selected-stage inspector.
 - States: selected stage, next action, pending review, runnable, blocked, complete.
 - Evidence: every stage node may show up to four traceable facts; the inspector expands those facts with run state and review notes.
+- Flow semantics: every stage node shows a compact input signal and output artifact pair so users can read the research workflow without knowing internal agent names.
+- Traceability: the inspector shows saved output and evidence field counts before detailed evidence, making empty or blocked stages obvious.
 - Accessibility: stage selection is a real button, while run/open actions remain separate controls.
 - Layout: map stacks above the inspector on narrow screens and uses a fixed-width scroll region for the five-stage workflow.
 
