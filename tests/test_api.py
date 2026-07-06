@@ -1,3 +1,4 @@
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
@@ -5,6 +6,8 @@ from sqlmodel import Session, select
 from noviscope.core.config import Settings
 from noviscope.db.session import create_db_engine
 from noviscope.main import create_app
+from noviscope.model_gateway.adapters import OpenAICompatibleAdapter
+from noviscope.model_gateway.service import ModelGateway
 from noviscope.models.user import User, UserRole
 
 DEV_ADMIN_TOKEN = "test-dev-admin-token-0123456789abcdef"
@@ -230,7 +233,29 @@ def test_shared_deployment_accepts_strong_bootstrap_token(monkeypatch):
     assert seen_database_urls == ["postgresql://user:pass@localhost:5432/noviscope"]
 
 
-def test_provider_crud_endpoints_do_not_return_api_key(dev_admin_header_enabled: None):
+def test_provider_crud_endpoints_do_not_return_api_key(
+    dev_admin_header_enabled: None,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    def build_fake_gateway() -> ModelGateway:
+        gateway = ModelGateway()
+        gateway.register_adapter(
+            "openai_compatible",
+            OpenAICompatibleAdapter(
+                client_factory=lambda: httpx.Client(
+                    transport=httpx.MockTransport(
+                        lambda request: httpx.Response(
+                            200,
+                            json={"data": [{"id": "gpt-4.1-mini"}]},
+                        )
+                    )
+                )
+            ),
+        )
+        return gateway
+
+    monkeypatch.setattr("noviscope.api.provider_tests.build_model_gateway", build_fake_gateway)
+
     with TestClient(create_app(database_url="sqlite:///:memory:")) as client:
         register_and_login(client, "INVITE-PROVIDER", "provider@example.com")
         create_response = client.post(
