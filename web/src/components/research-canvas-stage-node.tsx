@@ -97,7 +97,7 @@ export function CanvasStageNode({
   return (
     <div className="relative">
       {index < total - 1 ? (
-        <div className="absolute left-full top-12 hidden h-px w-3 lg:block" aria-hidden="true">
+        <div className="absolute left-full top-14 hidden h-px w-4 lg:block" aria-hidden="true">
           <div className={["h-px w-full", connectorClass].join(" ")} />
           <span className={["absolute -right-1 -top-2 text-xs", connectorClass].join(" ")}>&gt;</span>
         </div>
@@ -105,7 +105,7 @@ export function CanvasStageNode({
 
       <article
         className={[
-          "flex min-h-[380px] flex-col rounded-lg border p-4 shadow-sm transition",
+          "flex min-h-[360px] flex-col rounded-lg border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md",
           statusBorderClassName(stage.status),
           isSelected ? "ring-2 ring-teal-500 ring-offset-2" : "",
           !isSelected && isNextAction ? "ring-2 ring-teal-300 ring-offset-2" : "",
@@ -117,7 +117,12 @@ export function CanvasStageNode({
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-teal-200 bg-white text-sm font-semibold text-teal-700">
                 {index + 1}
               </div>
-              <p className="truncate text-xs font-semibold text-teal-700">{phaseLabel}</p>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-semibold text-teal-700">{phaseLabel}</p>
+                <p className="mt-0.5 text-[11px] font-medium text-slate-500">
+                  {index + 1}/{total}
+                </p>
+              </div>
             </div>
           </div>
           <Badge tone={stageTone(stage.status)}>{labelFromEnum(stage.status)}</Badge>
