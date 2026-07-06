@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, assert_never
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict
@@ -34,6 +34,13 @@ class StageReadinessRequestContext:
     session: Session
     current_user: User
     registry: StageRunnerRegistry
+
+
+@dataclass(frozen=True, slots=True)
+class StageReadinessBuildRequest:
+    stage: StageCard
+    workflow_stages: list[StageCard]
+    provider_id: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +82,32 @@ def get_stage_readiness_context(
         registry=registry,
         session=session,
     )
+
+
+def build_stage_status_block(stage: StageCard) -> StageBlock | None:
+    match stage.status:
+        case StageStatus.COMPLETE:
+            return StageBlock(
+                evidence_payload={
+                    "blocking_detail": "Completed stages are locked until versioned reruns exist.",
+                    "blocking_reason": "stage_already_complete",
+                },
+                summary="Stage is already complete.",
+            )
+        case StageStatus.RUNNING:
+            return StageBlock(
+                evidence_payload={
+                    "blocking_detail": (
+                        "Wait for the current run to finish before starting another run."
+                    ),
+                    "blocking_reason": "stage_already_running",
+                },
+                summary="Stage is already running.",
+            )
+        case StageStatus.PENDING | StageStatus.BLOCKED:
+            return None
+        case unreachable:
+            assert_never(unreachable)
 
 
 def build_blocked_response(stage: StageCard, block: StageBlock) -> StageReadinessResponse:
@@ -148,6 +181,54 @@ def string_field(payload: JsonObject, key: str) -> str:
     return value if isinstance(value, str) else ""
 
 
+def build_stage_readiness_response(
+    request: StageReadinessBuildRequest,
+    context: StageReadinessRequestContext,
+) -> StageReadinessResponse:
+    status_block = build_stage_status_block(request.stage)
+    if status_block is not None:
+        return build_blocked_response(request.stage, status_block)
+
+    runner = context.registry.get_runner(request.stage.agent_id)
+    if runner is None:
+        return build_blocked_response(request.stage, build_runner_block(request.stage))
+
+    dependency_block = build_dependency_block_if_needed(request.stage, request.workflow_stages)
+    if dependency_block is not None:
+        return build_blocked_response(request.stage, dependency_block)
+
+    if not runner.supported_provider_kinds:
+        return build_ready_response(
+            request.stage,
+            server_managed_provider(build_server_managed_provider()),
+        )
+
+    provider_service = get_provider_service(context.session)
+    assignment_service = AgentAssignmentService(context.session)
+    assignment = assignment_service.get_assignment(request.stage.agent_id)
+    configured_provider_id = assignment.provider_id if assignment is not None else None
+    configured_model_name = assignment.model_name if assignment is not None else None
+    effective_provider_id = (
+        request.provider_id if request.provider_id is not None else configured_provider_id
+    )
+    effective_model_name = None if request.provider_id is not None else configured_model_name
+    selection = select_provider(
+        ProviderSelectionContext(
+            current_user=context.current_user,
+            model_name=effective_model_name,
+            provider_id=effective_provider_id,
+            provider_service=provider_service,
+            runner=runner,
+        )
+    )
+    if selection.provider is None:
+        return build_blocked_response(request.stage, build_provider_block(selection))
+    return build_ready_response(
+        request.stage,
+        selected_model_provider(selection.provider, selection.model_name),
+    )
+
+
 @router.get("/stages/{stage_id}/readiness", response_model=StageReadinessResponse)
 def get_stage_readiness(
     stage_id: str,
@@ -155,45 +236,16 @@ def get_stage_readiness(
     provider_id: str | None = None,
 ) -> StageReadinessResponse:
     quest_service = QuestService(context.session)
-    provider_service = get_provider_service(context.session)
-    assignment_service = AgentAssignmentService(context.session)
     try:
         stage = quest_service.get_stage_card_for_user(stage_id, context.current_user)
-        runner = context.registry.get_runner(stage.agent_id)
-        if runner is None:
-            return build_blocked_response(stage, build_runner_block(stage))
-
         quest = quest_service.get_quest_for_user(stage.quest_id, context.current_user)
-        workflow_stages = quest_service.list_stage_cards(quest.id)
-        dependency_block = build_dependency_block_if_needed(stage, workflow_stages)
-        if dependency_block is not None:
-            return build_blocked_response(stage, dependency_block)
-
-        if not runner.supported_provider_kinds:
-            return build_ready_response(
-                stage,
-                server_managed_provider(build_server_managed_provider()),
-            )
-
-        assignment = assignment_service.get_assignment(stage.agent_id)
-        configured_provider_id = assignment.provider_id if assignment is not None else None
-        configured_model_name = assignment.model_name if assignment is not None else None
-        effective_provider_id = provider_id if provider_id is not None else configured_provider_id
-        effective_model_name = None if provider_id is not None else configured_model_name
-        selection = select_provider(
-            ProviderSelectionContext(
-                current_user=context.current_user,
-                model_name=effective_model_name,
-                provider_id=effective_provider_id,
-                provider_service=provider_service,
-                runner=runner,
-            )
-        )
-        if selection.provider is None:
-            return build_blocked_response(stage, build_provider_block(selection))
-        return build_ready_response(
-            stage,
-            selected_model_provider(selection.provider, selection.model_name),
+        return build_stage_readiness_response(
+            StageReadinessBuildRequest(
+                provider_id=provider_id,
+                stage=stage,
+                workflow_stages=quest_service.list_stage_cards(quest.id),
+            ),
+            context,
         )
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

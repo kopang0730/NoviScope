@@ -68,6 +68,8 @@ dependency gates. `stage_literature_papers.py` exposes saved Literature Scout
 rows as filtered, sorted table and detail contracts for the web workspace.
 `stage_display_output.py` owns the default stage-output payload for frontend
 views and hides raw model/secret-like fields from the main display path.
+`workflow_graph.py` exposes the selected quest's stage nodes, dependency edges,
+human gates, provider readiness, and blocking reasons for canvas/timeline views.
 
 `src/noviscope/quests`
 

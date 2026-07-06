@@ -172,6 +172,16 @@ The display-output endpoint returns:
 This preserves traceability while keeping raw LLM text out of the normal review
 surface.
 
+## Workflow Graph Display
+
+Canvas and timeline views should use `GET /quests/{quest_id}/workflow-graph`
+for the selected quest. The endpoint returns ordered stage nodes, dependency
+edges, human-gate states, provider/model readiness, blocking reasons, and
+confidence values in one frontend-friendly contract. It reuses the same
+readiness rules as `GET /stages/{stage_id}/readiness`, so the canvas should not
+show a stage as runnable when provider configuration, prerequisites, status, or
+human review gates block it.
+
 ## Review Rules
 
 Human approval has meaning. Use `human_approved` and `review_notes` for decisions
