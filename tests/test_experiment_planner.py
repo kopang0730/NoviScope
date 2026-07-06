@@ -1,13 +1,17 @@
 import json
 
+import httpx
 from pydantic import SecretStr
 
 from noviscope.agents.experiment_planner import (
     PLAN_ONLY_WARNING,
     ExperimentPlannerRequest,
+    ExperimentPlannerStageRunner,
+    OpenAICompatibleExperimentPlannerRunner,
     has_selected_idea,
     parse_experiment_plan_output,
 )
+from noviscope.agents.provider_chat import DEFAULT_MAX_TOKENS, ProviderChatClient
 from noviscope.models.provider import ProviderKind
 from noviscope.models.quest import StageCard, StageStatus
 
@@ -73,6 +77,62 @@ def test_parse_experiment_plan_output_fails_closed_on_invalid_json() -> None:
     assert output.first_runnable_script_plan == []
     assert "not valid structured JSON" in output.summary
     assert PLAN_ONLY_WARNING in output.warnings
+
+
+def test_experiment_runner_executes_anthropic_messages_api() -> None:
+    captured_payload: dict[str, object] = {}
+    model_response = {
+        "ablation_variables": ["temporal window size"],
+        "baselines_to_reproduce": ["Baseline action recognizer"],
+        "compute_requirements": "One A800 GPU.",
+        "confidence": "medium",
+        "data_availability_status": "ready",
+        "datasets_needed": ["/data/badminton"],
+        "expected_figures": ["Failure case grid"],
+        "expected_tables": ["Baseline and ablation table"],
+        "failure_risks": ["Data labels may be noisy."],
+        "first_runnable_script_plan": ["Build manifest", "Run baseline inference"],
+        "metrics": ["Action accuracy"],
+        "summary": "Plan the first baseline and ablation run.",
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url == httpx.URL("https://api.anthropic.com/v1/messages")
+        assert request.headers["x-api-key"] == "sk-test"
+        assert request.headers["anthropic-version"] == "2023-06-01"
+        captured_payload.update(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={"content": [{"text": json.dumps(model_response), "type": "text"}]},
+        )
+
+    runner = OpenAICompatibleExperimentPlannerRunner(
+        chat_client=ProviderChatClient(
+            client_factory=lambda: httpx.Client(transport=httpx.MockTransport(handler))
+        )
+    )
+    request = build_request().model_copy(
+        update={
+            "base_url": "https://api.anthropic.com/v1",
+            "model": "claude-test-model",
+            "provider_kind": ProviderKind.ANTHROPIC,
+            "provider_name": "Anthropic",
+        }
+    )
+
+    output = runner.run(request)
+
+    assert output.summary == "Plan the first baseline and ablation run."
+    assert PLAN_ONLY_WARNING in output.warnings
+    assert captured_payload["model"] == "claude-test-model"
+    assert captured_payload["max_tokens"] == DEFAULT_MAX_TOKENS
+    assert "temperature" not in captured_payload
+
+
+def test_experiment_stage_runner_supports_anthropic_provider() -> None:
+    runner = ExperimentPlannerStageRunner(OpenAICompatibleExperimentPlannerRunner())
+
+    assert ProviderKind.ANTHROPIC in runner.supported_provider_kinds
 
 
 def test_has_selected_idea_requires_matching_idea_payload() -> None:

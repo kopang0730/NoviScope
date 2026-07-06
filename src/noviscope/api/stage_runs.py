@@ -132,7 +132,7 @@ def select_provider(context: ProviderSelectionContext) -> ProviderSelection:
             )
         if provider.kind not in context.runner.supported_provider_kinds:
             return ProviderSelection(
-                blocking_detail="Choose an OpenAI-compatible or custom provider for this stage.",
+                blocking_detail="Choose a supported active provider for this stage.",
                 blocking_reason="unsupported_provider",
                 model_name=None,
                 provider=None,
@@ -154,9 +154,7 @@ def select_provider(context: ProviderSelectionContext) -> ProviderSelection:
             )
 
     return ProviderSelection(
-        blocking_detail=(
-            "Configure an active OpenAI-compatible or custom provider before running this stage."
-        ),
+        blocking_detail="Configure an active supported provider before running this stage.",
         blocking_reason="missing_provider",
         model_name=None,
         provider=None,

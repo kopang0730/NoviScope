@@ -481,7 +481,7 @@ def test_run_demand_validation_stage_blocks_without_provider(
     assert body["evidence_payload"]["can_run"] is False
     assert body["evidence_payload"]["blocking_reason"] == "missing_provider"
     assert body["evidence_payload"]["blocking_detail"] == (
-        "Configure an active OpenAI-compatible or custom provider before running this stage."
+        "Configure an active supported provider before running this stage."
     )
 
 
