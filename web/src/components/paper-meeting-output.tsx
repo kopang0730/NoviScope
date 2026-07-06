@@ -9,6 +9,7 @@ import {
 import { downloadTextFile } from "../lib/download-file";
 import { Badge } from "./badge";
 import { Button } from "./button";
+import { SourceStageList } from "./source-stage-list";
 
 function BulletList({ emptyLabel, items }: { readonly emptyLabel: string; readonly items: readonly string[] }) {
   if (items.length === 0) {
@@ -119,6 +120,9 @@ export function PaperMeetingOutput({ stage }: { readonly stage: StageCard }) {
         </DetailBlock>
         <DetailBlock title={t("humanReviewRequired")}>
           <BulletList emptyLabel={t("notAvailable")} items={view.humanReviewRequired} />
+        </DetailBlock>
+        <DetailBlock title={t("sourceStages")}>
+          <SourceStageList sourceStageIds={view.sourceStageIds} />
         </DetailBlock>
       </div>
 

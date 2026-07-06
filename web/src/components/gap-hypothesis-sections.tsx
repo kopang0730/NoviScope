@@ -5,6 +5,7 @@ import { confidenceTone } from "../lib/gap-hypothesis-tones";
 import type { IdeaGeneratorView, IdeaItem } from "../lib/gap-hypothesis-view";
 import { Badge } from "./badge";
 import { Button } from "./button";
+import { SourceStageList } from "./source-stage-list";
 
 function SupportingPaperList({ items }: { readonly items: readonly string[] }) {
   const { t } = useI18n();
@@ -43,7 +44,6 @@ function IdeaField({
 export function GapSummarySection({ view }: { readonly view: IdeaGeneratorView }) {
   const { t } = useI18n();
   const alreadySelected = view.selectionStatus === "selected_for_experiment_design";
-  const sourceStageEntries = Object.entries(view.sourceStageIds);
 
   return (
     <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
@@ -65,18 +65,14 @@ export function GapSummarySection({ view }: { readonly view: IdeaGeneratorView }
             {t("selectionStatus")}: {labelFromEnum(view.selectionStatus)}
           </Badge>
         </div>
-        {sourceStageEntries.length > 0 ? (
-          <div className="mt-3 text-xs text-slate-500">
+        {Object.keys(view.sourceStageIds).length > 0 ? (
+          <div className="mt-3">
             <p className="font-semibold uppercase tracking-wide text-slate-500">
               {t("sourceStages")}
             </p>
-            <ul className="mt-2 space-y-1">
-              {sourceStageEntries.map(([key, value]) => (
-                <li key={key}>
-                  {labelFromEnum(key)}: {value}
-                </li>
-              ))}
-            </ul>
+            <div className="mt-2">
+              <SourceStageList sourceStageIds={view.sourceStageIds} />
+            </div>
           </div>
         ) : null}
       </div>

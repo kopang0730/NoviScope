@@ -1,4 +1,5 @@
 import type { StageCard, StageConfidence } from "../api/types";
+import { readSourceStageIds, type SourceStageIds } from "./source-stage-ids";
 import { experimentPlannerAgentId } from "./stages";
 
 export type ExperimentPlannerSetup = {
@@ -19,6 +20,7 @@ export type ExperimentPlannerView = {
   readonly failureRisks: readonly string[];
   readonly firstRunnableScriptPlan: readonly string[];
   readonly metrics: readonly string[];
+  readonly sourceStageIds: SourceStageIds;
   readonly summary: string;
   readonly warnings: readonly string[];
 };
@@ -67,6 +69,7 @@ export function buildExperimentPlannerView(stage: StageCard): ExperimentPlannerV
     failureRisks: readStringArray(stage.output_payload, "failure_risks"),
     firstRunnableScriptPlan: readStringArray(stage.output_payload, "first_runnable_script_plan"),
     metrics: readStringArray(stage.output_payload, "metrics"),
+    sourceStageIds: readSourceStageIds(stage.output_payload),
     summary: readString(stage.output_payload, "summary") || stage.summary,
     warnings: readStringArray(stage.output_payload, "warnings"),
   };
