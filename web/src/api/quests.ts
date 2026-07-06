@@ -1,5 +1,11 @@
 import { apiRequest } from "./client";
-import type { Quest, QuestCreateResponse, StageCard, StageStatus } from "./types";
+import type {
+  MarkdownArtifactManifestResponse,
+  Quest,
+  QuestCreateResponse,
+  StageCard,
+  StageStatus,
+} from "./types";
 
 type QuestsResponse = {
   quests: Quest[];
@@ -61,4 +67,20 @@ export function runStage(stageId: string, payload: RunStagePayload = {}) {
     body: payload,
     method: "POST",
   });
+}
+
+export function getStageArtifacts(stageId: string) {
+  return apiRequest<MarkdownArtifactManifestResponse>(`/api/stages/${stageId}/artifacts`);
+}
+
+export function buildStageArtifactDownloadPath(downloadUrl: string) {
+  if (downloadUrl.startsWith("/api/")) {
+    return downloadUrl;
+  }
+
+  if (downloadUrl.startsWith("/")) {
+    return `/api${downloadUrl}`;
+  }
+
+  return `/api/${downloadUrl}`;
 }
