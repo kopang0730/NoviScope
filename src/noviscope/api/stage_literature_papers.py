@@ -5,6 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session
 
 from noviscope.api.dependencies import get_session
+from noviscope.api.literature_paper_detail import (
+    LiteraturePaperDetailResponse,
+    LiteraturePaperNotFoundError,
+    build_literature_paper_detail,
+)
 from noviscope.api.literature_paper_table import (
     LiteraturePaperReliabilityLevel,
     LiteraturePaperSort,
@@ -54,6 +59,16 @@ def read_literature_paper_table(
     return build_literature_paper_table(stage, options)
 
 
+def read_literature_paper_detail(
+    stage_id: str,
+    context: LiteraturePaperTableRouteContext,
+    paper_ref: str,
+) -> LiteraturePaperDetailResponse:
+    service = QuestService(context.session)
+    stage = service.get_stage_card_for_user(stage_id, context.current_user)
+    return build_literature_paper_detail(stage, paper_ref)
+
+
 @router.get("/stages/{stage_id}/literature-papers", response_model=LiteraturePaperTableResponse)
 def list_literature_papers(
     stage_id: str,
@@ -68,6 +83,28 @@ def list_literature_papers(
 ) -> LiteraturePaperTableResponse:
     try:
         return read_literature_paper_table(stage_id, context, options)
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+
+@router.get(
+    "/stages/{stage_id}/literature-papers/detail",
+    response_model=LiteraturePaperDetailResponse,
+)
+def get_literature_paper_detail(
+    stage_id: str,
+    context: Annotated[
+        LiteraturePaperTableRouteContext,
+        Depends(get_literature_paper_table_route_context),
+    ],
+    paper_ref: Annotated[str, Query(min_length=1)],
+) -> LiteraturePaperDetailResponse:
+    try:
+        return read_literature_paper_detail(stage_id, context, paper_ref)
+    except LiteraturePaperNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except PermissionError as exc:

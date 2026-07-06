@@ -77,6 +77,13 @@ and `sort=relevance_desc|year_desc|year_asc`. If the stage is pending, running,
 or blocked, the endpoint returns an empty table plus `unavailable_reason`; it
 does not synthesize placeholder papers.
 
+The frontend can open a single saved paper through
+`GET /stages/{stage_id}/literature-papers/detail?paper_ref=...`. `paper_ref`
+must come from the table response. Unknown references return `404` instead of a
+fabricated detail. Pending, running, or blocked stages return an empty detail
+with `unavailable_reason`. The response includes review warnings reminding the
+reader to verify metadata and full text before citing.
+
 ### Gap & Hypothesis Generator
 
 Purpose: generate candidate research ideas based on demand and literature
