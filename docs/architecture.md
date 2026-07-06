@@ -65,7 +65,7 @@ implementations. Runners return structured `StageRunResult` values containing
 FastAPI route modules. `routes.py` owns auth, providers, agents, quests, and
 manual stage updates. `stage_runs.py` owns executable stage transitions and
 dependency gates. `stage_literature_papers.py` exposes saved Literature Scout
-rows as a filtered, sorted table contract for the web workspace.
+rows as filtered, sorted table and detail contracts for the web workspace.
 
 `src/noviscope/quests`
 
