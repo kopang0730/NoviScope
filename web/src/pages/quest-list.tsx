@@ -197,24 +197,31 @@ export function QuestListPage() {
               const isSelected = quest.id === selectedQuestId;
 
               return (
-                <button
+                <div
                   className={[
-                    "w-full rounded-lg border px-4 py-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2",
+                    "rounded-lg border px-4 py-4 transition",
                     isSelected ? "border-teal-300 bg-teal-50 shadow-sm" : "border-slate-200 bg-white hover:bg-slate-50",
                   ].join(" ")}
                   key={quest.id}
-                  onClick={() => setSearchParams({ quest: quest.id })}
-                  type="button"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="font-medium text-slate-900">{quest.title}</p>
-                    <Badge tone={questTone(quest.status)}>{labelFromEnum(quest.status)}</Badge>
-                  </div>
-                  <p className="mt-2 text-sm text-slate-600">{directionSummary(quest.initial_direction)}</p>
-                  <p className="mt-2 text-xs text-slate-500">
-                    {t("updated")} {formatDateTime(quest.updated_at)}
-                  </p>
-                </button>
+                  <button
+                    className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
+                    onClick={() => setSearchParams({ quest: quest.id })}
+                    type="button"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="font-medium text-slate-900">{quest.title}</p>
+                      <Badge tone={questTone(quest.status)}>{labelFromEnum(quest.status)}</Badge>
+                    </div>
+                    <p className="mt-2 text-sm text-slate-600">{directionSummary(quest.initial_direction)}</p>
+                    <p className="mt-2 text-xs text-slate-500">
+                      {t("updated")} {formatDateTime(quest.updated_at)}
+                    </p>
+                  </button>
+                  <Link className="mt-3 inline-flex text-xs font-semibold text-teal-700 hover:text-teal-900" to={`/canvas?quest=${quest.id}`}>
+                    {t("openFullCanvas")}
+                  </Link>
+                </div>
               );
             })}
           </div>
