@@ -17,6 +17,7 @@ import { ExperimentPlannerOutput } from "./experiment-planner-output";
 import { GapHypothesisOutput } from "./gap-hypothesis-output";
 import { LiteratureScoutOutput } from "./literature-scout-output";
 import { PaperMeetingOutput } from "./paper-meeting-output";
+import { StageAuditTrail } from "./stage-audit-trail";
 import { StageRunSummary } from "./stage-run-summary";
 
 export function StageOutputPanel({
@@ -36,6 +37,11 @@ export function StageOutputPanel({
     : getStageRunAvailability(stage).reason;
   const experimentPlannerStage =
     workflowStages.find((candidate) => candidate.agent_id === experimentPlannerAgentId) ?? null;
+  const auditTrail = (
+    <div className="mt-5">
+      <StageAuditTrail stage={stage} />
+    </div>
+  );
 
   if (stage.agent_id === "literature_scout" && stage.status === "complete") {
     return (
@@ -47,6 +53,7 @@ export function StageOutputPanel({
         <div className="mt-5">
           <LiteratureScoutOutput stage={stage} />
         </div>
+        {auditTrail}
       </Card>
     );
   }
@@ -65,6 +72,7 @@ export function StageOutputPanel({
             stage={stage}
           />
         </div>
+        {auditTrail}
       </Card>
     );
   }
@@ -79,6 +87,7 @@ export function StageOutputPanel({
         <div className="mt-5">
           <ExperimentPlannerOutput onStageChange={onStageChange} stage={stage} />
         </div>
+        {auditTrail}
       </Card>
     );
   }
@@ -93,6 +102,7 @@ export function StageOutputPanel({
         <div className="mt-5">
           <PaperMeetingOutput stage={stage} />
         </div>
+        {auditTrail}
       </Card>
     );
   }
@@ -102,6 +112,7 @@ export function StageOutputPanel({
       <Card>
         <CardHeading description={runStateDescription} title={t("stageRunState")} />
         <StageRunSummary stage={stage} stageRunGate={stageRunGate} />
+        {auditTrail}
       </Card>
     );
   }
@@ -110,6 +121,7 @@ export function StageOutputPanel({
     <Card>
       <CardHeading description={t("demandValidationDescription")} title={t("demandValidationResult")} />
       <DemandValidationOutput onStageChange={onStageChange} stage={stage} />
+      {auditTrail}
     </Card>
   );
 }
