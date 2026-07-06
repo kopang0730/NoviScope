@@ -125,6 +125,10 @@ Expected output:
 
 If required data, code, or environment context is missing, the stage should be
 blocked or clearly marked as incomplete.
+The frontend should use `POST /stages/{stage_id}/experiment-setup` on the
+Experiment Planner stage to record `data_path`, `code_repository`, and
+`environment_notes`. Saving setup inputs resets a blocked missing-input stage
+back to `pending`, but it does not claim that any experiment has run.
 
 ### Paper & Meeting Writer
 

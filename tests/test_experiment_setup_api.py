@@ -68,9 +68,7 @@ def test_save_experiment_setup_records_runner_inputs(
     body = response.json()
     assert body["agent_id"] == EXPERIMENT_PLANNER_AGENT_ID
     assert body["status"] == "pending"
-    assert body["input_payload"]["code_repository"] == (
-        "https://github.com/lab/badminton-baseline"
-    )
+    assert body["input_payload"]["code_repository"] == ("https://github.com/lab/badminton-baseline")
     assert body["input_payload"]["data_path"] == "/data/badminton/train-videos"
     assert body["input_payload"]["environment_notes"] == (
         "A800 server, CUDA 12.4, PyTorch environment prepared."
@@ -138,7 +136,8 @@ def test_save_experiment_setup_rejects_wrong_stage(
         assert quest_response.status_code == 201
         stages_response = client.get(f"/quests/{quest_response.json()['id']}/stages")
         demand_stage = next(
-            stage for stage in stages_response.json()["stages"]
+            stage
+            for stage in stages_response.json()["stages"]
             if stage["agent_id"] == "demand_validator"
         )
 
