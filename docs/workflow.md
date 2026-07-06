@@ -23,6 +23,8 @@ structured evidence or explain why it is blocked.
 11. Run Experiment Planner.
 12. Run Paper & Meeting Writer after experiment planning completes.
 13. Download or copy the generated Markdown artifacts after human review.
+14. Export the quest traceability package when preparing a review, handoff, or
+    frontend canvas snapshot.
 
 ## Stage Gates
 
@@ -125,6 +127,22 @@ The generated text must label:
 - human review required.
 
 The writer must not present unrun experiments as completed results.
+
+## Traceability Export
+
+`GET /quests/{quest_id}/export` returns a quest-level review package for the
+authenticated owner or an admin. It includes:
+
+- quest metadata;
+- every stage card with input, output, evidence, confidence, review notes, and
+  human approval state;
+- Paper & Meeting Writer artifact manifest entries with download URLs;
+- a trust summary with complete, blocked, pending-review, low-confidence, and
+  artifact counts.
+
+This endpoint is intended for canvas views, review handoffs, and future export
+flows. It exposes traceability metadata and existing stage payloads; it does not
+expose provider API keys or invent missing experiment results.
 
 ## Review Rules
 
