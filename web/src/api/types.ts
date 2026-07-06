@@ -3,6 +3,11 @@ export type ProviderKind = "openai_compatible" | "anthropic" | "custom";
 export type ProviderScope = "personal" | "shared";
 export type InviteStatus = "active" | "disabled" | "exhausted";
 export type StageConfidence = "high" | "medium" | "low" | "unknown";
+export type MarkdownArtifactKey =
+  | "chinese_research_brief_markdown"
+  | "english_research_brief_markdown"
+  | "meeting_outline_markdown"
+  | "ieee_paper_skeleton_markdown";
 export type QuestStatus =
   | "draft"
   | "demand_review"
@@ -112,4 +117,19 @@ export interface QuestCreateResponse {
   initial_direction: string;
   status: QuestStatus;
   first_stage: StageCard;
+}
+
+export interface MarkdownArtifactManifestItem {
+  readonly key: MarkdownArtifactKey;
+  readonly title: string;
+  readonly filename: string;
+  readonly media_type: string;
+  readonly available: boolean;
+  readonly download_url: string;
+  readonly missing_reason: string;
+}
+
+export interface MarkdownArtifactManifestResponse {
+  readonly stage_id: string;
+  readonly artifacts: readonly MarkdownArtifactManifestItem[];
 }

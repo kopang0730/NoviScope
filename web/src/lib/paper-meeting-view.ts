@@ -1,11 +1,11 @@
-import type { StageCard, StageConfidence } from "../api/types";
+import type { MarkdownArtifactKey, StageCard, StageConfidence } from "../api/types";
 import { readSourceStageIds, type SourceStageIds } from "./source-stage-ids";
 import { paperMeetingWriterAgentId } from "./stages";
 
 export type MarkdownArtifact = {
   readonly content: string;
   readonly filename: string;
-  readonly key: string;
+  readonly key: MarkdownArtifactKey;
   readonly titleKey:
     | "chineseResearchBrief"
     | "englishResearchBrief"
