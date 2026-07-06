@@ -66,6 +66,8 @@ FastAPI route modules. `routes.py` owns auth, providers, agents, quests, and
 manual stage updates. `stage_runs.py` owns executable stage transitions and
 dependency gates. `stage_literature_papers.py` exposes saved Literature Scout
 rows as filtered, sorted table and detail contracts for the web workspace.
+`stage_display_output.py` owns the default stage-output payload for frontend
+views and hides raw model/secret-like fields from the main display path.
 
 `src/noviscope/quests`
 
@@ -112,6 +114,9 @@ forms, and overview cards.
 7. The runner writes structured payloads back to the stage card.
 8. Human review fields remain explicit through `human_approved` and
    `review_notes`.
+9. Stage detail views should call `GET /stages/{stage_id}/display-output` for
+   default rendering. Full `output_payload` remains available through existing
+   stage APIs for inspection and debugging.
 
 ## Stage State Model
 
