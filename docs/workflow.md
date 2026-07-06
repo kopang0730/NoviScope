@@ -7,19 +7,22 @@ structured evidence or explain why it is blocked.
 ## User Flow
 
 1. Register with an invitation code.
-2. Create a quest from the research intake form, including any demand evidence
+2. Open the Research Canvas. It is the default workspace after login and shows
+   the selected quest, stage map, next action, evidence trail, and human review
+   gates.
+3. Create a quest from the research intake form, including any demand evidence
    sources that a human can verify before experiments.
-3. Configure at least one model provider if running provider-backed stages.
-4. Run Demand Validation.
-5. Review the demand output and decide whether the problem is worth continuing.
-6. Run Literature Scout after demand validation completes.
-7. Run Gap & Hypothesis Generator after demand and literature outputs exist.
-8. Select one or more ideas for experiment design.
-9. Record experiment setup context: data path, code repository, and environment
+4. Configure at least one model provider if running provider-backed stages.
+5. Run Demand Validation.
+6. Review the demand output and decide whether the problem is worth continuing.
+7. Run Literature Scout after demand validation completes.
+8. Run Gap & Hypothesis Generator after demand and literature outputs exist.
+9. Select one or more ideas for experiment design.
+10. Record experiment setup context: data path, code repository, and environment
    notes.
-10. Run Experiment Planner.
-11. Run Paper & Meeting Writer after experiment planning completes.
-12. Download or copy the generated Markdown artifacts after human review.
+11. Run Experiment Planner.
+12. Run Paper & Meeting Writer after experiment planning completes.
+13. Download or copy the generated Markdown artifacts after human review.
 
 ## Stage Gates
 
