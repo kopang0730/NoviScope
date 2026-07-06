@@ -5,24 +5,10 @@ import { labelFromEnum } from "../lib/format";
 import { literatureScoutAgentId } from "../lib/stages";
 import { Badge } from "./badge";
 import { Input, Select } from "./input";
+import { PaperDetail, type LiteraturePaper } from "./literature-paper-detail";
 
 type ReliabilityLevel = "top_conference_or_journal" | "peer_reviewed" | "arxiv_preprint" | "unknown";
 type SortMode = "score_desc" | "year_desc" | "venue_asc";
-
-type LiteraturePaper = {
-  readonly abstractSummary: string;
-  readonly authors: readonly string[];
-  readonly doi: string;
-  readonly limitations: readonly string[];
-  readonly openalexId: string;
-  readonly relevanceScore: number;
-  readonly reliabilityLevel: ReliabilityLevel;
-  readonly title: string;
-  readonly url: string;
-  readonly venue: string;
-  readonly whyRelevant: string;
-  readonly year: number | null;
-};
 
 type LiteratureScoutView = {
   readonly papers: readonly LiteraturePaper[];
@@ -85,8 +71,12 @@ function readPaper(value: unknown): LiteraturePaper | null {
     doi: readString(value, "doi"),
     limitations: readStringArray(value, "limitations"),
     openalexId: readString(value, "openalex_id"),
+    publicationType: readString(value, "publication_type"),
+    recencyBucket: readString(value, "recency_bucket"),
     relevanceScore: readNumber(value, "relevance_score") ?? 0,
     reliabilityLevel: readReliabilityLevel(readString(value, "reliability_level")),
+    sourceQualitySignals: readStringArray(value, "source_quality_signals"),
+    sourceType: readString(value, "source_type"),
     title: readString(value, "title"),
     url: readString(value, "url"),
     venue: readString(value, "venue"),
@@ -144,41 +134,6 @@ function filterAndSortPapers(
     }
     return right.relevanceScore - left.relevanceScore;
   });
-}
-
-function PaperDetail({ paper }: { readonly paper: LiteraturePaper }) {
-  const { t } = useI18n();
-
-  return (
-    <details className="rounded-lg border border-slate-200 bg-white p-3">
-      <summary className="cursor-pointer text-sm font-medium text-slate-800">{paper.title || t("notAvailable")}</summary>
-      <div className="mt-3 grid gap-3 text-sm text-slate-600 lg:grid-cols-2">
-        <p>
-          <span className="font-medium text-slate-700">{t("abstractSummary")}:</span>{" "}
-          {paper.abstractSummary || t("notAvailable")}
-        </p>
-        <p>
-          <span className="font-medium text-slate-700">{t("whyRelevant")}:</span>{" "}
-          {paper.whyRelevant || t("notAvailable")}
-        </p>
-        <p>
-          <span className="font-medium text-slate-700">{t("limitations")}:</span>{" "}
-          {paper.limitations.length > 0 ? paper.limitations.join("; ") : t("notAvailable")}
-        </p>
-        <p>
-          <span className="font-medium text-slate-700">DOI:</span> {paper.doi || t("notAvailable")}
-          <br />
-          <span className="font-medium text-slate-700">{t("openalexId")}:</span>{" "}
-          {paper.openalexId || t("notAvailable")}
-        </p>
-      </div>
-      {paper.url ? (
-        <a className="mt-3 inline-flex text-sm font-medium text-teal-700 hover:text-teal-800" href={paper.url} rel="noreferrer" target="_blank">
-          {t("viewPaper")}
-        </a>
-      ) : null}
-    </details>
-  );
 }
 
 export function LiteratureScoutOutput({ stage }: { readonly stage: StageCard }) {

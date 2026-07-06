@@ -2,6 +2,12 @@ import re
 from dataclasses import dataclass
 from datetime import date
 
+from noviscope.agents.literature_source_quality import (
+    RECENT_YEAR_WINDOW,
+    build_source_quality,
+    reliability_level,
+    source_quality_signals,
+)
 from noviscope.agents.openalex_client import (
     OpenAlexClientConfig,
     OpenAlexSearchClient,
@@ -15,17 +21,13 @@ from noviscope.models.provider import ProviderKind
 
 LITERATURE_SCOUT_AGENT_ID = "literature_scout"
 OPENALEX_SOURCE = "openalex_works_api"
-RECENT_YEAR_WINDOW = 3
 ABSTRACT_SUMMARY_CHARS = 420
 QUERY_CHARS = 240
 
-TOP_VENUE_MARKERS = frozenset("acl cvpr eccv emnlp iccv iclr icml ijcai kdd neurips".split())
-PEER_REVIEWED_WORK_TYPES = frozenset(
-    "article book-chapter journal-article proceedings-article".split()
-)
 QUERY_STOP_WORDS = frozenset(
     {"about", "and", "for", "from", "into", "noviscope", "quest", "research", "the", "with"}
 )
+
 
 @dataclass(frozen=True, slots=True)
 class LiteratureScoutStageRunner(StageRunner):
@@ -102,6 +104,7 @@ def extract_query_terms(query: str) -> list[str]:
 
 def build_paper(work: OpenAlexWork, query_terms: list[str], current_year: int) -> JsonObject:
     venue = work_venue(work)
+    source_quality = build_source_quality(work, venue, current_year)
     abstract = abstract_summary(work.abstract_inverted_index)
     return {
         "abstract_summary": abstract,
@@ -109,8 +112,12 @@ def build_paper(work: OpenAlexWork, query_terms: list[str], current_year: int) -
         "doi": work.doi,
         "limitations": ["OpenAlex metadata only; verify the full paper before citing."],
         "openalex_id": work.id,
+        "publication_type": source_quality.publication_type,
+        "recency_bucket": source_quality.recency_bucket,
         "relevance_score": relevance_score(work, current_year),
-        "reliability_level": reliability_level(work, venue),
+        "reliability_level": reliability_level(work, venue, source_quality),
+        "source_quality_signals": source_quality_signals(source_quality),
+        "source_type": source_quality.source_type,
         "title": work.title or work.display_name or "Untitled OpenAlex work",
         "url": work_url(work),
         "venue": venue,
@@ -159,19 +166,6 @@ def relevance_score(work: OpenAlexWork, current_year: int) -> float:
     if work.publication_year is not None and work.publication_year >= recent_start_year:
         score *= 1.25
     return round(score, 3)
-
-
-def reliability_level(work: OpenAlexWork, venue: str) -> str:
-    source_type = None
-    if work.primary_location is not None and work.primary_location.source is not None:
-        source_type = work.primary_location.source.type
-    if "arxiv" in venue.lower() or work.type == "posted-content":
-        return "arxiv_preprint"
-    if any(marker in venue.lower() for marker in TOP_VENUE_MARKERS):
-        return "top_conference_or_journal"
-    if work.type in PEER_REVIEWED_WORK_TYPES or source_type in {"conference", "journal"}:
-        return "peer_reviewed"
-    return "unknown"
 
 
 def why_relevant(title: str, abstract: str, query_terms: list[str]) -> str:
