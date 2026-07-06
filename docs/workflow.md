@@ -69,6 +69,14 @@ Each paper should include:
 - why it is relevant;
 - limitations.
 
+The frontend can read saved paper rows through
+`GET /stages/{stage_id}/literature-papers`. The endpoint returns only papers
+already stored in the completed Literature Scout stage. It supports
+`reliability_level=top_conference_or_journal|peer_reviewed|arxiv_preprint|unknown`
+and `sort=relevance_desc|year_desc|year_asc`. If the stage is pending, running,
+or blocked, the endpoint returns an empty table plus `unavailable_reason`; it
+does not synthesize placeholder papers.
+
 ### Gap & Hypothesis Generator
 
 Purpose: generate candidate research ideas based on demand and literature
