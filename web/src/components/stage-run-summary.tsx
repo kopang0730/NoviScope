@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import type { StageCard } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
 import { labelFromEnum } from "../lib/format";
@@ -12,6 +13,7 @@ import {
   type WorkflowStageReadiness,
 } from "../lib/workflow-readiness";
 import { Badge } from "./badge";
+import { buttonClassName } from "./button";
 
 function readString(payload: Readonly<Record<string, unknown>>, key: string) {
   const value = payload[key];
@@ -45,6 +47,7 @@ export function StageRunSummary({
       ? getLocalizedWorkflowReadinessReason(workflowReadiness, t)
       : getLocalizedStageRunReason(stage, t);
   const canRun = stageRunGate?.canRun ?? workflowReadiness?.canRun ?? availability.canRun;
+  const blockingStages = stageRunGate?.workflowReadiness.blockingStages ?? workflowReadiness?.blockingStages ?? [];
 
   return (
     <div className="mt-3 space-y-2">
@@ -62,6 +65,20 @@ export function StageRunSummary({
       <p className="text-xs text-slate-500">
         {canRun ? t("stageRunReady") : t("stageRunUnavailable")}: {availabilityReason}
       </p>
+      {!canRun && blockingStages.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-slate-500">{t("stageRunOpenBlockingStage")}</span>
+          {blockingStages.map((blockingStage) => (
+            <Link
+              className={buttonClassName({ size: "sm", variant: "secondary" })}
+              key={blockingStage.id}
+              to={`/stages/${blockingStage.id}?quest=${stage.quest_id}`}
+            >
+              {blockingStage.title}
+            </Link>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
