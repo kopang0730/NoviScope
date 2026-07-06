@@ -1,6 +1,10 @@
 import httpx
 
-from noviscope.model_gateway.adapters import ConfigurationOnlyAdapter, OpenAICompatibleAdapter
+from noviscope.model_gateway.adapters import (
+    AnthropicAdapter,
+    ConfigurationOnlyAdapter,
+    OpenAICompatibleAdapter,
+)
 from noviscope.model_gateway.service import ModelGateway, ProviderProfile
 
 
@@ -111,14 +115,53 @@ def test_openai_compatible_adapter_reports_api_key_rejection():
     assert result == (False, "Provider rejected the API key while listing models.")
 
 
-def test_configuration_only_adapter_does_not_claim_live_success():
-    result = ConfigurationOnlyAdapter("Anthropic").test_connection(
+def test_anthropic_adapter_confirms_model_with_required_headers():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url == httpx.URL("https://api.anthropic.com/v1/models")
+        assert request.headers["x-api-key"] == "sk-ant-test"
+        assert request.headers["anthropic-version"] == "2023-06-01"
+        return httpx.Response(200, json={"data": [{"id": "claude-sonnet-test"}]})
+
+    adapter = AnthropicAdapter(
+        client_factory=lambda: httpx.Client(transport=httpx.MockTransport(handler))
+    )
+
+    result = adapter.test_connection(
         base_url="https://api.anthropic.com/v1",
+        api_key="sk-ant-test",
+        model="claude-sonnet-test",
+    )
+
+    assert result == (
+        True,
+        "Connected to Anthropic provider and confirmed the configured model is available.",
+    )
+
+
+def test_anthropic_adapter_reports_api_key_rejection():
+    adapter = AnthropicAdapter(
+        client_factory=lambda: httpx.Client(
+            transport=httpx.MockTransport(lambda request: httpx.Response(401, json={}))
+        )
+    )
+
+    result = adapter.test_connection(
+        base_url="https://api.anthropic.com/v1",
+        api_key="sk-ant-test",
+        model="claude-sonnet-test",
+    )
+
+    assert result == (False, "Anthropic rejected the API key while listing models.")
+
+
+def test_configuration_only_adapter_does_not_claim_live_success():
+    result = ConfigurationOnlyAdapter("custom").test_connection(
+        base_url="https://api.example.com/v1",
         api_key="sk-test",
-        model="claude-sonnet",
+        model="example-chat",
     )
 
     assert result == (
         False,
-        "Live connection test is not implemented for Anthropic providers yet.",
+        "Live connection test is not implemented for custom providers yet.",
     )
