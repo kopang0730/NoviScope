@@ -182,6 +182,12 @@ readiness rules as `GET /stages/{stage_id}/readiness`, so the canvas should not
 show a stage as runnable when provider configuration, prerequisites, status, or
 human review gates block it.
 
+For default canvas layout, the frontend can call
+`GET /workflow/canvas-template`. This endpoint returns static lanes, node
+coordinates, core-flow ids, planned-extension nodes, and edge labels. It does
+not contain user quest state; combine it with the quest workflow graph when
+rendering a selected quest.
+
 ## Review Rules
 
 Human approval has meaning. Use `human_approved` and `review_notes` for decisions
