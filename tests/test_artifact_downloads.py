@@ -1,3 +1,6 @@
+from io import BytesIO
+from zipfile import ZipFile
+
 from fastapi.testclient import TestClient
 
 from noviscope.core.stage_policy import PAPER_MEETING_WRITER_AGENT_ID
@@ -102,6 +105,36 @@ def test_download_paper_markdown_artifact_returns_attachment(
     )
 
 
+def test_download_paper_markdown_artifact_package_returns_zip(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'artifact-package.db'}")
+
+    with TestClient(app) as client:
+        register_and_login(client, "ARTIFACT-PACKAGE", "artifact-package@example.com")
+        paper_stage_id = create_quest_with_paper_stage(client)
+        complete_paper_stage_with_artifacts(client, paper_stage_id)
+
+        response = client.get(f"/stages/{paper_stage_id}/artifacts/download")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/zip")
+    assert response.headers["content-disposition"] == (
+        'attachment; filename="noviscope-review-packet.zip"'
+    )
+    with ZipFile(BytesIO(response.content)) as archive:
+        assert archive.namelist() == [
+            "noviscope-chinese-research-brief.md",
+            "noviscope-english-research-brief.md",
+            "noviscope-meeting-outline.md",
+            "noviscope-ieee-paper-skeleton.md",
+        ]
+        assert archive.read("noviscope-english-research-brief.md").decode().startswith(
+            "# Research Brief"
+        )
+
+
 def test_list_paper_markdown_artifacts_returns_download_manifest(
     tmp_path,
     dev_admin_header_enabled: None,
@@ -118,6 +151,11 @@ def test_list_paper_markdown_artifacts_returns_download_manifest(
     assert response.status_code == 200
     body = response.json()
     assert body["stage_id"] == paper_stage_id
+    assert body["package_available"] is True
+    assert body["package_download_url"] == f"/stages/{paper_stage_id}/artifacts/download"
+    assert body["package_filename"] == "noviscope-review-packet.zip"
+    assert body["package_media_type"] == "application/zip"
+    assert body["package_missing_reason"] == ""
     assert [artifact["key"] for artifact in body["artifacts"]] == [
         "chinese_research_brief_markdown",
         "english_research_brief_markdown",
