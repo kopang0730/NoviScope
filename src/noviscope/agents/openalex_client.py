@@ -94,7 +94,7 @@ class OpenAlexWorksClient:
 
     def search(self, query: str, *, current_year: int) -> list[OpenAlexWork]:
         params: OpenAlexQueryParams = {
-            "filter": f"from_publication_date:{current_year - FIVE_YEAR_LOOKBACK}-01-01",
+            "filter": f"from_publication_date:{five_year_cutoff_year(current_year)}-01-01",
             "per_page": MAX_PAPER_RESULTS,
             "search": query,
             "sort": "relevance_score:desc",
@@ -133,3 +133,7 @@ def openalex_api_key_value(config: OpenAlexClientConfig) -> str | None:
         return None
     api_key = config.api_key.get_secret_value().strip()
     return api_key or None
+
+
+def five_year_cutoff_year(current_year: int) -> int:
+    return current_year - FIVE_YEAR_LOOKBACK + 1

@@ -197,7 +197,7 @@ def test_openalex_client_uses_works_api_params_without_live_http() -> None:
 
     assert works[0].id == "https://openalex.org/W1"
     assert http_client.params["search"] == "badminton action recognition"
-    assert http_client.params["filter"] == "from_publication_date:2021-01-01"
+    assert http_client.params["filter"] == "from_publication_date:2022-01-01"
     assert http_client.params["per_page"] == 8
     assert http_client.params["api_key"] == "openalex-secret"
     assert http_client.headers["User-Agent"] == "NoviScope/0.1 (mailto:researcher@example.com)"
