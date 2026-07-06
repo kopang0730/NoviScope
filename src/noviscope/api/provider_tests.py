@@ -8,7 +8,11 @@ from noviscope.api.dependencies import get_session
 from noviscope.auth.dependencies import get_current_user
 from noviscope.core.config import get_settings
 from noviscope.core.crypto import SecretBox
-from noviscope.model_gateway.adapters import ConfigurationOnlyAdapter, OpenAICompatibleAdapter
+from noviscope.model_gateway.adapters import (
+    AnthropicAdapter,
+    ConfigurationOnlyAdapter,
+    OpenAICompatibleAdapter,
+)
 from noviscope.model_gateway.service import ConnectionTestResult, ModelGateway, ProviderProfile
 from noviscope.models.provider import ProviderKind
 from noviscope.models.user import User
@@ -20,7 +24,7 @@ router = APIRouter()
 def build_model_gateway() -> ModelGateway:
     gateway = ModelGateway()
     gateway.register_adapter(ProviderKind.OPENAI_COMPATIBLE.value, OpenAICompatibleAdapter())
-    gateway.register_adapter(ProviderKind.ANTHROPIC.value, ConfigurationOnlyAdapter("Anthropic"))
+    gateway.register_adapter(ProviderKind.ANTHROPIC.value, AnthropicAdapter())
     gateway.register_adapter(ProviderKind.CUSTOM.value, ConfigurationOnlyAdapter("custom"))
     return gateway
 
