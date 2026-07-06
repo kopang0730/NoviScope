@@ -6,6 +6,7 @@ import type { Quest, StageCard } from "../api/types";
 import { useAuth } from "../auth/auth-context";
 import { Badge } from "../components/badge";
 import { buttonClassName } from "../components/button";
+import { CanvasReviewPacketButton } from "../components/canvas-review-packet-button";
 import { Card, CardHeading } from "../components/card";
 import { Input } from "../components/input";
 import { ResearchCanvas } from "../components/research-canvas";
@@ -53,7 +54,7 @@ export function CanvasWorkspacePage() {
     try {
       setQuests(await getQuests());
     } catch (error) {
-      setQuestsError(getErrorMessage(error));
+      setQuestsError(error instanceof Error ? getErrorMessage(error) : "Unexpected error");
     } finally {
       setQuestsLoading(false);
     }
@@ -136,7 +137,7 @@ export function CanvasWorkspacePage() {
         currentStages.map((stage) => (stage.id === updatedStage.id ? updatedStage : stage)),
       );
     } catch (error) {
-      setStageRunError(getErrorMessage(error));
+      setStageRunError(error instanceof Error ? getErrorMessage(error) : "Unexpected error");
     } finally {
       setRunningStageId(null);
     }
@@ -208,7 +209,11 @@ export function CanvasWorkspacePage() {
 
       <div className="min-w-0 space-y-4">
         <Card className="overflow-hidden">
-          <CardHeading description={t("canvasWorkspaceMainDescription")} title={t("researchCanvasTitle")} />
+          <CardHeading
+            action={<CanvasReviewPacketButton quest={selectedQuest} stages={stages} />}
+            description={t("canvasWorkspaceMainDescription")}
+            title={t("researchCanvasTitle")}
+          />
           {!selectedQuestId ? <p className="mt-4 text-sm text-slate-500">{t("selectQuestForStages")}</p> : null}
           {detailError ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{detailError}</p> : null}
           {stageRunError ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{stageRunError}</p> : null}

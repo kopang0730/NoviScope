@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import type { Quest, StageCard } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
+import { downloadTextFile } from "../lib/download-file";
 import { buildPreviewData, findNextStage, parseIntakeBrief, summarizeProgress } from "../lib/quest-overview";
 import { buildQuestReviewPacket } from "../lib/quest-review-export";
 import { paperMeetingWriterAgentId } from "../lib/stages";
@@ -72,13 +73,11 @@ function usePreviewItems(stages: readonly StageCard[]): readonly PreviewItem[] {
 
 function downloadReviewPacket(quest: Quest, stages: readonly StageCard[]) {
   const packet = buildQuestReviewPacket(quest, stages);
-  const blob = new Blob([packet.content], { type: "text/markdown;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = packet.filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
+  downloadTextFile({
+    content: packet.content,
+    filename: packet.filename,
+    mimeType: "text/markdown;charset=utf-8",
+  });
 }
 
 export function QuestOverviewPanel({
