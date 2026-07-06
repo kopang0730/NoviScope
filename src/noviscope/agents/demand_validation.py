@@ -1,10 +1,15 @@
 import json
 from dataclasses import dataclass
-from typing import Literal, Protocol, TypedDict, assert_never
+from typing import Literal, Protocol, assert_never
 
-import httpx
 from pydantic import BaseModel, ConfigDict, SecretStr, ValidationError
 
+from noviscope.agents.provider_chat import (
+    ChatCompletionPayload,
+    ProviderChatClient,
+    ProviderChatRequest,
+    ProviderChatRunError,
+)
 from noviscope.agents.stage_runner import StageRunContext, StageRunner, StageRunResult
 from noviscope.core.json_types import JsonObject
 from noviscope.core.stage_policy import DEMAND_VALIDATOR_AGENT_ID, NO_EXTERNAL_VERIFICATION_RISK
@@ -60,71 +65,32 @@ class DemandValidationRunError(Exception):
         return self.reason
 
 
-class ChatMessage(TypedDict):
-    role: Literal["system", "user"]
-    content: str
-
-
-class ChatCompletionPayload(TypedDict):
-    model: str
-    messages: list[ChatMessage]
-    temperature: float
-
-
-class ChatCompletionMessage(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    content: str
-
-
-class ChatCompletionChoice(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    message: ChatCompletionMessage
-
-
-class ChatCompletionResponse(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    choices: list[ChatCompletionChoice]
-
-
 class OpenAICompatibleDemandValidationRunner:
+    def __init__(self, chat_client: ProviderChatClient | None = None) -> None:
+        self._chat_client = chat_client or ProviderChatClient()
+
     def run(self, request: DemandValidationRequest) -> DemandValidationOutput:
         match request.provider_kind:
-            case ProviderKind.OPENAI_COMPATIBLE | ProviderKind.CUSTOM:
-                return self._run_openai_compatible(request)
-            case ProviderKind.ANTHROPIC:
-                raise DemandValidationRunError(
-                    "Anthropic provider execution is not implemented in this MVP."
-                )
+            case ProviderKind.OPENAI_COMPATIBLE | ProviderKind.CUSTOM | ProviderKind.ANTHROPIC:
+                return self._run_provider_chat(request)
             case unreachable:
                 assert_never(unreachable)
 
-    def _run_openai_compatible(self, request: DemandValidationRequest) -> DemandValidationOutput:
-        endpoint = f"{request.base_url.rstrip('/')}/chat/completions"
+    def _run_provider_chat(self, request: DemandValidationRequest) -> DemandValidationOutput:
         payload = build_chat_completion_payload(request)
-        headers = {
-            "Authorization": f"Bearer {request.api_key.get_secret_value()}",
-            "Content-Type": "application/json",
-        }
-
         try:
-            with httpx.Client(timeout=60.0, follow_redirects=True) as client:
-                response = client.post(endpoint, json=payload, headers=headers)
-                response.raise_for_status()
-        except httpx.HTTPError as exc:
-            raise DemandValidationRunError(f"Model provider request failed: {exc}") from exc
-
-        try:
-            completion = ChatCompletionResponse.model_validate(response.json())
-        except (ValueError, ValidationError) as exc:
-            raise DemandValidationRunError(
-                "Model provider returned an invalid chat completion response."
-            ) from exc
-        if not completion.choices:
-            raise DemandValidationRunError("Model provider returned no choices.")
-        raw_content = completion.choices[0].message.content
+            raw_content = self._chat_client.complete(
+                ProviderChatRequest(
+                    api_key=request.api_key,
+                    base_url=request.base_url,
+                    messages=payload["messages"],
+                    model=request.model,
+                    provider_kind=request.provider_kind,
+                    temperature=payload["temperature"],
+                )
+            )
+        except ProviderChatRunError as exc:
+            raise DemandValidationRunError(str(exc)) from exc
         return parse_demand_validation_output(raw_content)
 
 
@@ -138,7 +104,9 @@ class DemandValidationStageRunner(StageRunner):
 
     @property
     def supported_provider_kinds(self) -> frozenset[ProviderKind]:
-        return frozenset({ProviderKind.OPENAI_COMPATIBLE, ProviderKind.CUSTOM})
+        return frozenset(
+            {ProviderKind.ANTHROPIC, ProviderKind.OPENAI_COMPATIBLE, ProviderKind.CUSTOM}
+        )
 
     def build_input_payload(self, context: StageRunContext) -> JsonObject:
         return {

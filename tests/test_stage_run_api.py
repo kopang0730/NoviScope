@@ -280,6 +280,22 @@ def create_personal_provider(client: TestClient) -> None:
     assert response.status_code == 201
 
 
+def create_personal_anthropic_provider(client: TestClient) -> str:
+    response = client.post(
+        "/providers",
+        json={
+            "api_key": "sk-ant-test",
+            "base_url": "https://api.anthropic.com/v1",
+            "default_model": "claude-test-model",
+            "kind": "anthropic",
+            "name": "Anthropic Provider",
+            "scope": "personal",
+        },
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
 def create_shared_provider(client: TestClient) -> str:
     response = client.post(
         "/providers",
@@ -388,6 +404,28 @@ def test_run_demand_validation_stage_completes_with_provider(
     assert body["evidence_payload"]["provider_name"] == "Example Provider"
     assert body["evidence_payload"]["can_run"] is True
     assert body["input_payload"]["agent_id"] == "demand_validator"
+
+
+def test_run_demand_validation_stage_completes_with_anthropic_provider(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'stage-run-anthropic.db'}")
+    app.dependency_overrides[get_demand_validation_runner] = get_fake_runner
+
+    with TestClient(app) as client:
+        register_and_login(client, "RUN-STAGE-ANTHROPIC", "anthropic@example.com")
+        provider_id = create_personal_anthropic_provider(client)
+        stage_id = create_quest(client)
+
+        response = client.post(f"/stages/{stage_id}/run", json={"provider_id": provider_id})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "complete"
+    assert body["input_payload"]["provider_id"] == provider_id
+    assert body["input_payload"]["provider_name"] == "Anthropic Provider"
+    assert body["input_payload"]["provider_model"] == "claude-test-model"
 
 
 def test_run_demand_validation_uses_agent_default_provider_model(
