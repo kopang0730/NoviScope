@@ -24,6 +24,25 @@ export interface User {
   updated_at: string;
 }
 
+export interface PublicVersionInfo {
+  app_version: string;
+}
+
+export interface AdminVersionInfo {
+  app_version: string;
+  local_branch: string | null;
+  local_commit: string | null;
+  local_commit_short: string | null;
+  local_dirty: boolean | null;
+  github_repo: string;
+  github_branch: string;
+  remote_commit: string | null;
+  remote_commit_short: string | null;
+  update_available: boolean;
+  check_error: string | null;
+  checked_at: string;
+}
+
 export interface Provider {
   id: string;
   name: string;

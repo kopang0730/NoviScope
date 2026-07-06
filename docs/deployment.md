@@ -33,6 +33,9 @@ NOVISCOPE_SESSION_COOKIE_SECURE=true
 NOVISCOPE_DEV_ADMIN_HEADER_ENABLED=false
 NOVISCOPE_DEV_ADMIN_TOKEN=
 NOVISCOPE_ARTIFACT_ROOT=/srv/noviscope/artifacts
+NOVISCOPE_GITHUB_REPO=kopang0730/NoviScope
+NOVISCOPE_GITHUB_BRANCH=main
+NOVISCOPE_VERSION_CHECK_TIMEOUT_SECONDS=3
 ```
 
 For non-SQLite deployments, the app refuses to start with placeholder or weak
@@ -141,7 +144,30 @@ plan.
 
 ## Updating a Deployment
 
-1. Pull the latest code.
+The web header always shows the public version number. Admins also get a
+read-only update notice from `/admin/version` when the running commit is behind
+`NOVISCOPE_GITHUB_REPO` / `NOVISCOPE_GITHUB_BRANCH`. The web app does not run
+server commands.
+
+For a non-root deployment user, the recommended update command is:
+
+```bash
+./scripts/update-and-build.sh
+```
+
+The script refuses to run on a dirty worktree, fetches the configured remote and
+branch, fast-forwards only when possible, reinstalls the backend package if
+`.venv/bin/python` exists, and rebuilds `web/dist`. To restart after a successful
+build:
+
+```bash
+NOVISCOPE_RESTART_COMMAND='./restart-noviscope.sh' \
+./scripts/update-and-build.sh
+```
+
+Manual update flow:
+
+1. Pull the latest code with a fast-forward merge.
 2. Review release notes or PR descriptions for database model changes.
 3. Stop the backend.
 4. Reinstall backend dependencies if `pyproject.toml` changed.
