@@ -58,7 +58,7 @@ def select_stage_ideas(
                 **stage.output_payload,
                 "selected_idea_ids": selected_idea_ids,
                 "selected_ideas": selected_ideas,
-                "selection_status": "selected_for_experiment",
+                "selection_status": "selected_for_experiment_design",
             },
             review_notes=request.review_notes,
             summary=f"Selected {len(selected_ideas)} idea(s) for Experiment Planner.",
@@ -93,9 +93,7 @@ def ensure_selectable_idea_stage(stage: StageCard) -> None:
             "Idea selection is only available for Gap & hypothesis generator stages."
         )
     if stage.status != StageStatus.COMPLETE:
-        raise IdeaSelectionError(
-            "Gap & hypothesis generator must complete before selecting ideas."
-        )
+        raise IdeaSelectionError("Gap & hypothesis generator must complete before selecting ideas.")
 
 
 def unique_selected_ids(selected_idea_ids: list[str]) -> list[str]:

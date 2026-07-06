@@ -114,7 +114,7 @@ def test_select_ideas_marks_gap_stage_human_approved(
     assert body["human_approved"] is True
     assert body["review_notes"] == "Use the temporal cue idea for the first experiment plan."
     assert body["output_payload"]["selected_idea_ids"] == ["idea_temporal_cues"]
-    assert body["output_payload"]["selection_status"] == "selected_for_experiment"
+    assert body["output_payload"]["selection_status"] == "selected_for_experiment_design"
     assert body["output_payload"]["selected_ideas"][0]["idea_id"] == "idea_temporal_cues"
     assert body["evidence_payload"]["human_selected_idea_ids"] == ["idea_temporal_cues"]
     assert body["evidence_payload"]["selected_idea_count"] == 1
