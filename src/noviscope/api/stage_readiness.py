@@ -9,15 +9,19 @@ from noviscope.agents.assignments import AgentAssignmentService
 from noviscope.agents.stage_runner import ModelProviderCredentials, StageRunnerRegistry
 from noviscope.api.dependencies import get_session
 from noviscope.api.routes import get_provider_service
-from noviscope.api.stage_runs import (
+from noviscope.api.stage_provider_selection import (
     ProviderSelectionContext,
+    build_provider_block,
+    build_server_managed_provider,
+    select_provider,
+)
+from noviscope.api.stage_run_blocks import (
     StageBlock,
     build_dependency_block_if_needed,
-    build_provider_block,
     build_runner_block,
-    build_server_managed_provider,
+)
+from noviscope.api.stage_runs import (
     get_stage_runner_registry,
-    select_provider,
 )
 from noviscope.auth.dependencies import get_current_user
 from noviscope.core.json_types import JsonObject
