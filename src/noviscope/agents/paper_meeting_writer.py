@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass
 from typing import Literal, Protocol, assert_never
 
-from pydantic import BaseModel, ConfigDict, SecretStr, ValidationError
+from pydantic import BaseModel, ConfigDict, JsonValue, SecretStr, ValidationError
 
 from noviscope.agents.experiment_planner import read_selected_ideas
 from noviscope.agents.gap_hypothesis import read_literature_papers
@@ -368,17 +368,22 @@ def compact_payload(payload: JsonObject) -> JsonObject:
     for key, value in payload.items():
         if key == "raw_response":
             continue
-        if isinstance(value, str):
-            compacted[key] = trim_text(value)
-        elif isinstance(value, list):
-            compacted[key] = [
-                trim_text(item) if isinstance(item, str) else item
-                for item in value[:10]
-                if isinstance(item, str | int | float | bool | dict)
-            ]
-        elif isinstance(value, int | float | bool | dict) or value is None:
-            compacted[key] = value
+        compacted[key] = compact_json_value(value)
     return compacted
+
+
+def compact_json_value(value: JsonValue) -> JsonValue:
+    match value:
+        case str() as text:
+            return trim_text(text)
+        case list() as items:
+            return [compact_json_value(item) for item in items[:10]]
+        case dict() as payload:
+            return compact_payload(payload)
+        case bool() | int() | float() | None:
+            return value
+        case unreachable:
+            assert_never(unreachable)
 
 
 def trim_text(value: str) -> str:
