@@ -140,6 +140,35 @@ def test_export_quest_returns_traceable_package(
     assert "raw provider response with private details" not in body_text
 
 
+def test_export_quest_download_returns_json_attachment(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    # Given: an owner has a traceable quest export package.
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'quest-export-download.db'}")
+    with TestClient(app) as client:
+        register_and_login(client, "QUEST-EXPORT-DOWNLOAD", "download-owner@example.com")
+        quest_id = create_traceable_quest(client)
+
+        # When: the owner downloads the package as an attachment.
+        response = client.get(f"/quests/{quest_id}/export/download")
+
+    # Then: the attachment uses the same sanitized export contract.
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/json; charset=utf-8"
+    assert response.headers["content-disposition"] == (
+        f'attachment; filename="noviscope-quest-export-{quest_id}.json"'
+    )
+    body = response.json()
+    assert body["quest"]["id"] == quest_id
+    assert len(body["stages"]) == 5
+    assert body["trust_summary"]["complete_stages"] == 2
+    body_text = response.text
+    assert "sk-test-secret" not in body_text
+    assert "private-session-token" not in body_text
+    assert "raw provider response with private details" not in body_text
+
+
 def test_export_quest_rejects_other_member(
     tmp_path,
     dev_admin_header_enabled: None,
