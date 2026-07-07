@@ -1,27 +1,34 @@
 from collections.abc import Generator
 from sqlite3 import Connection as SQLiteConnection
+from sqlite3 import DatabaseError as SQLiteDatabaseError
 
 from sqlalchemy import event, inspect, text
 from sqlalchemy.engine import Engine
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import ConnectionPoolEntry, StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
 from noviscope.models.agent import AgentAssignment  # noqa: F401
 from noviscope.models.provider import ModelProvider  # noqa: F401
 from noviscope.models.quest import Quest, StageCard  # noqa: F401
+from noviscope.models.stage_transition import StageTransitionEvent  # noqa: F401
 from noviscope.models.user import InviteCode, User  # noqa: F401
 
 
 def create_db_engine(database_url: str) -> Engine:
     connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
-    engine_kwargs: dict[str, object] = {"connect_args": connect_args}
+    engine_kwargs: dict[str, dict[str, bool] | type[StaticPool]] = {
+        "connect_args": connect_args
+    }
     if database_url in {"sqlite:///:memory:", "sqlite://"}:
         engine_kwargs["poolclass"] = StaticPool
     engine = create_engine(database_url, **engine_kwargs)
     if database_url.startswith("sqlite"):
 
         @event.listens_for(engine, "connect")
-        def enable_sqlite_foreign_keys(dbapi_connection: SQLiteConnection, _: object) -> None:
+        def enable_sqlite_foreign_keys(
+            dbapi_connection: SQLiteConnection,
+            _: ConnectionPoolEntry,
+        ) -> None:
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.close()
@@ -176,7 +183,7 @@ def _upgrade_sqlite_modelprovider_schema(engine: Engine, existing_columns: set[s
             "ALTER TABLE modelprovider__noviscope_upgrade RENAME TO modelprovider"
         )
         raw_connection.commit()
-    except Exception:
+    except SQLiteDatabaseError:
         raw_connection.rollback()
         raise
     finally:
