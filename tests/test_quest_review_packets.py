@@ -66,6 +66,10 @@ def create_reviewable_quest(client: TestClient) -> str:
                 "confidence": "medium",
                 "demand_assessment": "plausible",
                 "human_review_required": ["Confirm video consent scope."],
+                "metadata": {
+                    "access_token": "packet-access-token",
+                    "apiKey": "packet-camel-api-key",
+                },
                 "raw_response": "raw provider response should stay hidden",
             },
             "review_notes": "Demand is worth scouting.",
@@ -129,8 +133,12 @@ def test_download_quest_review_packet_returns_markdown_attachment(
     assert "## Output Payload" in response.text
     assert "## Evidence Payload" in response.text
     assert "input_payload.token" in response.text
+    assert "output_payload.metadata.access_token" in response.text
+    assert "output_payload.metadata.apiKey" in response.text
     assert "output_payload.raw_response" in response.text
     assert "evidence_payload.api_key" in response.text
+    assert "packet-access-token" not in response.text
+    assert "packet-camel-api-key" not in response.text
     assert "sk-review-packet-secret" not in response.text
     assert "private-review-token" not in response.text
     assert "raw provider response should stay hidden" not in response.text

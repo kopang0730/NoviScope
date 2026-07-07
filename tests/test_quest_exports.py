@@ -65,6 +65,10 @@ def create_traceable_quest(client: TestClient) -> str:
                 "confidence": "medium",
                 "demand_assessment": "plausible",
                 "human_review_required": ["Confirm video consent scope."],
+                "metadata": {
+                    "access_token": "export-access-token",
+                    "apiKey": "export-camel-api-key",
+                },
                 "raw_response": "raw provider response with private details",
             },
             "input_payload": {"token": "private-session-token"},
@@ -123,6 +127,8 @@ def test_export_quest_returns_traceable_package(
     assert demand_stage["human_approved"] is True
     assert demand_stage["hidden_payload_fields"] == [
         "input_payload.token",
+        "output_payload.metadata.access_token",
+        "output_payload.metadata.apiKey",
         "output_payload.raw_response",
         "evidence_payload.api_key",
     ]
@@ -136,6 +142,8 @@ def test_export_quest_returns_traceable_package(
     assert body["trust_summary"]["artifact_available_count"] == 4
     body_text = str(body)
     assert "sk-test-secret" not in body_text
+    assert "export-access-token" not in body_text
+    assert "export-camel-api-key" not in body_text
     assert "private-session-token" not in body_text
     assert "raw provider response with private details" not in body_text
 
