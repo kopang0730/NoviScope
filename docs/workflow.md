@@ -25,6 +25,8 @@ structured evidence or explain why it is blocked.
 13. Download or copy the generated Markdown artifacts after human review.
 14. Export the quest traceability package when preparing a review, handoff, or
     frontend canvas snapshot.
+15. Download the quest review packet when preparing a handoff, group meeting,
+    or manual audit.
 
 ## Stage Gates
 
@@ -222,6 +224,17 @@ This endpoint is intended for canvas views, review handoffs, and future export
 flows. It exposes traceability metadata and existing stage payloads; it does not
 expose provider API keys, raw provider responses, or invent missing experiment
 results.
+
+## Quest Review Packet
+
+`GET /quests/{quest_id}/review-packet/download` returns a Markdown attachment
+for the authenticated quest owner or an admin. The packet serializes saved quest
+state, stage summaries, review status, sanitized input/output/evidence payloads,
+hidden payload field paths, and any generated paper/meeting draft artifacts.
+
+The packet is review-only. It is meant for group discussion and audit handoff;
+it must not expose provider API keys or raw provider responses, and must not be
+treated as proof that experiments have run.
 
 ## Review Rules
 
