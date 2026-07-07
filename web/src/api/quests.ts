@@ -4,6 +4,7 @@ import type {
   Quest,
   QuestCreateResponse,
   StageCard,
+  StageDisplayOutputResponse,
   StageStatus,
 } from "./types";
 
@@ -71,6 +72,10 @@ export function runStage(stageId: string, payload: RunStagePayload = {}) {
 
 export function getStageArtifacts(stageId: string) {
   return apiRequest<MarkdownArtifactManifestResponse>(`/api/stages/${stageId}/artifacts`);
+}
+
+export function getStageDisplayOutput(stageId: string) {
+  return apiRequest<StageDisplayOutputResponse>(`/api/stages/${stageId}/display-output`);
 }
 
 export function buildStageArtifactDownloadPath(downloadUrl: string) {
