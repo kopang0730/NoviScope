@@ -65,7 +65,7 @@ export function QuestListPage() {
     try {
       setQuests(await getQuests());
     } catch (error) {
-      setQuestsError(getErrorMessage(error));
+      setQuestsError(error instanceof Error ? getErrorMessage(error) : "Unexpected error");
     } finally {
       setQuestsLoading(false);
     }
@@ -125,7 +125,7 @@ export function QuestListPage() {
         }
         setSelectedQuest(null);
         setStages([]);
-        setDetailError(getErrorMessage(error));
+        setDetailError(error instanceof Error ? getErrorMessage(error) : "Unexpected error");
       })
       .finally(() => {
         if (active) {
@@ -148,7 +148,7 @@ export function QuestListPage() {
         currentStages.map((stage) => (stage.id === updatedStage.id ? updatedStage : stage)),
       );
     } catch (error) {
-      setStageRunError(getErrorMessage(error));
+      setStageRunError(error instanceof Error ? getErrorMessage(error) : "Unexpected error");
     } finally {
       setRunningStageId(null);
     }
@@ -185,7 +185,7 @@ export function QuestListPage() {
         ) : null}
         {questsError ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{questsError}</p> : null}
         {questsLoading ? <p className="mt-4 text-sm text-slate-500">{t("loadingQuests")}</p> : null}
-        {!questsLoading && filteredQuests.length === 0 ? (
+        {currentUser && !questsLoading && filteredQuests.length === 0 ? (
           <p className="mt-4 rounded-lg border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-500">
             {quests.length === 0 ? t("noQuestsAvailable") : t("noQuestsMatch")}
           </p>
