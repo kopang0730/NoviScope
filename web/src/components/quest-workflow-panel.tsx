@@ -20,6 +20,7 @@ export function QuestWorkflowPanel({
   detailError,
   detailLoading,
   onRunStage,
+  onStageChange,
   runningStageId,
   selectedQuest,
   selectedQuestId,
@@ -29,6 +30,7 @@ export function QuestWorkflowPanel({
   readonly detailError: string | null;
   readonly detailLoading: boolean;
   readonly onRunStage: (stageId: string) => void;
+  readonly onStageChange: (stage: StageCard) => void;
   readonly runningStageId: string | null;
   readonly selectedQuest: Quest | null;
   readonly selectedQuestId: string | null;
@@ -109,6 +111,7 @@ export function QuestWorkflowPanel({
               {viewMode === "canvas" ? (
                 <ResearchCanvas
                   onRunStage={onRunStage}
+                  onStageChange={onStageChange}
                   providerReadinessData={providerReadinessData}
                   runningStageId={runningStageId}
                   selectedQuest={selectedQuest}

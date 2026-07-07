@@ -127,15 +127,19 @@ export function CanvasWorkspacePage() {
     };
   }, [currentUser, selectedQuestId]);
 
+  function handleStageChange(nextStage: StageCard) {
+    setStages((currentStages) =>
+      currentStages.map((stage) => (stage.id === nextStage.id ? nextStage : stage)),
+    );
+  }
+
   async function handleRunStage(stageId: string) {
     setRunningStageId(stageId);
     setStageRunError(null);
 
     try {
       const updatedStage = await runStage(stageId);
-      setStages((currentStages) =>
-        currentStages.map((stage) => (stage.id === updatedStage.id ? updatedStage : stage)),
-      );
+      handleStageChange(updatedStage);
     } catch (error) {
       setStageRunError(error instanceof Error ? getErrorMessage(error) : "Unexpected error");
     } finally {
@@ -242,6 +246,7 @@ export function CanvasWorkspacePage() {
               ) : (
                 <ResearchCanvas
                   onRunStage={(stageId) => void handleRunStage(stageId)}
+                  onStageChange={handleStageChange}
                   providerReadinessData={providerReadinessData}
                   runningStageId={runningStageId}
                   selectedQuest={selectedQuest}

@@ -11,6 +11,7 @@ import {
 import { stageTone } from "../lib/status-tones";
 import { Badge, type BadgeTone } from "./badge";
 import { Button, buttonClassName } from "./button";
+import { CanvasStageReviewControl } from "./canvas-stage-review-control";
 import { SourceStageList } from "./source-stage-list";
 
 function reviewTone(stage: StageCard): BadgeTone {
@@ -54,6 +55,7 @@ function payloadFieldCount(payload: Readonly<Record<string, unknown>>) {
 export function ResearchCanvasInspector({
   details,
   onRunStage,
+  onStageChange,
   runningStageId,
   selectedQuest,
   stage,
@@ -61,6 +63,7 @@ export function ResearchCanvasInspector({
 }: {
   readonly details: readonly CanvasDetail[];
   readonly onRunStage: (stageId: string) => void;
+  readonly onStageChange: (stage: StageCard) => void;
   readonly runningStageId: string | null;
   readonly selectedQuest: Quest;
   readonly stage: StageCard;
@@ -138,12 +141,7 @@ export function ResearchCanvasInspector({
         </div>
       </div>
 
-      <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t("reviewNotes")}</p>
-        <p className="mt-1 text-xs leading-5 text-slate-700">
-          {stage.review_notes || t("canvasReviewNotRecorded")}
-        </p>
-      </div>
+      <CanvasStageReviewControl onStageChange={onStageChange} stage={stage} />
 
       <div className="mt-4 flex flex-wrap gap-2">
         {stageRunGate.canRun ? (
