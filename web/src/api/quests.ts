@@ -84,3 +84,7 @@ export function buildStageArtifactDownloadPath(downloadUrl: string) {
 
   return `/api/${downloadUrl}`;
 }
+
+export function buildStageReviewPacketDownloadPath(stageId: string) {
+  return `/api/stages/${encodeURIComponent(stageId)}/review-packet/download`;
+}

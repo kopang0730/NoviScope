@@ -101,6 +101,14 @@ def create_reviewable_quest(client: TestClient) -> str:
     return quest_id
 
 
+def demand_stage_id(client: TestClient, quest_id: str) -> str:
+    stages_response = client.get(f"/quests/{quest_id}/stages")
+    assert stages_response.status_code == 200
+    stages = stages_response.json()["stages"]
+    demand_stage = next(stage for stage in stages if stage["agent_id"] == DEMAND_VALIDATOR_AGENT_ID)
+    return demand_stage["id"]
+
+
 def test_download_quest_review_packet_returns_markdown_attachment(
     tmp_path,
     dev_admin_header_enabled: None,
@@ -136,6 +144,38 @@ def test_download_quest_review_packet_returns_markdown_attachment(
     assert "raw provider response should stay hidden" not in response.text
 
 
+def test_download_stage_review_packet_returns_sanitized_markdown_attachment(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    # Given: an owner has a completed stage with saved private payload fields.
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'stage-review-packet.db'}")
+    with TestClient(app) as client:
+        register_and_login(client, "STAGE-REVIEW-PACKET", "stage-packet-owner@example.com")
+        quest_id = create_reviewable_quest(client)
+        stage_id = demand_stage_id(client, quest_id)
+
+        # When: the owner downloads the single-stage review packet.
+        response = client.get(f"/stages/{stage_id}/review-packet/download")
+
+    # Then: the packet is an attachment with sanitized payloads and hidden field paths.
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/markdown")
+    assert response.headers["content-disposition"] == (
+        f'attachment; filename="demand-validation-{stage_id}-review-packet.md"'
+    )
+    assert "# NoviScope Stage Review Packet: Demand validation" in response.text
+    assert "Review-only export" in response.text
+    assert "Demand has a real training scenario." in response.text
+    assert "Demand is worth scouting." in response.text
+    assert "input_payload.token" in response.text
+    assert "output_payload.raw_response" in response.text
+    assert "evidence_payload.api_key" in response.text
+    assert "sk-review-packet-secret" not in response.text
+    assert "private-review-token" not in response.text
+    assert "raw provider response should stay hidden" not in response.text
+
+
 def test_download_quest_review_packet_rejects_other_member(
     tmp_path,
     dev_admin_header_enabled: None,
@@ -153,4 +193,25 @@ def test_download_quest_review_packet_rejects_other_member(
         response = client.get(f"/quests/{quest_id}/review-packet/download")
 
     # Then: quest ownership is enforced for review packet downloads.
+    assert response.status_code == 403
+
+
+def test_download_stage_review_packet_rejects_other_member(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    # Given: one member owns a quest stage and a second member is logged in.
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'stage-review-packet-access.db'}")
+    with TestClient(app) as client:
+        register_and_login(client, "STAGE-PACKET-OWNER", "stage-owner@example.com")
+        quest_id = create_reviewable_quest(client)
+        stage_id = demand_stage_id(client, quest_id)
+        logout_response = client.post("/auth/logout")
+        assert logout_response.status_code == 204
+        register_and_login(client, "STAGE-PACKET-OTHER", "stage-other@example.com")
+
+        # When: the second member tries to download the owner's stage packet.
+        response = client.get(f"/stages/{stage_id}/review-packet/download")
+
+    # Then: quest ownership is enforced for stage review packet downloads.
     assert response.status_code == 403
