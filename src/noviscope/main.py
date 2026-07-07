@@ -20,6 +20,7 @@ from noviscope.api.stage_readiness import router as stage_readiness_router
 from noviscope.api.stage_review_guidance import router as stage_review_guidance_router
 from noviscope.api.stage_runs import router as stage_runs_router
 from noviscope.api.version_routes import router as version_router
+from noviscope.api.workflow_autopilot import router as workflow_autopilot_router
 from noviscope.api.workflow_canvas import router as workflow_canvas_router
 from noviscope.api.workflow_capabilities import router as workflow_capabilities_router
 from noviscope.api.workflow_graph import router as workflow_graph_router
@@ -54,6 +55,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
     app.include_router(stage_review_guidance_router)
     app.include_router(stage_runs_router)
     app.include_router(version_router)
+    app.include_router(workflow_autopilot_router)
     app.include_router(workflow_canvas_router)
     app.include_router(workflow_capabilities_router)
     app.include_router(workflow_graph_router)
