@@ -482,6 +482,9 @@ const en = {
   stageRunReasonRunning: "Already running.",
   stageRunState: "Stage run state",
   stageRunUnavailable: "Not runnable",
+  stageTrustSummaryDescription:
+    "These signals come from saved output and evidence metadata. They describe review boundaries, not independent verification.",
+  stageTrustSummaryTitle: "Trust boundary",
   workflowReadinessDemandRequired: "Complete Demand validation before running this stage.",
   workflowReadinessDemandEvidenceRequired: "Record a plausible or verified human demand evidence source before downstream stages may rely on Demand validation.",
   workflowReadinessDemandReviewRequired: "Approve Demand validation before downstream stages may rely on it.",
@@ -1030,6 +1033,9 @@ const zh: Record<keyof typeof en, string> = {
   stageRunReasonRunning: "该阶段正在运行。",
   stageRunState: "阶段运行状态",
   stageRunUnavailable: "不可运行",
+  stageTrustSummaryDescription:
+    "这些信号来自已保存的 output 和 evidence 元数据，用来说明复核边界，并不等同于独立验证。",
+  stageTrustSummaryTitle: "可信边界",
   workflowReadinessDemandRequired: "请先完成需求验证，再运行该阶段。",
   workflowReadinessDemandEvidenceRequired: "请先记录基本可信或已验证的人工需求证据来源，下游阶段才能依赖需求验证。",
   workflowReadinessDemandReviewRequired: "请先人工批准需求验证结果，下游阶段才能依赖它。",

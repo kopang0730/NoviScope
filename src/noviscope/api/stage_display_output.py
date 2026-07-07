@@ -41,6 +41,10 @@ class StageDisplayOutputResponse(BaseModel):
     summary: str
     output_available: bool
     raw_response_available: bool
+    requires_human_review: bool
+    review_items: list[str]
+    warnings: list[str]
+    source_stage_ids: JsonObject
     display_payload: JsonObject
     hidden_fields: list[str]
 
@@ -96,6 +100,46 @@ def sanitize_json_value(value: JsonValue, parent_path: str) -> SanitizedJsonValu
             assert_never(unreachable)
 
 
+def read_string_list(payload: JsonObject, key: str) -> list[str]:
+    match payload.get(key):
+        case list() as items:
+            return [item for item in items if isinstance(item, str) and item]
+        case None | str() | bool() | int() | float() | dict():
+            return []
+        case unreachable:
+            assert_never(unreachable)
+
+
+def read_bool(payload: JsonObject, key: str) -> bool:
+    match payload.get(key):
+        case bool() as flag:
+            return flag
+        case None | str() | int() | float() | list() | dict():
+            return False
+        case unreachable:
+            assert_never(unreachable)
+
+
+def read_source_stage_ids(payload: JsonObject) -> JsonObject:
+    match payload.get("source_stage_ids"):
+        case dict() as mapping:
+            source_stage_ids: JsonObject = {}
+            for stage_name, stage_id in mapping.items():
+                if isinstance(stage_name, str) and isinstance(stage_id, str) and stage_id:
+                    source_stage_ids[stage_name] = stage_id
+            return source_stage_ids
+        case None | str() | bool() | int() | float() | list():
+            return {}
+        case unreachable:
+            assert_never(unreachable)
+
+
+def stage_requires_human_review(output_payload: JsonObject, evidence_payload: JsonObject) -> bool:
+    return read_bool(evidence_payload, "requires_human_review") or bool(
+        read_string_list(output_payload, "human_review_required")
+    )
+
+
 def build_stage_display_output(stage: StageCard) -> StageDisplayOutputResponse:
     output_payload = normalize_stage_output_payload(stage.agent_id, stage.output_payload)
     sanitized = sanitize_json_value(output_payload, OUTPUT_PAYLOAD_ROOT)
@@ -115,9 +159,16 @@ def build_stage_display_output(stage: StageCard) -> StageDisplayOutputResponse:
         raw_response_available=any(
             hidden_field.endswith(".raw_response") for hidden_field in sanitized.hidden_fields
         ),
+        requires_human_review=stage_requires_human_review(
+            output_payload,
+            stage.evidence_payload,
+        ),
+        review_items=read_string_list(output_payload, "human_review_required"),
+        source_stage_ids=read_source_stage_ids(output_payload),
         stage_id=stage.id,
         status=stage.status,
         summary=stage.summary,
+        warnings=read_string_list(output_payload, "warnings"),
     )
 
 
