@@ -9,7 +9,7 @@ import { WorkflowProviderReadinessNotice } from "./stage-provider-readiness";
 import { StageRunSummary } from "./stage-run-summary";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
-import { useProviderReadinessData } from "../lib/provider-readiness-data";
+import type { ProviderReadinessData } from "../lib/provider-readiness-data";
 import {
   getLocalizedStageRunGateReason,
   getStageRunGate,
@@ -20,6 +20,7 @@ export function QuestWorkflowPanel({
   detailError,
   detailLoading,
   onRunStage,
+  providerReadinessData,
   runningStageId,
   selectedQuest,
   selectedQuestId,
@@ -29,6 +30,7 @@ export function QuestWorkflowPanel({
   readonly detailError: string | null;
   readonly detailLoading: boolean;
   readonly onRunStage: (stageId: string) => void;
+  readonly providerReadinessData: ProviderReadinessData;
   readonly runningStageId: string | null;
   readonly selectedQuest: Quest | null;
   readonly selectedQuestId: string | null;
@@ -37,7 +39,6 @@ export function QuestWorkflowPanel({
 }) {
   const { t } = useI18n();
   const [viewMode, setViewMode] = useState<"canvas" | "list">("canvas");
-  const providerReadinessData = useProviderReadinessData();
 
   return (
     <Card className="min-w-0">

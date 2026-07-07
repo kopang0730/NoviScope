@@ -12,6 +12,7 @@ import { QuestOverviewPanel } from "../components/quest-overview-panel";
 import { QuestWorkflowPanel } from "../components/quest-workflow-panel";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
+import { useProviderReadinessData } from "../lib/provider-readiness-data";
 import { questTone } from "../lib/status-tones";
 
 const questStatusOptions: Array<QuestStatus | "all"> = [
@@ -46,6 +47,7 @@ export function QuestListPage() {
   const [stageRunError, setStageRunError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<QuestStatus | "all">("all");
+  const providerReadinessData = useProviderReadinessData();
 
   const selectedQuestId = searchParams.get("quest");
 
@@ -233,6 +235,7 @@ export function QuestListPage() {
           detailError={detailError}
           detailLoading={detailLoading}
           onRunStage={(stageId) => void handleRunStage(stageId)}
+          providerReadinessData={providerReadinessData}
           runningStageId={runningStageId}
           selectedQuest={selectedQuest}
           selectedQuestId={selectedQuestId}
@@ -243,6 +246,9 @@ export function QuestListPage() {
         <QuestOverviewPanel
           detailError={detailError}
           detailLoading={detailLoading}
+          onRunStage={(stageId) => void handleRunStage(stageId)}
+          providerReadinessData={providerReadinessData}
+          runningStageId={runningStageId}
           selectedQuest={selectedQuest}
           selectedQuestId={selectedQuestId}
           stages={stages}
