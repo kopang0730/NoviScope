@@ -125,7 +125,69 @@ def test_get_quest_workflow_graph_reports_selected_provider(
     assert first_node["provider_kind"] == "openai_compatible"
     assert first_node["provider_model"] == "example-chat"
     assert first_node["provider_name"] == "Example Provider"
+    assert first_node["next_human_action"] == "run_stage"
     assert "sk-test-workflow-graph" not in str(first_node)
+
+
+def test_get_quest_workflow_graph_reports_next_human_action_for_demand_review(
+    dev_admin_header_enabled: None,
+    tmp_path,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'workflow-graph-action.db'}")
+    with TestClient(app) as client:
+        # Given: Demand Validation has completed but still waits for human review.
+        register_and_login(client)
+        create_response = client.post(
+            "/quests",
+            json={
+                "initial_direction": "Use computer vision to erase handwritten text.",
+                "title": "Handwritten text erasure",
+            },
+        )
+        assert create_response.status_code == 201
+        quest_id = create_response.json()["id"]
+        stages_response = client.get(f"/quests/{quest_id}/stages")
+        assert stages_response.status_code == 200
+        demand_stage = next(
+            stage
+            for stage in stages_response.json()["stages"]
+            if stage["agent_id"] == "demand_validator"
+        )
+        running_response = client.patch(
+            f"/stages/{demand_stage['id']}",
+            json={"status": "running"},
+        )
+        assert running_response.status_code == 200
+        complete_response = client.patch(
+            f"/stages/{demand_stage['id']}",
+            json={
+                "evidence_payload": {"requires_human_review": True},
+                "output_payload": {
+                    "confidence": "medium",
+                    "demand_assessment": "plausible",
+                    "evidence_for_demand": [
+                        "The task names a concrete document cleanup workflow."
+                    ],
+                    "missing_evidence": ["Need a real customer or dataset proof point."],
+                    "risks": ["Demand source still needs external verification."],
+                    "summary": "Demand is plausible but needs human review.",
+                },
+                "status": "complete",
+                "summary": "Demand is plausible but needs human review.",
+            },
+        )
+        assert complete_response.status_code == 200, complete_response.text
+
+        # When: the frontend requests the workflow graph for the Quest canvas.
+        response = client.get(f"/quests/{quest_id}/workflow-graph")
+
+    # Then: the demand node tells the Canvas which human action to surface.
+    assert response.status_code == 200
+    demand_node = next(
+        node for node in response.json()["nodes"] if node["agent_id"] == "demand_validator"
+    )
+    assert demand_node["review_state"] == "pending_review"
+    assert demand_node["next_human_action"] == "review_demand"
 
 
 def test_get_quest_workflow_graph_requires_authentication(tmp_path) -> None:
