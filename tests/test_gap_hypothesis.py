@@ -10,6 +10,9 @@ from noviscope.agents.gap_hypothesis import (
     build_no_paper_output,
     parse_gap_hypothesis_output,
 )
+from noviscope.agents.gap_hypothesis import (
+    build_chat_completion_payload as build_gap_chat_completion_payload,
+)
 from noviscope.agents.provider_chat import DEFAULT_MAX_TOKENS, ProviderChatClient
 from noviscope.agents.stage_runner import ModelProviderCredentials, StageRunContext
 from noviscope.models.provider import ProviderKind
@@ -75,6 +78,57 @@ def test_parse_gap_hypothesis_output_caps_confidence_and_removes_unknown_refs() 
     assert output.ideas[0].based_on_which_papers == ["https://openalex.org/W123"]
     assert output.selection_status == "pending_human_selection"
     assert output.warnings
+
+
+def test_gap_prompt_excludes_nested_raw_responses() -> None:
+    request = GapHypothesisRequest(
+        api_key=SecretStr("sk-test"),
+        base_url="https://api.example.com/v1",
+        demand_validation={
+            "evidence_for_demand": [
+                {
+                    "raw_response": "SECRET DEMAND RAW RESPONSE",
+                    "summary": "Coach feedback demand.",
+                }
+            ],
+            "summary": "Demand summary kept.",
+        },
+        initial_direction="Badminton action recognition",
+        model="example-chat",
+        papers=[
+            {
+                "limitations": [
+                    {
+                        "raw_response": "SECRET PAPER RAW RESPONSE",
+                        "summary": "Fast motion remains difficult.",
+                    }
+                ],
+                "paper_ref": "https://openalex.org/W123",
+                "title": "Badminton benchmark",
+            }
+        ],
+        provider_id="provider_1",
+        provider_kind=ProviderKind.OPENAI_COMPATIBLE,
+        provider_name="Example Provider",
+        quest_title="Badminton action recognition",
+        source_stage_ids={"demand_validation": "stage_demand", "literature_scout": "stage_lit"},
+        stage_id="stage_gap",
+    )
+
+    payload = build_gap_chat_completion_payload(request)
+
+    user_message = payload["messages"][1]
+    prompt_payload = json.loads(user_message["content"])
+    assert "SECRET DEMAND RAW RESPONSE" not in user_message["content"]
+    assert "SECRET PAPER RAW RESPONSE" not in user_message["content"]
+    assert prompt_payload["demand_validation"] == {
+        "evidence_for_demand": [{"summary": "Coach feedback demand."}],
+        "summary": "Demand summary kept.",
+    }
+    assert prompt_payload["papers"][0]["limitations"] == [
+        {"summary": "Fast motion remains difficult."}
+    ]
+    assert prompt_payload["source_stage_ids"]["literature_scout"] == "stage_lit"
 
 
 def test_gap_runner_executes_anthropic_messages_api() -> None:

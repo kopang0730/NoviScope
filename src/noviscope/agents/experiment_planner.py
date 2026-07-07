@@ -4,6 +4,7 @@ from typing import Literal, Protocol, assert_never
 
 from pydantic import BaseModel, ConfigDict, SecretStr, ValidationError
 
+from noviscope.agents.prompt_compaction import compact_prompt_payload
 from noviscope.agents.provider_chat import (
     ChatCompletionPayload,
     ProviderChatClient,
@@ -193,7 +194,9 @@ def build_chat_completion_payload(request: ExperimentPlannerRequest) -> ChatComp
             "initial_direction": request.initial_direction,
             "title": request.quest_title,
         },
-        "selected_ideas": request.selected_ideas[:MAX_SELECTED_IDEAS_FOR_PROMPT],
+        "selected_ideas": [
+            compact_payload(idea) for idea in request.selected_ideas[:MAX_SELECTED_IDEAS_FOR_PROMPT]
+        ],
         "source_stage_ids": request.source_stage_ids,
     }
     return {
@@ -393,21 +396,11 @@ def build_source_stage_ids(idea_stage: StageCard | None) -> JsonObject:
 
 
 def compact_payload(payload: JsonObject) -> JsonObject:
-    compacted: JsonObject = {}
-    for key, value in payload.items():
-        if key == "raw_response":
-            continue
-        if isinstance(value, str):
-            compacted[key] = trim_text(value)
-        elif isinstance(value, list):
-            compacted[key] = [
-                trim_text(item) if isinstance(item, str) else item
-                for item in value[:8]
-                if isinstance(item, str | int | float | bool | dict)
-            ]
-        elif isinstance(value, int | float | bool | dict) or value is None:
-            compacted[key] = value
-    return compacted
+    return compact_prompt_payload(
+        payload,
+        max_list_items=8,
+        max_text_chars=MAX_TEXT_FIELD_CHARS,
+    )
 
 
 def normalize_dict(value: dict[object, object]) -> JsonObject:
@@ -418,10 +411,6 @@ def normalize_dict(value: dict[object, object]) -> JsonObject:
         ):
             normalized[key] = item
     return normalized
-
-
-def trim_text(value: str) -> str:
-    return " ".join(value.split())[:MAX_TEXT_FIELD_CHARS]
 
 
 def string_value(value: object) -> str:
