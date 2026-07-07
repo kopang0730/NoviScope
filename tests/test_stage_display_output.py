@@ -129,6 +129,86 @@ def test_stage_display_output_marks_pending_stage_without_output(
     assert body["confidence"] == "unknown"
 
 
+def test_stage_raw_response_returns_explicit_audit_payload(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'stage-raw-response.db'}")
+
+    with TestClient(app) as client:
+        # Given a completed stage with top-level and nested raw model responses.
+        register_and_login(client, "RAW-RESPONSE", "raw-response@example.com")
+        demand_stage_id = create_quest_with_demand_stage(client)
+        complete_demand_stage_with_raw_response(client, demand_stage_id)
+
+        # When the owner explicitly asks for the raw response audit view.
+        response = client.get(f"/stages/{demand_stage_id}/raw-response")
+
+    # Then the API returns only the explicitly requested raw response fields.
+    assert response.status_code == 200
+    body = response.json()
+    assert body["stage_id"] == demand_stage_id
+    assert body["agent_id"] == DEMAND_VALIDATOR_AGENT_ID
+    assert body["raw_response_count"] == 2
+    raw_responses = body["raw_responses"]
+    assert raw_responses == [
+        {
+            "path": "output_payload.raw_response",
+            "content": "provider response should not be in the default UI",
+            "char_count": len("provider response should not be in the default UI"),
+        },
+        {
+            "path": "output_payload.trace.raw_response",
+            "content": "nested provider details should also stay hidden",
+            "char_count": len("nested provider details should also stay hidden"),
+        },
+    ]
+    assert "display_payload" not in body
+
+
+def test_stage_raw_response_marks_stage_without_raw_response(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'stage-raw-empty.db'}")
+
+    with TestClient(app) as client:
+        # Given a stage that has not produced raw model output.
+        register_and_login(client, "RAW-EMPTY", "raw-empty@example.com")
+        demand_stage_id = create_quest_with_demand_stage(client)
+
+        # When the owner asks for the explicit raw response audit view.
+        response = client.get(f"/stages/{demand_stage_id}/raw-response")
+
+    # Then the API returns an explicit empty audit state.
+    assert response.status_code == 200
+    body = response.json()
+    assert body["raw_response_count"] == 0
+    assert body["raw_responses"] == []
+
+
+def test_stage_raw_response_rejects_other_users_stage(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'stage-raw-permission.db'}")
+
+    with TestClient(app) as client:
+        # Given one user owns a stage with raw model responses.
+        register_and_login(client, "RAW-OWNER", "raw-owner@example.com")
+        demand_stage_id = create_quest_with_demand_stage(client)
+        complete_demand_stage_with_raw_response(client, demand_stage_id)
+        logout_response = client.post("/auth/logout")
+        assert logout_response.status_code == 204
+        register_and_login(client, "RAW-OTHER", "raw-other@example.com")
+
+        # When another user asks for the explicit raw response audit view.
+        response = client.get(f"/stages/{demand_stage_id}/raw-response")
+
+    # Then ownership rules prevent cross-user raw response access.
+    assert response.status_code == 403
+
+
 def test_stage_display_output_rejects_other_users_stage(
     tmp_path,
     dev_admin_header_enabled: None,
