@@ -154,6 +154,9 @@ const en = {
   experimentDataPathHint: "Server path, dataset name, or accessible storage location.",
   experimentEnvironmentNotes: "Environment notes",
   experimentEnvironmentNotesHint: "CUDA, Python, conda, GPU, dependency, and permission notes.",
+  experimentPlanBoundary: "Execution boundary",
+  experimentPlanBoundaryDescription:
+    "This stage has not executed scripts, reproduced baselines, or measured metrics. Treat tables, figures, and the script plan as a protocol until verified experiment results are recorded.",
   experimentPlannerDescription: "Plan-only experiment design. It does not claim results before scripts run.",
   experimentPlannerResult: "Experiment Planner result",
   experimentSetupDescription: "Record the data, code, and environment context required before planning experiments.",
@@ -702,6 +705,9 @@ const zh: Record<keyof typeof en, string> = {
   experimentDataPathHint: "服务器路径、数据集名称或可访问的存储位置。",
   experimentEnvironmentNotes: "实验环境说明",
   experimentEnvironmentNotesHint: "CUDA、Python、conda、GPU、依赖和权限说明。",
+  experimentPlanBoundary: "执行边界",
+  experimentPlanBoundaryDescription:
+    "该阶段尚未运行脚本、复现 baseline 或测量指标。记录经过核验的实验结果前，请把表格、图和脚本计划都视为实验方案。",
   experimentPlannerDescription: "只生成实验计划；脚本运行前不声称已有实验结果。",
   experimentPlannerResult: "Experiment Planner 结果",
   experimentSetupDescription: "在实验规划前记录数据、代码和环境上下文。",
