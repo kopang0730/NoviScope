@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlmodel import Session
 
+from noviscope.api.agent_provider_matrix import router as agent_provider_matrix_router
 from noviscope.api.artifacts import router as artifacts_router
 from noviscope.api.demand_review import router as demand_review_router
 from noviscope.api.dependencies import get_session
@@ -40,6 +41,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
 
     app = FastAPI(title=settings.app_name, lifespan=lifespan)
     app.include_router(router)
+    app.include_router(agent_provider_matrix_router)
     app.include_router(artifacts_router)
     app.include_router(demand_review_router)
     app.include_router(evidence_ledger_router)
