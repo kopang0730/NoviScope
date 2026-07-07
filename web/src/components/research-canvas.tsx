@@ -18,6 +18,7 @@ import {
   type CanvasStageFilter,
   ResearchCanvasStageMap,
 } from "./research-canvas-stage-map";
+import { ResearchCanvasTraceabilitySummary } from "./research-canvas-traceability-summary";
 
 function stageMatchesFilter(stage: StageCard, filter: CanvasStageFilter, nextActionStage: StageCard | null) {
   switch (filter) {
@@ -140,6 +141,8 @@ export function ResearchCanvas({
           )}
         </div>
       </div>
+
+      <ResearchCanvasTraceabilitySummary stages={stages} />
 
       <div className="mt-4">
         <ResearchCanvasDecisionBrief
