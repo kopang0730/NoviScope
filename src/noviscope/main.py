@@ -23,6 +23,7 @@ from noviscope.api.version_routes import router as version_router
 from noviscope.api.workflow_canvas import router as workflow_canvas_router
 from noviscope.api.workflow_capabilities import router as workflow_capabilities_router
 from noviscope.api.workflow_graph import router as workflow_graph_router
+from noviscope.api.workflow_next_actions import router as workflow_next_actions_router
 from noviscope.core.config import get_settings, validate_deployment_settings
 from noviscope.db.session import create_db_engine, create_schema, session_generator
 
@@ -57,6 +58,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
     app.include_router(workflow_canvas_router)
     app.include_router(workflow_capabilities_router)
     app.include_router(workflow_graph_router)
+    app.include_router(workflow_next_actions_router)
 
     def session_dependency() -> Generator[Session, None, None]:
         yield from session_generator(engine)
