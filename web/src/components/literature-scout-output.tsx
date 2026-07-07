@@ -60,6 +60,15 @@ function parseSortMode(value: string): SortMode {
   return "score_desc";
 }
 
+function readPaperRef(value: Record<string, unknown>) {
+  return (
+    readString(value, "paper_ref") ||
+    readString(value, "openalex_id") ||
+    readString(value, "doi") ||
+    readString(value, "url")
+  );
+}
+
 function readPaper(value: unknown): LiteraturePaper | null {
   if (!isRecord(value)) {
     return null;
@@ -71,6 +80,7 @@ function readPaper(value: unknown): LiteraturePaper | null {
     doi: readString(value, "doi"),
     limitations: readStringArray(value, "limitations"),
     openalexId: readString(value, "openalex_id"),
+    paperRef: readPaperRef(value),
     publicationType: readString(value, "publication_type"),
     recencyBucket: readString(value, "recency_bucket"),
     relevanceScore: readNumber(value, "relevance_score") ?? 0,
@@ -202,7 +212,7 @@ export function LiteratureScoutOutput({ stage }: { readonly stage: StageCard }) 
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
               {visiblePapers.map((paper) => (
-                <tr key={paper.openalexId || paper.title}>
+                <tr key={paper.paperRef || paper.title}>
                   <td className="max-w-xl px-4 py-3">
                     <p className="font-medium text-slate-900">{paper.title || t("notAvailable")}</p>
                     <p className="mt-1 text-xs text-slate-500">{paper.authors.join(", ") || t("notAvailable")}</p>
@@ -222,7 +232,7 @@ export function LiteratureScoutOutput({ stage }: { readonly stage: StageCard }) 
 
       <div className="space-y-2">
         {visiblePapers.map((paper) => (
-          <PaperDetail key={`${paper.openalexId || paper.title}-detail`} paper={paper} />
+          <PaperDetail key={`${paper.paperRef || paper.title}-detail`} paper={paper} />
         ))}
       </div>
     </div>
