@@ -3,6 +3,7 @@ import type {
   MarkdownArtifactManifestResponse,
   Quest,
   QuestCreateResponse,
+  QuestExportResponse,
   StageCard,
   StageStatus,
 } from "./types";
@@ -48,6 +49,10 @@ export function createQuest(payload: CreateQuestPayload) {
 
 export function getQuest(questId: string) {
   return apiRequest<Quest>(`/api/quests/${questId}`);
+}
+
+export function getQuestExport(questId: string) {
+  return apiRequest<QuestExportResponse>(`/api/quests/${questId}/export`);
 }
 
 export async function getQuestStages(questId: string) {
