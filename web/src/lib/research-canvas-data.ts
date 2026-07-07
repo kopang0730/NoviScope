@@ -44,6 +44,10 @@ function readRecordArray(payload: Readonly<Record<string, unknown>>, key: string
     : [];
 }
 
+function firstDetailValue(items: readonly string[], fallback: string) {
+  return items[0] ?? fallback;
+}
+
 function findSelectedIdeaTitle(stage: StageCard) {
   const selectedIdeaIds = new Set(readStringArray(stage.output_payload, "selected_idea_ids"));
   const ideas = readRecordArray(stage.output_payload, "ideas");
@@ -186,14 +190,29 @@ export function buildStageDetails(stage: StageCard, t: Translate): CanvasDetail[
   }
 
   if (stage.agent_id === paperMeetingWriterAgentId) {
-    const artifactCount = stage.evidence_payload.artifact_count;
-    const downloadFormat = readString(stage.evidence_payload, "download_format");
-    if (typeof artifactCount === "number") {
-      details.push({ label: t("canvasArtifacts"), value: String(artifactCount) });
-    }
-    if (downloadFormat) {
-      details.push({ label: t("canvasDownloadFormat"), value: labelFromEnum(downloadFormat) });
-    }
+    const fallback = t("notAvailable");
+    details.push({
+      label: t("verifiedFacts"),
+      value: firstDetailValue(readStringArray(stage.output_payload, "verified_facts"), fallback),
+    });
+    details.push({
+      label: t("modelGeneratedHypotheses"),
+      value: firstDetailValue(
+        readStringArray(stage.output_payload, "model_generated_hypotheses"),
+        fallback,
+      ),
+    });
+    details.push({
+      label: t("experimentResultsNotAvailable"),
+      value: firstDetailValue(
+        readStringArray(stage.output_payload, "experiment_results_not_available"),
+        fallback,
+      ),
+    });
+    details.push({
+      label: t("humanReviewRequired"),
+      value: firstDetailValue(readStringArray(stage.output_payload, "human_review_required"), fallback),
+    });
   }
 
   if (blockingDetail) {
