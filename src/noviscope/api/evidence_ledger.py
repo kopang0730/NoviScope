@@ -1,11 +1,16 @@
 from dataclasses import dataclass
 from typing import Annotated, ClassVar, Final
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, JsonValue
 from sqlmodel import Session
 
 from noviscope.api.dependencies import get_session
+from noviscope.api.evidence_ledger_markdown import (
+    MARKDOWN_MEDIA_TYPE,
+    evidence_ledger_filename,
+    render_evidence_ledger_markdown,
+)
 from noviscope.auth.dependencies import get_current_user
 from noviscope.core.json_types import JsonObject
 from noviscope.core.stage_policy import StageConfidence, stage_confidence
@@ -168,3 +173,27 @@ def get_quest_evidence_ledger(
     except PermissionError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     return build_quest_evidence_ledger(quest_id, service.list_stage_cards(quest_id))
+
+
+@router.get("/quests/{quest_id}/evidence-ledger/download")
+def download_quest_evidence_ledger(
+    quest_id: str,
+    context: Annotated[EvidenceLedgerContext, Depends(get_evidence_ledger_context)],
+) -> Response:
+    service = QuestService(context.session)
+    try:
+        _ = service.get_quest_for_user(quest_id, context.current_user)
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    ledger = build_quest_evidence_ledger(quest_id, service.list_stage_cards(quest_id))
+    return Response(
+        content=render_evidence_ledger_markdown(ledger),
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{evidence_ledger_filename(quest_id)}"'
+            )
+        },
+        media_type=MARKDOWN_MEDIA_TYPE,
+    )

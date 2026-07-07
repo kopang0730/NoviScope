@@ -194,3 +194,47 @@ def test_evidence_ledger_endpoint_returns_saved_stage_evidence(
     assert literature_entry["source_count"] == 0
     assert literature_entry["source_refs"] == []
     assert literature_entry["source_policy"] == "no_evidence_recorded"
+
+
+def test_download_evidence_ledger_returns_markdown_review_attachment(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'evidence-ledger-download.db'}")
+
+    with TestClient(app) as client:
+        # Given: a Quest with reviewable evidence and missing evidence stages.
+        register_and_login(
+            client,
+            "EVIDENCE-LEDGER-DOWNLOAD",
+            "evidence-ledger-download@example.com",
+        )
+        quest_id, demand_stage_id, literature_stage_id = create_traceable_quest(client)
+        complete_traceable_demand_stage(client, demand_stage_id)
+
+        # When: the user downloads the evidence ledger for offline review.
+        response = client.get(f"/quests/{quest_id}/evidence-ledger/download")
+
+    # Then: the response is a Markdown attachment with traceability metadata.
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/markdown")
+    assert response.headers["content-disposition"] == (
+        f'attachment; filename="noviscope-evidence-ledger-{quest_id}.md"'
+    )
+    assert f"# NoviScope Evidence Ledger: {quest_id}" in response.text
+    assert "## Trust Summary" in response.text
+    assert "- Total stages: 5" in response.text
+    assert "- Evidence-bearing stages: 1" in response.text
+    assert "- Missing evidence stages: 4" in response.text
+    assert "- Stages requiring human review: 1" in response.text
+    assert f"### Demand validation (`{demand_stage_id}`)" in response.text
+    assert "- Status: complete" in response.text
+    assert "- Confidence: medium" in response.text
+    assert "- Human approved: No" in response.text
+    assert "- Requires human review: Yes" in response.text
+    assert "- Provider: provider_123 / gpt-test" in response.text
+    assert "- Source policy: model_only_no_external_source_verification" in response.text
+    assert "- Source refs: worksheet vendor interview; sample worksheet batch" in response.text
+    assert "- Review notes: Need a human to verify the vendor scenario." in response.text
+    assert f"### Literature scout (`{literature_stage_id}`)" in response.text
+    assert "- Source refs: None recorded" in response.text
