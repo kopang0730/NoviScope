@@ -110,6 +110,52 @@ export interface StageCard {
   updated_at: string;
 }
 
+export interface QuestExportQuest {
+  readonly id: string;
+  readonly owner_user_id: string | null;
+  readonly title: string;
+  readonly initial_direction: string;
+  readonly status: QuestStatus;
+  readonly created_at: string;
+  readonly updated_at: string;
+}
+
+export interface QuestExportStage {
+  readonly id: string;
+  readonly quest_id: string;
+  readonly agent_id: string;
+  readonly title: string;
+  readonly status: StageStatus;
+  readonly confidence: StageConfidence;
+  readonly summary: string;
+  readonly input_payload: Record<string, unknown>;
+  readonly output_payload: Record<string, unknown>;
+  readonly evidence_payload: Record<string, unknown>;
+  readonly hidden_payload_fields: readonly string[];
+  readonly human_approved: boolean | null;
+  readonly review_notes: string;
+  readonly artifact_manifest: MarkdownArtifactManifestResponse | null;
+  readonly created_at: string;
+  readonly updated_at: string;
+}
+
+export interface QuestExportTrustSummary {
+  readonly total_stages: number;
+  readonly complete_stages: number;
+  readonly blocked_stages: number;
+  readonly pending_review_stages: number;
+  readonly low_confidence_stages: number;
+  readonly artifact_available_count: number;
+  readonly warnings: readonly string[];
+}
+
+export interface QuestExportResponse {
+  readonly generated_at: string;
+  readonly quest: QuestExportQuest;
+  readonly stages: readonly QuestExportStage[];
+  readonly trust_summary: QuestExportTrustSummary;
+}
+
 export interface QuestCreateResponse {
   id: string;
   owner_user_id: string | null;

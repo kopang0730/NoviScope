@@ -7,6 +7,7 @@ import { useAuth } from "../auth/auth-context";
 import { Badge } from "../components/badge";
 import { buttonClassName } from "../components/button";
 import { CanvasReviewPacketButton } from "../components/canvas-review-packet-button";
+import { CanvasTrustExportButton } from "../components/canvas-trust-export-button";
 import { Card, CardHeading } from "../components/card";
 import { Input } from "../components/input";
 import { ResearchCanvas } from "../components/research-canvas";
@@ -210,7 +211,14 @@ export function CanvasWorkspacePage() {
       <div className="min-w-0 space-y-4">
         <Card className="overflow-hidden">
           <CardHeading
-            action={<CanvasReviewPacketButton quest={selectedQuest} stages={stages} />}
+            action={
+              selectedQuest ? (
+                <div className="flex flex-wrap items-start gap-2">
+                  <CanvasReviewPacketButton quest={selectedQuest} stages={stages} />
+                  <CanvasTrustExportButton quest={selectedQuest} />
+                </div>
+              ) : null
+            }
             description={t("canvasWorkspaceMainDescription")}
             title={t("researchCanvasTitle")}
           />
