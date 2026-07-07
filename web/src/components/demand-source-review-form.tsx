@@ -62,6 +62,17 @@ function splitSources(value: string) {
     .filter((source) => source.length > 0);
 }
 
+function verdictRequiresSources(verdict: DemandReviewVerdict) {
+  switch (verdict) {
+    case "plausible":
+    case "verified":
+      return true;
+    case "rejected":
+    case "unverified":
+      return false;
+  }
+}
+
 function verdictLabel(verdict: DemandReviewVerdict, t: ReturnType<typeof useI18n>["t"]) {
   switch (verdict) {
     case "plausible":
@@ -107,13 +118,20 @@ export function DemandSourceReviewForm({ onStageChange, stage }: {
     setSaveError(null);
     setSaved(false);
 
+    const sources = splitSources(formState.sourcesText);
+    if (verdictRequiresSources(formState.verdict) && sources.length === 0) {
+      setSaveError(t("demandSourceRequiredForPositiveVerdict"));
+      setSaving(false);
+      return;
+    }
+
     try {
       const updatedStage = await updateStage(stage.id, {
         evidence_payload: {
           ...stage.evidence_payload,
           human_demand_review_notes: formState.notes.trim(),
           human_demand_reviewed_at: new Date().toISOString(),
-          human_demand_sources: splitSources(formState.sourcesText),
+          human_demand_sources: sources,
           human_demand_verdict: formState.verdict,
         },
       });
