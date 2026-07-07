@@ -1,3 +1,6 @@
+import csv
+from io import StringIO
+
 from fastapi.testclient import TestClient
 from literature_stage_helpers import (
     complete_literature_stage,
@@ -49,6 +52,44 @@ def test_literature_paper_table_filters_and_sorts_saved_papers(
     assert paper["venue"] == "CVPR"
     assert paper["relevance_score"] == 112.5
     assert paper["source_quality_signals"] == ["Venue matched CVPR."]
+
+
+def test_literature_paper_table_downloads_filtered_csv(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'literature-paper-csv.db'}")
+
+    with TestClient(app) as client:
+        # Given a completed Literature Scout stage with saved OpenAlex paper metadata.
+        register_and_login(client, "PAPER-TABLE-CSV", "paper-csv@example.com")
+        literature_stage_id = create_quest_with_literature_stage(client)
+        complete_literature_stage(client, literature_stage_id)
+
+        # When the owner downloads the filtered paper table as CSV.
+        response = client.get(
+            f"/stages/{literature_stage_id}/literature-papers/download.csv",
+            params={
+                "reliability_level": "top_conference_or_journal",
+                "sort": "year_desc",
+            },
+        )
+
+    # Then the attachment contains the same sorted paper row without hidden state.
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/csv; charset=utf-8"
+    assert response.headers["content-disposition"] == (
+        f'attachment; filename="noviscope-literature-papers-{literature_stage_id}.csv"'
+    )
+    rows = list(csv.DictReader(StringIO(response.text)))
+    assert len(rows) == 1
+    assert rows[0]["paper_ref"] == "https://openalex.org/W2"
+    assert rows[0]["title"] == "Badminton action recognition benchmark"
+    assert rows[0]["authors"] == "Ada Chen; Bo Lin"
+    assert rows[0]["year"] == "2025"
+    assert rows[0]["venue"] == "CVPR"
+    assert rows[0]["reliability_level"] == "top_conference_or_journal"
+    assert rows[0]["source_quality_signals"] == "Venue matched CVPR."
 
 
 def test_literature_paper_table_marks_incomplete_stage_unavailable(
