@@ -69,9 +69,15 @@ def complete_paper_stage_with_artifacts(client: TestClient, stage_id: str) -> No
                 "model_generated_hypotheses": [
                     "Temporal consistency may improve action labels."
                 ],
+                "source_stage_ids": {
+                    "demand_validation": "stage-demand",
+                    "experiment_planner": "stage-experiment",
+                    "idea_generator": "stage-idea",
+                    "literature_scout": "stage-literature",
+                },
                 "summary": "Generated traceable draft artifacts.",
                 "verified_facts": ["The demand scenario is coach feedback."],
-                "warnings": [],
+                "warnings": ["Drafts are not submission-ready until human review."],
             },
             "status": "complete",
         },
@@ -136,6 +142,39 @@ def test_list_paper_markdown_artifacts_returns_download_manifest(
         "media_type": "text/markdown",
         "missing_reason": "",
         "title": "Chinese research brief",
+    }
+
+
+def test_list_paper_markdown_artifacts_includes_trust_summary(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'artifact-trust.db'}")
+
+    with TestClient(app) as client:
+        # Given
+        register_and_login(client, "ARTIFACT-TRUST", "trust@example.com")
+        paper_stage_id = create_quest_with_paper_stage(client)
+        complete_paper_stage_with_artifacts(client, paper_stage_id)
+
+        # When
+        response = client.get(f"/stages/{paper_stage_id}/artifacts")
+
+    # Then
+    assert response.status_code == 200
+    trust_summary = response.json()["trust_summary"]
+    assert trust_summary == {
+        "experiment_results_available": False,
+        "experiment_results_not_available": ["No experiment results are available yet."],
+        "human_review_required": ["Confirm data access."],
+        "requires_human_review": True,
+        "source_stage_ids": {
+            "demand_validation": "stage-demand",
+            "experiment_planner": "stage-experiment",
+            "idea_generator": "stage-idea",
+            "literature_scout": "stage-literature",
+        },
+        "warnings": ["Drafts are not submission-ready until human review."],
     }
 
 

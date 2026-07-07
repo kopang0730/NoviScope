@@ -8,6 +8,7 @@ from sqlmodel import Session
 
 from noviscope.api.dependencies import get_session
 from noviscope.auth.dependencies import get_current_user
+from noviscope.core.json_types import JsonObject
 from noviscope.core.stage_policy import PAPER_MEETING_WRITER_AGENT_ID
 from noviscope.models.quest import StageCard, StageStatus
 from noviscope.models.user import User
@@ -68,11 +69,23 @@ class MarkdownArtifactManifestItem(BaseModel):
     missing_reason: str
 
 
+class MarkdownArtifactTrustSummary(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    requires_human_review: bool
+    experiment_results_available: bool
+    human_review_required: list[str]
+    experiment_results_not_available: list[str]
+    source_stage_ids: JsonObject
+    warnings: list[str]
+
+
 class MarkdownArtifactManifestResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     stage_id: str
     artifacts: list[MarkdownArtifactManifestItem]
+    trust_summary: MarkdownArtifactTrustSummary
 
 
 def get_artifact_context(
@@ -156,11 +169,58 @@ def build_manifest_item(stage: StageCard, key: MarkdownArtifactKey) -> MarkdownA
     )
 
 
+def string_list_payload_field(stage: StageCard, key: str) -> list[str]:
+    value = stage.output_payload.get(key)
+    match value:
+        case list() as items:
+            return [item for item in items if isinstance(item, str) and item.strip()]
+        case None | str() | bool() | int() | float() | dict():
+            return []
+        case unreachable:
+            assert_never(unreachable)
+
+
+def json_object_payload_field(stage: StageCard, key: str) -> JsonObject:
+    value = stage.output_payload.get(key)
+    match value:
+        case dict() as mapping:
+            normalized: JsonObject = {}
+            for field_name, item in mapping.items():
+                if isinstance(field_name, str) and (
+                    isinstance(item, str | int | float | bool | list | dict) or item is None
+                ):
+                    normalized[field_name] = item
+            return normalized
+        case None | str() | bool() | int() | float() | list():
+            return {}
+        case unreachable:
+            assert_never(unreachable)
+
+
+def build_artifact_trust_summary(stage: StageCard) -> MarkdownArtifactTrustSummary:
+    experiment_results_not_available = string_list_payload_field(
+        stage,
+        "experiment_results_not_available",
+    )
+    human_review_required = string_list_payload_field(stage, "human_review_required")
+    return MarkdownArtifactTrustSummary(
+        experiment_results_available=(
+            stage.status == StageStatus.COMPLETE and not experiment_results_not_available
+        ),
+        experiment_results_not_available=experiment_results_not_available,
+        human_review_required=human_review_required,
+        requires_human_review=bool(human_review_required),
+        source_stage_ids=json_object_payload_field(stage, "source_stage_ids"),
+        warnings=string_list_payload_field(stage, "warnings"),
+    )
+
+
 def build_artifact_manifest(stage: StageCard) -> MarkdownArtifactManifestResponse:
     ensure_paper_writer_stage(stage)
     return MarkdownArtifactManifestResponse(
         artifacts=[build_manifest_item(stage, key) for key in MARKDOWN_ARTIFACT_KEYS],
         stage_id=stage.id,
+        trust_summary=build_artifact_trust_summary(stage),
     )
 
 
