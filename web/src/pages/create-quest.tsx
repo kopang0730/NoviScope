@@ -158,6 +158,14 @@ export function CreateQuestPage() {
                 rows={4}
                 value={formState.knownWork}
               />
+              <TextArea
+                hint={t("questKnownBaselineHint")}
+                label={t("questKnownBaseline")}
+                onChange={(event) => updateField("knownBaseline", event.target.value)}
+                placeholder={t("questKnownBaselinePlaceholder")}
+                rows={4}
+                value={formState.knownBaseline}
+              />
             </div>
           </section>
 

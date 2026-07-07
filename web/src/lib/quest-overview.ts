@@ -6,6 +6,7 @@ export type IntakeBrief = {
   readonly demandEvidenceSources: string;
   readonly direction: string;
   readonly expectedOutput: string;
+  readonly knownBaseline: string;
   readonly knownWork: string;
   readonly metric: string;
   readonly outputLanguage: string;
@@ -108,6 +109,7 @@ export function parseIntakeBrief(initialDirection: string): IntakeBrief {
     demandEvidenceSources: readLineValue(initialDirection, ["Demand evidence sources to verify", "待核验需求证据来源"]),
     direction: readLineValue(initialDirection, ["Research direction", "研究方向"]),
     expectedOutput: readLineValue(initialDirection, ["Expected research output", "期望科研产出"]),
+    knownBaseline: readLineValue(initialDirection, ["Known baseline or reproduction target", "已知 baseline 或复现对象"]),
     knownWork: readLineValue(initialDirection, ["Known papers / methods / baselines", "Known papers, methods, or baselines", "已知论文、方法或 baseline"]),
     metric: readLineValue(initialDirection, ["Evaluation metric or success signal", "评价指标或成功信号"]),
     outputLanguage: readLineValue(initialDirection, ["Preferred output language", "期望产出语言"]),

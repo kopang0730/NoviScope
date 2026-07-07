@@ -74,6 +74,7 @@ export function buildQuestReviewPacket(quest: Quest, stages: readonly StageCard[
   appendLine(lines, "Input and desired output", intake.target);
   appendLine(lines, "Current pain point or suspected gap", intake.painPoint);
   appendLine(lines, "Known papers / methods / baselines", intake.knownWork);
+  appendLine(lines, "Known baseline or reproduction target", intake.knownBaseline);
   appendLine(lines, "Data, code, or resources", intake.dataAssets);
   appendLine(lines, "Evaluation metric or success signal", intake.metric);
   appendLine(lines, "Expected research output", intake.expectedOutput);
