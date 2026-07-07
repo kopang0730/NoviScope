@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="NoviScope">
+  <rect width="64" height="64" rx="14" fill="#ccfbf1" />
+  <path
+    d="M20 46V18h7.1l10.7 16.7V18H44v28h-6.9L26.2 29.1V46H20Z"
+    fill="#0f766e"
+  />
+</svg>
