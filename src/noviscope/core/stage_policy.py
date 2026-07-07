@@ -1,4 +1,5 @@
-from typing import Literal, TypeAlias
+from dataclasses import dataclass
+from typing import Final, Literal, TypeAlias
 
 from noviscope.core.json_types import JsonObject
 
@@ -12,8 +13,37 @@ NO_EXTERNAL_VERIFICATION_RISK = (
 NO_EXPERIMENT_VERIFICATION_RISK = (
     "High confidence was downgraded because hypotheses have not been experimentally verified."
 )
+APPROVING_HUMAN_DEMAND_VERDICTS: Final = frozenset({"plausible", "verified"})
+DEMAND_REVIEW_SOURCE_REQUIRED_MESSAGE: Final = (
+    "At least one demand evidence source is required to approve demand."
+)
 
 StageConfidence: TypeAlias = Literal["high", "medium", "low", "unknown"]
+
+
+@dataclass(frozen=True, slots=True)
+class DemandEvidenceSourceError(ValueError):
+    detail: str = DEMAND_REVIEW_SOURCE_REQUIRED_MESSAGE
+
+    def __str__(self) -> str:
+        return self.detail
+
+
+def require_positive_human_demand_sources(
+    agent_id: str,
+    evidence_payload: JsonObject,
+) -> None:
+    if agent_id != DEMAND_VALIDATOR_AGENT_ID:
+        return
+    verdict = evidence_payload.get("human_demand_verdict")
+    if not isinstance(verdict, str) or verdict not in APPROVING_HUMAN_DEMAND_VERDICTS:
+        return
+    sources = evidence_payload.get("human_demand_sources")
+    if isinstance(sources, list) and any(
+        isinstance(source, str) and source.strip() for source in sources
+    ):
+        return
+    raise DemandEvidenceSourceError()
 
 
 def normalize_stage_output_payload(agent_id: str, output_payload: JsonObject) -> JsonObject:
