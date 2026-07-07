@@ -157,7 +157,7 @@ export function ResearchCanvas({
         stages={stages}
       />
 
-      <div className="mt-4 grid gap-4 2xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="mt-4 grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1fr)_340px]">
         <ResearchCanvasStageMap
           filterCounts={filterCounts}
           nextActionStage={nextActionStage}

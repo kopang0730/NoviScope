@@ -67,7 +67,7 @@ export function ResearchCanvasStageMap({
   const { t } = useI18n();
 
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <div className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
           <p className="text-sm font-semibold text-slate-900">{t("canvasMapTitle")}</p>
