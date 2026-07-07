@@ -7,6 +7,7 @@ import { Card, CardHeading } from "./card";
 import { ResearchCanvas } from "./research-canvas";
 import { WorkflowProviderReadinessNotice } from "./stage-provider-readiness";
 import { StageRunSummary } from "./stage-run-summary";
+import { WorkflowAutopilotCard } from "./workflow-autopilot-card";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
 import { useProviderReadinessData } from "../lib/provider-readiness-data";
@@ -105,6 +106,12 @@ export function QuestWorkflowPanel({
             </p>
           ) : (
             <>
+              <WorkflowAutopilotCard
+                onRunStage={onRunStage}
+                quest={selectedQuest}
+                runningStageId={runningStageId}
+                stages={stages}
+              />
               <WorkflowProviderReadinessNotice readinessData={providerReadinessData} stages={stages} />
               {viewMode === "canvas" ? (
                 <ResearchCanvas

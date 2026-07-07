@@ -133,3 +133,47 @@ export interface MarkdownArtifactManifestResponse {
   readonly stage_id: string;
   readonly artifacts: readonly MarkdownArtifactManifestItem[];
 }
+
+export type AutopilotStatus =
+  | "ready_to_run"
+  | "waiting_for_human_review"
+  | "needs_configuration"
+  | "blocked"
+  | "complete";
+
+export type AutopilotStepAction =
+  | "run_next"
+  | "already_complete"
+  | "await_human_review"
+  | "needs_configuration"
+  | "blocked";
+
+export type AutopilotStep = {
+  readonly stage_id: string;
+  readonly agent_id: string;
+  readonly title: string;
+  readonly status: StageStatus;
+  readonly action: AutopilotStepAction;
+  readonly can_run: boolean;
+  readonly blocking_reason: string;
+  readonly blocking_detail: string;
+  readonly requires_human_review: boolean;
+  readonly human_approved: boolean | null;
+  readonly provider_id: string | null;
+  readonly provider_name: string | null;
+  readonly provider_kind: ProviderKind | null;
+  readonly provider_model: string | null;
+  readonly provider_scope: ProviderScope | null;
+  readonly uses_server_managed_provider: boolean;
+};
+
+export type AutopilotPlan = {
+  readonly quest_id: string;
+  readonly status: AutopilotStatus;
+  readonly summary: string;
+  readonly next_stage_id: string | null;
+  readonly next_stage_title: string | null;
+  readonly stop_stage_id: string | null;
+  readonly stop_stage_title: string | null;
+  readonly steps: readonly AutopilotStep[];
+};

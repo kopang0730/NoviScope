@@ -1,5 +1,6 @@
 import { apiRequest } from "./client";
 import type {
+  AutopilotPlan,
   MarkdownArtifactManifestResponse,
   Quest,
   QuestCreateResponse,
@@ -71,6 +72,10 @@ export function runStage(stageId: string, payload: RunStagePayload = {}) {
 
 export function getStageArtifacts(stageId: string) {
   return apiRequest<MarkdownArtifactManifestResponse>(`/api/stages/${stageId}/artifacts`);
+}
+
+export function getWorkflowAutopilotPlan(questId: string) {
+  return apiRequest<AutopilotPlan>(`/api/quests/${questId}/autopilot-plan`);
 }
 
 export function buildStageArtifactDownloadPath(downloadUrl: string) {
