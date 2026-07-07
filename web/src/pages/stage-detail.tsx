@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { getQuest, getQuestStages, runStage } from "../api/quests";
 import { getErrorMessage } from "../api/client";
+import { buildStageReviewPacketDownloadPath, getQuest, getQuestStages, runStage } from "../api/quests";
 import type { Quest, StageCard, StageStatus } from "../api/types";
 import { useAuth } from "../auth/auth-context";
 import { Badge } from "../components/badge";
@@ -13,17 +13,12 @@ import { StageNextActionCard } from "../components/stage-next-action-card";
 import { StageOutputPanel } from "../components/stage-output-summary";
 import { StageReviewGateCard } from "../components/stage-review-gate-card";
 import { useI18n } from "../i18n/i18n-context";
-import { downloadTextFile } from "../lib/download-file";
 import { formatDateTime, labelFromEnum } from "../lib/format";
 import { useProviderReadinessData } from "../lib/provider-readiness-data";
 import {
   getLocalizedStageRunGateReason,
   getStageRunGate,
 } from "../lib/stage-run-gate";
-import {
-  buildStageReviewPacketFilename,
-  buildStageReviewPacketMarkdown,
-} from "../lib/stage-review-packet";
 
 function stageTone(status: StageStatus) {
   if (status === "complete") {
@@ -140,14 +135,6 @@ export function StageDetailPage() {
     }
   }
 
-  function handleDownloadReviewPacket(currentStage: StageCard) {
-    downloadTextFile({
-      content: buildStageReviewPacketMarkdown(currentStage, t),
-      filename: buildStageReviewPacketFilename(currentStage),
-      mimeType: "text/markdown;charset=utf-8",
-    });
-  }
-
   if (!questId) {
     return (
       <Card>
@@ -185,9 +172,12 @@ export function StageDetailPage() {
               </Button>
             ) : null}
             {stage ? (
-              <Button onClick={() => handleDownloadReviewPacket(stage)} size="sm" type="button" variant="secondary">
+              <a
+                className={buttonClassName({ variant: "secondary", size: "sm" })}
+                href={buildStageReviewPacketDownloadPath(stage.id)}
+              >
                 {t("downloadReviewPacket")}
-              </Button>
+              </a>
             ) : null}
             <Link className={buttonClassName({ variant: "secondary", size: "sm" })} to={workflowBackLink}>
               {t("stageDetailBackToWorkflow")}
