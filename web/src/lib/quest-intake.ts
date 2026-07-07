@@ -5,6 +5,7 @@ export type QuestIntakeState = {
   readonly demandEvidenceSources: string;
   readonly direction: string;
   readonly expectedOutput: string;
+  readonly knownBaseline: string;
   readonly knownWork: string;
   readonly metric: string;
   readonly outputLanguage: OutputLanguage;
@@ -21,6 +22,7 @@ type IntakeLabels = {
   readonly direction: string;
   readonly empty: string;
   readonly expectedOutput: string;
+  readonly knownBaseline: string;
   readonly knownWork: string;
   readonly metric: string;
   readonly note: string;
@@ -38,6 +40,7 @@ export const emptyIntake: QuestIntakeState = {
   demandEvidenceSources: "",
   direction: "",
   expectedOutput: "",
+  knownBaseline: "",
   knownWork: "",
   metric: "",
   outputLanguage: "both",
@@ -56,6 +59,7 @@ export const questIntakeExamples: Record<"zh" | "en", Record<"erasure" | "badmin
         "Coach or training analyst interview notes to verify; available training video samples to inspect.",
       direction: "Use computer vision to recognize badminton shuttle trajectory or player actions from match/training videos.",
       expectedOutput: "Validate whether the task has enough value, list datasets/baselines, and propose the first feasible experiment.",
+      knownBaseline: "Pose-based action classifier, shuttle detector/tracker, and simple temporal smoothing baseline.",
       knownWork: "Sports pose estimation, shuttle tracking, action recognition, temporal modeling.",
       metric: "Trajectory localization error, action classification accuracy, frame-level consistency, and coach usability feedback.",
       outputLanguage: "both",
@@ -71,6 +75,7 @@ export const questIntakeExamples: Record<"zh" | "en", Record<"erasure" | "badmin
         "Education-company worksheet reuse request to verify with contact; sample filled/clean exam-sheet scans if available.",
       direction: "Erase handwritten answers from scanned exam sheets and recover a clean worksheet for reuse.",
       expectedOutput: "Demand validation brief, related-work map, candidate improvement idea, and experiment plan.",
+      knownBaseline: "OCR-guided mask + classical inpainting; document inpainting or scene text removal baselines if reproducible.",
       knownWork: "Document inpainting, scene text removal, OCR-guided masks, diffusion/inpainting baselines.",
       metric: "Printed-content preservation, OCR recovery, human preference, and PSNR/SSIM if paired clean sheets exist.",
       outputLanguage: "both",
@@ -87,6 +92,7 @@ export const questIntakeExamples: Record<"zh" | "en", Record<"erasure" | "badmin
       demandEvidenceSources: "待核验的教练或训练分析人员访谈记录；可检查的训练视频样本。",
       direction: "使用机器视觉识别羽毛球轨迹或运动员动作，用于训练复盘和动作分析。",
       expectedOutput: "验证任务价值，梳理数据集和 baseline，并提出第一步可行实验。",
+      knownBaseline: "姿态动作分类器、羽毛球检测/跟踪器，以及简单时序平滑 baseline。",
       knownWork: "体育姿态估计、羽毛球检测/跟踪、动作识别、时序建模。",
       metric: "轨迹定位误差、动作分类准确率、帧间一致性，以及教练使用反馈。",
       outputLanguage: "both",
@@ -101,6 +107,7 @@ export const questIntakeExamples: Record<"zh" | "en", Record<"erasure" | "badmin
       demandEvidenceSources: "待核验的教培企业试卷复用需求记录；如可获取，检查已填写/干净试卷样本。",
       direction: "擦除扫描试卷中的手写答案，并恢复成干净试卷，便于再次使用。",
       expectedOutput: "需求验证简报、相关工作地图、候选改进 idea 和实验计划。",
+      knownBaseline: "OCR 引导 mask + 传统修复；如果可复现，再比较文档修复或场景文本移除 baseline。",
       knownWork: "文档修复、场景文本移除、OCR 引导 mask、扩散/修复类 baseline。",
       metric: "印刷内容保留、OCR 恢复准确率、人工偏好；如果有成对干净试卷再评估 PSNR/SSIM。",
       outputLanguage: "both",
@@ -120,6 +127,7 @@ const labelsByLanguage: Record<"zh" | "en", IntakeLabels> = {
     direction: "Research direction",
     empty: "Not provided",
     expectedOutput: "Expected research output",
+    knownBaseline: "Known baseline or reproduction target",
     knownWork: "Known papers / methods / baselines",
     metric: "Evaluation metric or success signal",
     note: "Note: Created from structured NoviScope intake. Demand reality and evidence sources should be reviewed before experiment execution.",
@@ -141,6 +149,7 @@ const labelsByLanguage: Record<"zh" | "en", IntakeLabels> = {
     direction: "研究方向",
     empty: "未提供",
     expectedOutput: "期望科研产出",
+    knownBaseline: "已知 baseline 或复现对象",
     knownWork: "已知论文、方法或 baseline",
     metric: "评价指标或成功信号",
     note: "说明：由 NoviScope 结构化采集表创建。进入实验前应先人工复核需求真实性和证据来源。",
@@ -187,6 +196,7 @@ export function buildInitialDirection(formState: QuestIntakeState, language: "zh
     optionalLine(labels.target, formState.target, labels.empty),
     optionalLine(labels.painPoint, formState.painPoint, labels.empty),
     optionalLine(labels.knownWork, formState.knownWork, labels.empty),
+    optionalLine(labels.knownBaseline, formState.knownBaseline, labels.empty),
     optionalLine(labels.dataAssets, formState.dataAssets, labels.empty),
     optionalLine(labels.metric, formState.metric, labels.empty),
     optionalLine(labels.expectedOutput, formState.expectedOutput, labels.empty),

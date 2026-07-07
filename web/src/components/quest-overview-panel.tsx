@@ -162,6 +162,7 @@ export function QuestOverviewPanel({
               <BriefItem label={t("questTarget")} value={intake.target || t("notAvailable")} />
               <BriefItem label={t("questPainPoint")} value={intake.painPoint || t("notAvailable")} />
               <BriefItem label={t("questKnownWork")} value={intake.knownWork || t("notAvailable")} />
+              <BriefItem label={t("questKnownBaseline")} value={intake.knownBaseline || t("notAvailable")} />
               <BriefItem label={t("questDataAssets")} value={intake.dataAssets || t("notAvailable")} />
               <BriefItem label={t("questMetric")} value={intake.metric || t("notAvailable")} />
               <BriefItem label={t("questExpectedOutput")} value={intake.expectedOutput || t("notAvailable")} />
