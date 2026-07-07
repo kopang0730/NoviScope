@@ -138,15 +138,19 @@ export function QuestListPage() {
     };
   }, [currentUser, selectedQuestId]);
 
+  function handleStageChange(nextStage: StageCard) {
+    setStages((currentStages) =>
+      currentStages.map((stage) => (stage.id === nextStage.id ? nextStage : stage)),
+    );
+  }
+
   async function handleRunStage(stageId: string) {
     setRunningStageId(stageId);
     setStageRunError(null);
 
     try {
       const updatedStage = await runStage(stageId);
-      setStages((currentStages) =>
-        currentStages.map((stage) => (stage.id === updatedStage.id ? updatedStage : stage)),
-      );
+      handleStageChange(updatedStage);
     } catch (error) {
       setStageRunError(getErrorMessage(error));
     } finally {
@@ -233,6 +237,7 @@ export function QuestListPage() {
           detailError={detailError}
           detailLoading={detailLoading}
           onRunStage={(stageId) => void handleRunStage(stageId)}
+          onStageChange={handleStageChange}
           runningStageId={runningStageId}
           selectedQuest={selectedQuest}
           selectedQuestId={selectedQuestId}

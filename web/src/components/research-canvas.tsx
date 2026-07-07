@@ -36,6 +36,7 @@ function stageMatchesFilter(stage: StageCard, filter: CanvasStageFilter, nextAct
 
 export function ResearchCanvas({
   onRunStage,
+  onStageChange,
   providerReadinessData,
   runningStageId,
   selectedQuest,
@@ -43,6 +44,7 @@ export function ResearchCanvas({
   stages,
 }: {
   readonly onRunStage: (stageId: string) => void;
+  readonly onStageChange: (stage: StageCard) => void;
   readonly providerReadinessData: ProviderReadinessData;
   readonly runningStageId: string | null;
   readonly selectedQuest: Quest;
@@ -177,6 +179,7 @@ export function ResearchCanvas({
           <ResearchCanvasInspector
             details={buildStageDetails(selectedStage, t)}
             onRunStage={onRunStage}
+            onStageChange={onStageChange}
             runningStageId={runningStageId}
             selectedQuest={selectedQuest}
             stage={selectedStage}
