@@ -120,6 +120,39 @@ def test_select_ideas_marks_gap_stage_human_approved(
     assert body["evidence_payload"]["selected_idea_count"] == 1
 
 
+def test_idea_review_downloads_candidate_markdown(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'idea-review-download.db'}")
+    with TestClient(app) as client:
+        # Given a completed Gap & Hypothesis stage with candidate ideas.
+        register_and_login(client, "IDEA-REVIEW", "idea-review@example.com")
+        idea_stage_id = create_quest_with_idea_stage(client)
+        complete_idea_stage(client, idea_stage_id)
+
+        # When the owner downloads the candidate idea review packet.
+        response = client.get(f"/stages/{idea_stage_id}/idea-review/download.md")
+
+    # Then the packet exposes evidence-linked idea details before human selection.
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/markdown; charset=utf-8"
+    assert response.headers["content-disposition"] == (
+        f'attachment; filename="noviscope-idea-review-{idea_stage_id}.md"'
+    )
+    body = response.text
+    assert "# NoviScope Idea Review Packet" in body
+    assert f"- Stage ID: `{idea_stage_id}`" in body
+    assert "- Selection status: `pending_human_selection`" in body
+    assert "## idea_temporal_cues: Temporal cue badminton action recognition" in body
+    assert "- Based on papers: paper-1" in body
+    assert "- Core hypothesis: Temporal cues improve recognition." in body
+    assert "- Required data: Badminton training videos" in body
+    assert "- Required baseline: Pose-based action classifier" in body
+    assert "- Novelty risk: medium" in body
+    assert "## idea_trajectory_smoothing: Trajectory smoothing" in body
+
+
 def test_select_ideas_rejects_unknown_idea_id(
     tmp_path,
     dev_admin_header_enabled: None,

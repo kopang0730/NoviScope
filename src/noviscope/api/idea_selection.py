@@ -1,11 +1,15 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, StringConstraints
 from pydantic.types import JsonValue
 from sqlmodel import Session
 
 from noviscope.api.dependencies import get_session
+from noviscope.api.idea_review_markdown import (
+    build_idea_review_markdown,
+    idea_review_markdown_filename,
+)
 from noviscope.api.routes import StageCardResponse, stage_response
 from noviscope.auth.dependencies import get_current_user
 from noviscope.core.json_types import JsonObject
@@ -73,6 +77,36 @@ def select_stage_ideas(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=exc.detail,
         ) from exc
+
+
+@router.get("/stages/{stage_id}/idea-review/download.md")
+def download_idea_review_markdown(
+    stage_id: str,
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> Response:
+    service = QuestService(session)
+    try:
+        stage = service.get_stage_card_for_user(stage_id, current_user)
+        ensure_selectable_idea_stage(stage)
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except IdeaSelectionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=exc.detail,
+        ) from exc
+    return Response(
+        content=build_idea_review_markdown(stage_id, stage.output_payload),
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{idea_review_markdown_filename(stage_id)}"'
+            ),
+        },
+        media_type="text/markdown; charset=utf-8",
+    )
 
 
 def select_ideas(stage: StageCard, selected_idea_ids: list[str]) -> list[JsonObject]:
