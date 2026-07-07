@@ -93,7 +93,7 @@ export function ProviderListCard({
       ) : null}
       {loadingError ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{loadingError}</p> : null}
       {loading ? <p className="mt-4 text-sm text-slate-500">{t("loadingProviderData")}</p> : null}
-      {!loading && providers.length === 0 ? (
+      {currentUser && !loading && providers.length === 0 ? (
         <p className="mt-4 rounded-lg border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-500">
           {t("noProvidersAvailable")}
         </p>

@@ -6,6 +6,7 @@ import { Card } from "./components/card";
 import { LanguageToggle } from "./components/language-toggle";
 import { VersionStatus } from "./components/version-status";
 import { useI18n } from "./i18n/i18n-context";
+import { readRedirectPath } from "./lib/auth-redirect";
 import { AdminInvitesPage } from "./pages/admin-invites";
 import { CanvasWorkspacePage } from "./pages/canvas-workspace";
 import { CreateQuestPage } from "./pages/create-quest";
@@ -113,10 +114,11 @@ function WorkspaceLayout() {
 
 function AuthLayout({ children }: { children: ReactNode }) {
   const { currentUser } = useAuth();
+  const location = useLocation();
   const { t } = useI18n();
 
   if (currentUser) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={readRedirectPath(location.state)} replace />;
   }
 
   return (
