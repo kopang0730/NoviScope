@@ -11,12 +11,18 @@ export function SourceStageList({ sourceStageIds }: { readonly sourceStageIds: R
 
   return (
     <ul className="space-y-1 text-sm text-slate-600">
-      {entries.map(([key, value]) => (
-        <li className="flex flex-wrap gap-x-2 gap-y-1" key={key}>
-          <span className="font-medium text-slate-700">{labelFromEnum(key)}:</span>
-          <span className="break-all">{value}</span>
-        </li>
-      ))}
+      {entries.map(([key, value]) => {
+        const sourceStageId = value.trim();
+
+        return (
+          <li className="flex flex-wrap gap-x-2 gap-y-1" key={key}>
+            <span className="font-medium text-slate-700">{labelFromEnum(key)}:</span>
+            <span className={sourceStageId ? "break-all" : "text-slate-500"}>
+              {sourceStageId || t("notAvailable")}
+            </span>
+          </li>
+        );
+      })}
     </ul>
   );
 }
