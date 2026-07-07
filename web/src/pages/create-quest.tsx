@@ -7,6 +7,7 @@ import { useAuth } from "../auth/auth-context";
 import { Button } from "../components/button";
 import { Card, CardHeading } from "../components/card";
 import { Input, Select, TextArea } from "../components/input";
+import { QuestIntakeReadiness } from "../components/quest-intake-readiness";
 import { useI18n } from "../i18n/i18n-context";
 import {
   buildInitialDirection,
@@ -76,6 +77,8 @@ export function CreateQuestPage() {
             {t("questExampleBadminton")}
           </Button>
         </div>
+
+        <QuestIntakeReadiness formState={formState} />
 
         <form className="mt-6 space-y-6" onSubmit={(event) => void handleSubmit(event)}>
           <section className="grid gap-4 lg:grid-cols-2">
