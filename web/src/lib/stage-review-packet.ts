@@ -1,6 +1,7 @@
 import type { StageCard } from "../api/types";
 import type { TranslationKey } from "../i18n/i18n-context";
 import { labelFromEnum } from "./format";
+import { sanitizeReviewPayload } from "./review-packet-sanitizer";
 
 type Translate = (key: TranslationKey) => string;
 
@@ -35,6 +36,14 @@ export function buildStageReviewPacketMarkdown(stage: StageCard, t: Translate) {
       : stage.human_approved === false
         ? t("stageReviewRejected")
         : t("stageReviewPending");
+  const inputPayload = sanitizeReviewPayload(stage.input_payload, "input_payload");
+  const outputPayload = sanitizeReviewPayload(stage.output_payload, "output_payload");
+  const evidencePayload = sanitizeReviewPayload(stage.evidence_payload, "evidence_payload");
+  const hiddenPayloadFields = [
+    ...inputPayload.hiddenFields,
+    ...outputPayload.hiddenFields,
+    ...evidencePayload.hiddenFields,
+  ];
 
   return [
     `# ${stage.title}`,
@@ -54,17 +63,23 @@ export function buildStageReviewPacketMarkdown(stage: StageCard, t: Translate) {
     "",
     stage.review_notes || t("stageReviewNoNotes"),
     "",
+    `## ${t("stageReviewHiddenPayloadFields")}`,
+    "",
+    hiddenPayloadFields.length
+      ? hiddenPayloadFields.map((field) => `- ${field}`).join("\n")
+      : t("stageReviewNoHiddenPayloadFields"),
+    "",
     `## ${t("stageInputPayload")}`,
     "",
-    fencedBlock("json", stage.input_payload),
+    fencedBlock("json", inputPayload.payload),
     "",
     `## ${t("stageOutputPayload")}`,
     "",
-    fencedBlock("json", stage.output_payload),
+    fencedBlock("json", outputPayload.payload),
     "",
     `## ${t("stageEvidencePayload")}`,
     "",
-    fencedBlock("json", stage.evidence_payload),
+    fencedBlock("json", evidencePayload.payload),
     "",
   ].join("\n");
 }

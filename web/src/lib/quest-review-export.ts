@@ -2,6 +2,7 @@ import type { Quest, StageCard } from "../api/types";
 import { labelFromEnum } from "./format";
 import { buildPaperMeetingWriterView } from "./paper-meeting-view";
 import { parseIntakeBrief, summarizeProgress } from "./quest-overview";
+import { sanitizeReviewPayload } from "./review-packet-sanitizer";
 import { paperMeetingWriterAgentId } from "./stages";
 
 function slugify(value: string) {
@@ -53,7 +54,7 @@ export function buildQuestReviewPacket(quest: Quest, stages: readonly StageCard[
   lines.push("- Model-generated hypotheses and draft writing must remain under human review until explicitly approved.");
   lines.push("- Experiment plans are not experiment results. Missing data, code, or environment details should remain blocking evidence.");
   lines.push("- Citations and paper metadata are only as reliable as the recorded source payloads; verify primary papers before formal submission.");
-  lines.push("- JSON payloads below are included for auditability and should be treated as the source of the summarized claims.");
+  lines.push("- JSON payloads below are included for auditability; secret-like fields and raw provider responses are omitted.");
   lines.push("");
 
   lines.push("## Quest Metadata");
@@ -93,14 +94,29 @@ export function buildQuestReviewPacket(quest: Quest, stages: readonly StageCard[
     appendLine(lines, "Updated", formatTimestamp(stage.updated_at));
     appendLine(lines, "Summary", stage.summary);
     appendLine(lines, "Review notes", stage.review_notes);
+    const inputPayload = sanitizeReviewPayload(stage.input_payload, "input_payload");
+    const outputPayload = sanitizeReviewPayload(stage.output_payload, "output_payload");
+    const evidencePayload = sanitizeReviewPayload(stage.evidence_payload, "evidence_payload");
+    const hiddenPayloadFields = [
+      ...inputPayload.hiddenFields,
+      ...outputPayload.hiddenFields,
+      ...evidencePayload.hiddenFields,
+    ];
+    if (hiddenPayloadFields.length > 0) {
+      appendLine(lines, "Hidden payload fields", hiddenPayloadFields.join(", "));
+    }
+    lines.push("");
+    lines.push("#### Input Payload");
+    lines.push("");
+    lines.push(jsonBlock(inputPayload.payload));
     lines.push("");
     lines.push("#### Output Payload");
     lines.push("");
-    lines.push(jsonBlock(stage.output_payload));
+    lines.push(jsonBlock(outputPayload.payload));
     lines.push("");
     lines.push("#### Evidence Payload");
     lines.push("");
-    lines.push(jsonBlock(stage.evidence_payload));
+    lines.push(jsonBlock(evidencePayload.payload));
   }
 
   const paperStage = stages.find((stage) => stage.agent_id === paperMeetingWriterAgentId);
