@@ -71,6 +71,8 @@ views and hides raw model/secret-like fields from the main display path.
 `evidence_ledger.py` exposes saved per-stage source references, provider/model
 metadata, confidence, review notes, and human approval states for quest-level
 audit views.
+`experiment_runbooks.py` owns plan-only Experiment Planner Markdown runbook
+downloads.
 `quest_exports.py` owns quest-level traceability export packages for canvas
 snapshots, review handoffs, and future downloadable bundles.
 `quest_review_packets.py` owns quest-level Markdown review packet downloads.
