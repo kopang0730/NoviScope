@@ -7,6 +7,7 @@ import { useAuth } from "../auth/auth-context";
 import { Badge } from "../components/badge";
 import { Button, buttonClassName } from "../components/button";
 import { Card, CardHeading } from "../components/card";
+import { StageClaimSafetyCard } from "../components/stage-claim-safety-card";
 import { StageProviderReadinessCard } from "../components/stage-provider-readiness";
 import { StageEditor } from "../components/stage-editor";
 import { StageNextActionCard } from "../components/stage-next-action-card";
@@ -215,6 +216,8 @@ export function StageDetailPage() {
 
       {stage ? (
         <>
+          <StageClaimSafetyCard stage={stage} />
+
           <StageReviewGateCard onStageChange={handleStageChange} stage={stage} />
 
           <StageProviderReadinessCard readinessData={providerReadinessData} stage={stage} />

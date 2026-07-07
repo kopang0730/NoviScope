@@ -425,6 +425,35 @@ const en = {
   stageDetailMissingQuestDescription: "Open this view from a quest workflow so the page knows which quest owns the stage.",
   stageDetailSignInDescription: "Sign in to edit a workflow stage.",
   stageDetailTitle: "Stage Detail",
+  stageClaimSafetyBadge_approved: "Review-safe",
+  stageClaimSafetyBadge_missing_evidence: "Evidence missing",
+  stageClaimSafetyBadge_missing_output: "Output missing",
+  stageClaimSafetyBadge_needs_review: "Needs review",
+  stageClaimSafetyBadge_not_complete: "Not ready",
+  stageClaimSafetyBadge_rejected: "Rejected",
+  stageClaimSafetyDescription:
+    "Use this before moving content into papers, briefs, or downstream experiment decisions.",
+  stageClaimSafetyDetail_approved:
+    "This stage is complete, human-approved, and has saved output and evidence fields. It may be cited as reviewed material, while still preserving source traceability.",
+  stageClaimSafetyDetail_missing_evidence:
+    "This stage is approved but has no saved evidence fields. Do not treat its claims as supported until evidence is recorded or the stage is rerun.",
+  stageClaimSafetyDetail_missing_output:
+    "This stage is approved but has no saved output fields. There is no substantive result to carry into papers or downstream stages.",
+  stageClaimSafetyDetail_needs_review:
+    "This stage is complete but still waiting for human review. Downstream work should treat the output as model-generated and unverified.",
+  stageClaimSafetyDetail_not_complete:
+    "This stage has not completed yet. It cannot support a research claim, paper section, or experiment decision.",
+  stageClaimSafetyDetail_rejected:
+    "A human reviewer rejected this stage. Revise inputs or rerun before using the output downstream.",
+  stageClaimSafetyHumanReview: "Human review",
+  stageClaimSafetyStageStatus: "Stage status",
+  stageClaimSafetyState_approved: "Reviewed material can be used with traceability",
+  stageClaimSafetyState_missing_evidence: "Approved but missing evidence",
+  stageClaimSafetyState_missing_output: "Approved but missing output",
+  stageClaimSafetyState_needs_review: "Model output still needs review",
+  stageClaimSafetyState_not_complete: "No completed claim yet",
+  stageClaimSafetyState_rejected: "Rejected output must not be used",
+  stageClaimSafetyTitle: "Claim safety",
   stageNextActionBlocked: "Blocked",
   stageNextActionCompleteDescription:
     "All workflow stages are complete. Review the Canvas before using generated artifacts as research claims.",
@@ -973,6 +1002,35 @@ const zh: Record<keyof typeof en, string> = {
   stageDetailMissingQuestDescription: "请从 Quest 工作流打开该页面，这样系统才能知道阶段属于哪个 Quest。",
   stageDetailSignInDescription: "登录后才能编辑工作流阶段。",
   stageDetailTitle: "阶段详情",
+  stageClaimSafetyBadge_approved: "可复核引用",
+  stageClaimSafetyBadge_missing_evidence: "缺少证据",
+  stageClaimSafetyBadge_missing_output: "缺少产出",
+  stageClaimSafetyBadge_needs_review: "待复核",
+  stageClaimSafetyBadge_not_complete: "未就绪",
+  stageClaimSafetyBadge_rejected: "已拒绝",
+  stageClaimSafetyDescription:
+    "在把内容写入论文、brief 或下游实验决策前，先看这里。",
+  stageClaimSafetyDetail_approved:
+    "该阶段已完成、已通过人工复核，并保存了输出和证据字段。可以作为已复核材料引用，同时保留来源追踪。",
+  stageClaimSafetyDetail_missing_evidence:
+    "该阶段已批准，但没有保存证据字段。记录证据或重新运行前，不应把其中论断当作已有支撑。",
+  stageClaimSafetyDetail_missing_output:
+    "该阶段已批准，但没有保存输出字段。当前没有可写入论文或下游阶段的实质结果。",
+  stageClaimSafetyDetail_needs_review:
+    "该阶段已完成，但仍等待人工复核。下游工作应把它视为模型生成且尚未验证的输出。",
+  stageClaimSafetyDetail_not_complete:
+    "该阶段尚未完成，不能支撑科研论断、论文段落或实验决策。",
+  stageClaimSafetyDetail_rejected:
+    "人工复核已拒绝该阶段。继续使用前应修正输入或重新运行。",
+  stageClaimSafetyHumanReview: "人工复核",
+  stageClaimSafetyStageStatus: "阶段状态",
+  stageClaimSafetyState_approved: "已复核材料可带来源使用",
+  stageClaimSafetyState_missing_evidence: "已批准但缺少证据",
+  stageClaimSafetyState_missing_output: "已批准但缺少产出",
+  stageClaimSafetyState_needs_review: "模型输出仍需复核",
+  stageClaimSafetyState_not_complete: "尚无已完成论断",
+  stageClaimSafetyState_rejected: "已拒绝产出不能使用",
+  stageClaimSafetyTitle: "论断安全性",
   stageNextActionBlocked: "被阻塞",
   stageNextActionCompleteDescription:
     "所有工作流阶段都已完成。把生成产物当作科研论断使用前，请先回到 Canvas 复核证据链。",
