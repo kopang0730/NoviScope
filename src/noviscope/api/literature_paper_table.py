@@ -43,6 +43,7 @@ class LiteraturePaperRow(BaseModel):
     venue: str
     url: str
     doi: str
+    arxiv_id: str
     abstract_summary: str
     relevance_score: float
     reliability_level: str
@@ -172,6 +173,7 @@ def paper_ref(row: JsonObject) -> str:
 def paper_row(row: JsonObject) -> LiteraturePaperRow:
     return LiteraturePaperRow(
         abstract_summary=read_text(row, "abstract_summary"),
+        arxiv_id=read_text(row, "arxiv_id"),
         authors=read_string_list(row, "authors"),
         doi=read_text(row, "doi"),
         limitations=read_string_list(row, "limitations"),

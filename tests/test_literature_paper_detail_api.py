@@ -37,6 +37,7 @@ def test_literature_paper_detail_returns_saved_source_context(
     assert body["score_basis"] == "OpenAlex relevance_score with a recency boost."
     assert body["unavailable_reason"] == ""
     assert body["paper"]["title"] == "Badminton action recognition benchmark"
+    assert body["paper"]["arxiv_id"] == "2401.01234"
     assert body["paper"]["limitations"] == ["Verify full text before citing."]
     assert body["paper"]["source_quality_signals"] == ["Venue matched CVPR."]
     assert body["review_warnings"] == [

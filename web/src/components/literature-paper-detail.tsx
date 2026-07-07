@@ -2,6 +2,7 @@ import { useI18n } from "../i18n/i18n-context";
 
 export type LiteraturePaper = {
   readonly abstractSummary: string;
+  readonly arxivId: string;
   readonly authors: readonly string[];
   readonly doi: string;
   readonly limitations: readonly string[];
@@ -92,6 +93,9 @@ export function PaperDetail({ paper }: { readonly paper: LiteraturePaper }) {
         </p>
         <p>
           <span className="font-medium text-slate-700">DOI:</span> {paper.doi || t("notAvailable")}
+          <br />
+          <span className="font-medium text-slate-700">arXiv ID:</span>{" "}
+          {paper.arxivId || t("notAvailable")}
           <br />
           <span className="font-medium text-slate-700">{t("openalexId")}:</span>{" "}
           {paper.openalexId || t("notAvailable")}

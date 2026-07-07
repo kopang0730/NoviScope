@@ -67,6 +67,7 @@ function readPaper(value: unknown): LiteraturePaper | null {
 
   return {
     abstractSummary: readString(value, "abstract_summary"),
+    arxivId: readString(value, "arxiv_id"),
     authors: readStringArray(value, "authors"),
     doi: readString(value, "doi"),
     limitations: readStringArray(value, "limitations"),
