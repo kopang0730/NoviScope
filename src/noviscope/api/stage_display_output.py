@@ -23,10 +23,16 @@ OUTPUT_PAYLOAD_ROOT: Final = "output_payload"
 HIDDEN_DISPLAY_KEYS: Final = frozenset(
     {
         "api_key",
-        "encrypted_api_key",
         "raw_response",
         "secret",
-        "token",
+    }
+)
+HIDDEN_DISPLAY_KEY_MARKERS: Final = frozenset(
+    {
+        "api_key",
+        "ciphertext",
+        "raw_response",
+        "secret",
     }
 )
 
@@ -68,6 +74,15 @@ def json_path(parent_path: str, child_name: str) -> str:
     return f"{parent_path}.{child_name}"
 
 
+def should_hide_display_field(field_name: str) -> bool:
+    normalized = field_name.lower()
+    return (
+        normalized.endswith("token")
+        or normalized in HIDDEN_DISPLAY_KEYS
+        or any(marker in normalized for marker in HIDDEN_DISPLAY_KEY_MARKERS)
+    )
+
+
 def sanitize_json_value(value: JsonValue, parent_path: str) -> SanitizedJsonValue:
     match value:
         case dict() as mapping:
@@ -75,7 +90,7 @@ def sanitize_json_value(value: JsonValue, parent_path: str) -> SanitizedJsonValu
             hidden_fields: list[str] = []
             for field_name, item in mapping.items():
                 child_path = json_path(parent_path, field_name)
-                if field_name in HIDDEN_DISPLAY_KEYS:
+                if should_hide_display_field(field_name):
                     hidden_fields.append(child_path)
                     continue
                 child = sanitize_json_value(item, child_path)
