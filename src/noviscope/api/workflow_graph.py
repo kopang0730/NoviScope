@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Annotated, Final, Literal, TypeAlias
+from typing import Annotated, Final
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict
@@ -11,7 +11,14 @@ from noviscope.api.stage_readiness import (
     build_stage_readiness_response,
     get_stage_readiness_context,
 )
-from noviscope.core.json_types import JsonObject
+from noviscope.api.workflow_gate_status import (
+    GateStatus,
+    NextHumanAction,
+    gate_status,
+    human_review_required,
+    next_human_action,
+    review_state,
+)
 from noviscope.core.stage_policy import (
     DEMAND_VALIDATOR_AGENT_ID,
     EXPERIMENT_PLANNER_AGENT_ID,
@@ -26,22 +33,6 @@ from noviscope.models.quest import Quest, QuestStatus, StageCard, StageStatus
 from noviscope.quests.service import QuestService
 
 router = APIRouter()
-
-GateStatus: TypeAlias = Literal[
-    "not_required",
-    "waiting_for_completion",
-    "pending_review",
-    "approved",
-    "rejected",
-]
-
-HUMAN_REVIEW_AGENT_IDS: Final = frozenset(
-    {
-        DEMAND_VALIDATOR_AGENT_ID,
-        IDEA_GENERATOR_AGENT_ID,
-        EXPERIMENT_PLANNER_AGENT_ID,
-    }
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,6 +108,7 @@ class WorkflowNodeResponse(BaseModel):
     blocking_detail: str
     human_review_required: bool
     review_state: GateStatus
+    next_human_action: NextHumanAction
     human_approved: bool | None
     provider_id: str | None
     provider_name: str | None
@@ -193,6 +185,7 @@ def build_node(
         human_approved=stage.human_approved,
         human_review_required=human_review_required(stage),
         id=stage.id,
+        next_human_action=next_human_action(stage, readiness.can_run),
         order=order,
         review_state=review_state(stage),
         stage_id=stage.id,
@@ -227,46 +220,13 @@ def build_edge(
 ) -> WorkflowEdgeResponse:
     return WorkflowEdgeResponse(
         gate_required=dependency.gate_required,
-        gate_status=gate_status(dependency, source_stage),
+        gate_status=gate_status(dependency.gate_required, source_stage),
         id=f"{source_stage.id}->{target_stage.id}",
         relationship=dependency.relationship,
         source_agent_id=source_stage.agent_id,
         source_stage_id=source_stage.id,
         target_agent_id=target_stage.agent_id,
         target_stage_id=target_stage.id,
-    )
-
-
-def human_review_required(stage: StageCard) -> bool:
-    return stage.agent_id in HUMAN_REVIEW_AGENT_IDS
-
-
-def review_state(stage: StageCard) -> GateStatus:
-    return gate_status_for_stage(stage, human_review_required(stage))
-
-
-def gate_status(dependency: WorkflowDependency, source_stage: StageCard) -> GateStatus:
-    return gate_status_for_stage(source_stage, dependency.gate_required)
-
-
-def gate_status_for_stage(stage: StageCard, gate_required: bool) -> GateStatus:
-    if not gate_required:
-        return "not_required"
-    if stage.status != StageStatus.COMPLETE:
-        return "waiting_for_completion"
-    if stage.agent_id == IDEA_GENERATOR_AGENT_ID:
-        return "approved" if has_selected_idea(stage.output_payload) else "pending_review"
-    if stage.human_approved is True:
-        return "approved"
-    if stage.human_approved is False:
-        return "rejected"
-    return "pending_review"
-
-
-def has_selected_idea(output_payload: JsonObject) -> bool:
-    selected_ideas = output_payload.get("selected_ideas")
-    return isinstance(selected_ideas, list) and any(
-        isinstance(selected_idea, dict) for selected_idea in selected_ideas
     )
 
 
