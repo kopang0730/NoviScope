@@ -3,21 +3,23 @@ import type { Quest, StageCard } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
 import { downloadTextFile } from "../lib/download-file";
-import { buildPreviewData, findNextStage, parseIntakeBrief, summarizeProgress } from "../lib/quest-overview";
+import { buildPreviewData, parseIntakeBrief, summarizeProgress } from "../lib/quest-overview";
 import { buildQuestReviewPacket } from "../lib/quest-review-export";
+import type { ProviderReadinessData } from "../lib/provider-readiness-data";
+import { findNextActionStage } from "../lib/research-canvas-data";
 import { paperMeetingWriterAgentId } from "../lib/stages";
-import { questTone, stageTone } from "../lib/status-tones";
-import {
-  getLocalizedWorkflowReadinessReason,
-  getWorkflowStageReadiness,
-} from "../lib/workflow-readiness";
+import { questTone } from "../lib/status-tones";
 import { Badge } from "./badge";
 import { Button, buttonClassName } from "./button";
 import { Card, CardHeading } from "./card";
+import { QuestNextActionCard } from "./quest-next-action-card";
 
 type QuestOverviewPanelProps = {
   readonly detailError: string | null;
   readonly detailLoading: boolean;
+  readonly onRunStage: (stageId: string) => void;
+  readonly providerReadinessData: ProviderReadinessData;
+  readonly runningStageId: string | null;
   readonly selectedQuest: Quest | null;
   readonly selectedQuestId: string | null;
   readonly stages: readonly StageCard[];
@@ -83,18 +85,21 @@ function downloadReviewPacket(quest: Quest, stages: readonly StageCard[]) {
 export function QuestOverviewPanel({
   detailError,
   detailLoading,
+  onRunStage,
+  providerReadinessData,
+  runningStageId,
   selectedQuest,
   selectedQuestId,
   stages,
 }: QuestOverviewPanelProps) {
   const { t } = useI18n();
   const progress = summarizeProgress(stages);
-  const nextStage = findNextStage(stages);
   const intake = selectedQuest ? parseIntakeBrief(selectedQuest.initial_direction) : null;
   const previews = usePreviewItems(stages);
   const lastStage = stages.length > 0 ? stages[stages.length - 1] ?? null : null;
-  const reviewStage = nextStage ?? stages.find((stage) => stage.agent_id === paperMeetingWriterAgentId) ?? lastStage;
-  const nextStageReadiness = nextStage ? getWorkflowStageReadiness(nextStage, stages) : null;
+  const nextActionStage = findNextActionStage(stages, providerReadinessData);
+  const reviewStage =
+    nextActionStage ?? stages.find((stage) => stage.agent_id === paperMeetingWriterAgentId) ?? lastStage;
 
   return (
     <Card>
@@ -142,16 +147,13 @@ export function QuestOverviewPanel({
             <BriefItem label={t("overviewPendingStages")} value={String(progress.pending)} />
           </div>
 
-          <div className="rounded-lg border border-slate-200 p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t("overviewNextAction")}</p>
-                <p className="mt-1 font-medium text-slate-900">{nextStage ? nextStage.title : t("overviewAllStagesComplete")}</p>
-                {nextStageReadiness ? <p className="mt-2 text-sm text-slate-600">{getLocalizedWorkflowReadinessReason(nextStageReadiness, t)}</p> : null}
-              </div>
-              {nextStage ? <Badge tone={stageTone(nextStage.status)}>{labelFromEnum(nextStage.status)}</Badge> : null}
-            </div>
-          </div>
+          <QuestNextActionCard
+            onRunStage={onRunStage}
+            providerReadinessData={providerReadinessData}
+            quest={selectedQuest}
+            runningStageId={runningStageId}
+            stages={stages}
+          />
 
           <div>
             <p className="text-sm font-semibold text-slate-900">{t("overviewIntakeBrief")}</p>
@@ -186,7 +188,7 @@ export function QuestOverviewPanel({
             className={buttonClassName({ className: "w-full", variant: "secondary" })}
             to={reviewStage ? `/stages/${reviewStage.id}?quest=${selectedQuest.id}` : `/?quest=${selectedQuest.id}`}
           >
-            {nextStage ? t("overviewOpenNextStage") : t("overviewReviewArtifacts")}
+            {nextActionStage ? t("overviewOpenNextStage") : t("overviewReviewArtifacts")}
           </Link>
         </div>
       ) : null}
