@@ -2,11 +2,15 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Annotated, Final, assert_never
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, JsonValue
 from sqlmodel import Session
 
 from noviscope.api.dependencies import get_session
+from noviscope.api.stage_review_guidance_markdown import (
+    build_stage_review_guidance_markdown,
+    stage_review_guidance_markdown_filename,
+)
 from noviscope.auth.dependencies import get_current_user
 from noviscope.core.json_types import JsonObject
 from noviscope.core.stage_policy import (
@@ -197,6 +201,15 @@ def build_stage_review_guidance(stage: StageCard) -> StageReviewGuidanceResponse
     )
 
 
+def read_stage_review_guidance(
+    stage_id: str,
+    context: StageReviewGuidanceContext,
+) -> StageReviewGuidanceResponse:
+    service = QuestService(context.session)
+    stage = service.get_stage_card_for_user(stage_id, context.current_user)
+    return build_stage_review_guidance(stage)
+
+
 @router.get("/stages/{stage_id}/review-guidance", response_model=StageReviewGuidanceResponse)
 def get_stage_review_guidance(
     stage_id: str,
@@ -205,11 +218,34 @@ def get_stage_review_guidance(
         Depends(get_stage_review_guidance_context),
     ],
 ) -> StageReviewGuidanceResponse:
-    service = QuestService(context.session)
     try:
-        stage = service.get_stage_card_for_user(stage_id, context.current_user)
-        return build_stage_review_guidance(stage)
+        return read_stage_review_guidance(stage_id, context)
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except PermissionError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+
+@router.get("/stages/{stage_id}/review-guidance/download.md")
+def download_stage_review_guidance_markdown(
+    stage_id: str,
+    context: Annotated[
+        StageReviewGuidanceContext,
+        Depends(get_stage_review_guidance_context),
+    ],
+) -> Response:
+    try:
+        guidance = read_stage_review_guidance(stage_id, context)
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    return Response(
+        content=build_stage_review_guidance_markdown(guidance),
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{stage_review_guidance_markdown_filename(stage_id)}"'
+            ),
+        },
+        media_type="text/markdown; charset=utf-8",
+    )
