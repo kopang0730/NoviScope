@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from noviscope.agents.literature_scout import LITERATURE_SCOUT_AGENT_ID
 from noviscope.core.stage_policy import DEMAND_VALIDATOR_AGENT_ID
 from noviscope.main import create_app
 
@@ -63,21 +64,56 @@ def create_quest(client: TestClient) -> tuple[str, str]:
     return quest_id, demand_stage["id"]
 
 
-def complete_unapproved_demand_stage(client: TestClient, stage_id: str) -> None:
+def stage_id_for_agent(client: TestClient, quest_id: str, agent_id: str) -> str:
+    stages_response = client.get(f"/quests/{quest_id}/stages")
+    assert stages_response.status_code == 200
+    stage = next(
+        stage
+        for stage in stages_response.json()["stages"]
+        if stage["agent_id"] == agent_id
+    )
+    return stage["id"]
+
+
+def complete_demand_stage(client: TestClient, stage_id: str) -> None:
     running_response = client.patch(f"/stages/{stage_id}", json={"status": "running"})
     assert running_response.status_code == 200
     response = client.patch(
         f"/stages/{stage_id}",
         json={
-            "human_approved": False,
             "output_payload": {
                 "confidence": "medium",
                 "demand_assessment": "plausible",
                 "evidence_for_demand": ["worksheet reuse workflow"],
             },
-            "review_notes": "Need stronger customer evidence before continuing.",
             "status": "complete",
             "summary": "Demand is plausible but needs review.",
+        },
+    )
+    assert response.status_code == 200
+
+
+def approve_completed_demand_stage(client: TestClient, stage_id: str) -> None:
+    complete_demand_stage(client, stage_id)
+    response = client.post(
+        f"/stages/{stage_id}/demand-review",
+        json={
+            "review_notes": "Confirmed worksheet reuse demand with customer evidence.",
+            "sources": ["Customer worksheet reuse interview"],
+            "verdict": "verified",
+        },
+    )
+    assert response.status_code == 200
+
+
+def reject_completed_demand_stage(client: TestClient, stage_id: str) -> None:
+    complete_demand_stage(client, stage_id)
+    response = client.post(
+        f"/stages/{stage_id}/demand-review",
+        json={
+            "review_notes": "Need stronger customer evidence before continuing.",
+            "sources": [],
+            "verdict": "rejected",
         },
     )
     assert response.status_code == 200
@@ -115,28 +151,72 @@ def test_workflow_next_actions_prioritizes_provider_configuration(
     }
 
 
-def test_workflow_next_actions_prioritizes_human_review_gate(
+def test_workflow_next_actions_skips_approved_completed_stage(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'workflow-next-actions-approved.db'}")
+    with TestClient(app) as client:
+        # Given: Demand validation is complete, approved, and backed by human evidence.
+        register_and_login(client, "NEXT-ACTIONS-APPROVED", "next-actions-approved@example.com")
+        create_personal_provider(client)
+        quest_id, demand_stage_id = create_quest(client)
+        literature_stage_id = stage_id_for_agent(client, quest_id, LITERATURE_SCOUT_AGENT_ID)
+        approve_completed_demand_stage(client, demand_stage_id)
+
+        # When: the workbench asks what should run next.
+        response = client.get(f"/quests/{quest_id}/workflow-next-actions")
+
+    # Then: the completed Demand validation stage is skipped in favor of Literature Scout.
+    assert response.status_code == 200
+    body = response.json()
+    assert body["action_count"] == 1
+    assert body["actions"][0] == {
+        "action_type": "run_stage",
+        "agent_id": LITERATURE_SCOUT_AGENT_ID,
+        "blocking_reason": "",
+        "can_run": True,
+        "detail": "Stage is ready to run.",
+        "label": "Run Literature scout",
+        "priority": 2,
+        "stage_id": literature_stage_id,
+        "stage_status": "pending",
+        "stage_title": "Literature scout",
+    }
+
+
+def test_workflow_next_actions_routes_rejected_demand_to_recovery_blocker(
     tmp_path,
     dev_admin_header_enabled: None,
 ) -> None:
     app = create_app(database_url=f"sqlite:///{tmp_path / 'workflow-next-actions-review.db'}")
     with TestClient(app) as client:
-        # Given: Demand validation is complete but explicitly not approved.
+        # Given: Demand validation is complete and human review rejected the demand.
         register_and_login(client, "NEXT-ACTIONS-REVIEW", "next-actions-review@example.com")
         create_personal_provider(client)
         quest_id, demand_stage_id = create_quest(client)
-        complete_unapproved_demand_stage(client, demand_stage_id)
+        literature_stage_id = stage_id_for_agent(client, quest_id, LITERATURE_SCOUT_AGENT_ID)
+        reject_completed_demand_stage(client, demand_stage_id)
 
         # When: the workbench asks what blocks the research workflow.
         response = client.get(f"/quests/{quest_id}/workflow-next-actions")
 
-    # Then: the next action is human review before downstream stages run.
+    # Then: rejected demand does not ask for another review; downstream stages stay blocked.
     assert response.status_code == 200
     body = response.json()
     assert body["action_count"] == 1
-    assert body["actions"][0]["action_type"] == "review_stage"
-    assert body["actions"][0]["agent_id"] == DEMAND_VALIDATOR_AGENT_ID
-    assert body["actions"][0]["stage_id"] == demand_stage_id
-    assert body["actions"][0]["label"] == "Review Demand validation"
-    assert body["actions"][0]["detail"] == "Need stronger customer evidence before continuing."
-    assert body["actions"][0]["can_run"] is False
+    assert body["actions"][0] == {
+        "action_type": "resolve_blocker",
+        "agent_id": LITERATURE_SCOUT_AGENT_ID,
+        "blocking_reason": "demand_validation_review_required",
+        "can_run": False,
+        "detail": (
+            "Approve Demand validation before running Literature scout. If the demand was "
+            "rejected, revise or rerun Demand validation first."
+        ),
+        "label": "Resolve blocker for Literature scout",
+        "priority": 2,
+        "stage_id": literature_stage_id,
+        "stage_status": "pending",
+        "stage_title": "Literature scout",
+    }

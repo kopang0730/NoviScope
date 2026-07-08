@@ -1,4 +1,4 @@
-from typing import Annotated, Literal, TypeAlias, assert_never
+from typing import Annotated, Final, Literal, TypeAlias, assert_never
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict
@@ -26,6 +26,7 @@ WorkflowActionType: TypeAlias = Literal[
     "wait_for_stage",
 ]
 BlockingActionType: TypeAlias = Literal["configure_provider", "resolve_blocker"]
+COMPLETED_STAGE_BLOCKING_REASON: Final = "stage_already_complete"
 
 
 class WorkflowNextActionResponse(BaseModel):
@@ -73,9 +74,9 @@ def review_detail(stage: StageCard, node: WorkflowNodeResponse) -> str:
 
 def review_action_required(review_state: GateStatus) -> bool:
     match review_state:
-        case "pending_review" | "rejected":
+        case "pending_review":
             return True
-        case "approved" | "not_required" | "waiting_for_completion":
+        case "approved" | "not_required" | "rejected" | "waiting_for_completion":
             return False
         case unreachable:
             assert_never(unreachable)
@@ -145,7 +146,23 @@ def node_next_action(
 
 
 def node_needs_action(node: WorkflowNodeResponse) -> bool:
-    return review_action_required(node.review_state) or node.can_run or bool(node.blocking_reason)
+    return (
+        review_action_required(node.review_state)
+        or node.can_run
+        or node_has_actionable_blocker(node)
+    )
+
+
+def node_has_actionable_blocker(node: WorkflowNodeResponse) -> bool:
+    if not node.blocking_reason:
+        return False
+    match node.status:
+        case StageStatus.COMPLETE:
+            return node.blocking_reason != COMPLETED_STAGE_BLOCKING_REASON
+        case StageStatus.PENDING | StageStatus.BLOCKED | StageStatus.RUNNING:
+            return True
+        case unreachable:
+            assert_never(unreachable)
 
 
 def build_next_actions(
