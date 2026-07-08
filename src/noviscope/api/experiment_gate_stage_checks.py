@@ -2,10 +2,18 @@ from typing import Final, assert_never
 
 from pydantic import JsonValue
 
+from noviscope.agents.experiment_planner import has_selected_idea
 from noviscope.api.experiment_gate_types import ExperimentGateCheck, ExperimentGateCheckStatus
 from noviscope.models.quest import StageCard, StageStatus
 
 EXPERIMENT_SETUP_FIELDS: Final = ("data_path", "code_repository", "environment_notes")
+APPROVING_DEMAND_VERDICTS: Final = frozenset({"plausible", "verified"})
+EXPERIMENT_PLAN_DETAIL_FIELDS: Final = (
+    "datasets_needed",
+    "baselines_to_reproduce",
+    "metrics",
+    "first_runnable_script_plan",
+)
 DEMAND_KEY, DEMAND_TITLE = "demand_validation", "Demand validation reviewed"
 IDEA_KEY, IDEA_TITLE = "idea_selection", "Idea selected for experiment"
 SETUP_KEY, SETUP_TITLE = "experiment_setup", "Experiment setup recorded"
@@ -22,16 +30,6 @@ def text_present(value: JsonValue | None) -> bool:
             assert_never(unreachable)
 
 
-def true_value(value: JsonValue | None) -> bool:
-    match value:
-        case True:
-            return True
-        case False | None | str() | int() | float() | list() | dict():
-            return False
-        case unreachable:
-            assert_never(unreachable)
-
-
 def has_text_item(value: JsonValue | None) -> bool:
     match value:
         case list() as items:
@@ -40,6 +38,10 @@ def has_text_item(value: JsonValue | None) -> bool:
             return False
         case unreachable:
             assert_never(unreachable)
+
+
+def has_text_value(value: JsonValue | None) -> bool:
+    return text_present(value) or has_text_item(value)
 
 
 def missing_stage_check(key: str, title: str, detail: str) -> ExperimentGateCheck:
@@ -82,7 +84,24 @@ def demand_stage_check(stage: StageCard) -> ExperimentGateCheck:
 def demand_human_review_check(stage: StageCard) -> ExperimentGateCheck:
     match stage.human_approved:
         case True:
-            if has_text_item(stage.evidence_payload.get("human_demand_sources")):
+            if not has_text_item(stage.evidence_payload.get("human_demand_sources")):
+                return ExperimentGateCheck(
+                    detail="Demand approval is missing human evidence sources.",
+                    key=DEMAND_KEY,
+                    stage_id=stage.id,
+                    status=ExperimentGateCheckStatus.NEEDS_REVIEW,
+                    title=DEMAND_TITLE,
+                )
+            verdict = stage.evidence_payload.get("human_demand_verdict")
+            if not isinstance(verdict, str) or not verdict.strip():
+                return ExperimentGateCheck(
+                    detail="Demand approval is missing a human verdict.",
+                    key=DEMAND_KEY,
+                    stage_id=stage.id,
+                    status=ExperimentGateCheckStatus.NEEDS_REVIEW,
+                    title=DEMAND_TITLE,
+                )
+            if verdict in APPROVING_DEMAND_VERDICTS:
                 return ExperimentGateCheck(
                     detail="Demand was approved with human evidence sources.",
                     key=DEMAND_KEY,
@@ -91,10 +110,10 @@ def demand_human_review_check(stage: StageCard) -> ExperimentGateCheck:
                     title=DEMAND_TITLE,
                 )
             return ExperimentGateCheck(
-                detail="Demand approval is missing human evidence sources.",
+                detail="Demand verdict must be plausible or verified before experiments.",
                 key=DEMAND_KEY,
                 stage_id=stage.id,
-                status=ExperimentGateCheckStatus.NEEDS_REVIEW,
+                status=ExperimentGateCheckStatus.BLOCKED,
                 title=DEMAND_TITLE,
             )
         case False:
@@ -150,12 +169,21 @@ def idea_stage_check(stage: StageCard) -> ExperimentGateCheck:
 def idea_human_review_check(stage: StageCard) -> ExperimentGateCheck:
     match stage.human_approved:
         case True:
-            if has_text_item(stage.output_payload.get("selected_idea_ids")):
+            selected_ids = stage.output_payload.get("selected_idea_ids")
+            if has_selected_idea(stage):
                 return ExperimentGateCheck(
                     detail="At least one generated idea was selected by a human reviewer.",
                     key=IDEA_KEY,
                     stage_id=stage.id,
                     status=ExperimentGateCheckStatus.PASS,
+                    title=IDEA_TITLE,
+                )
+            if has_text_item(selected_ids):
+                return ExperimentGateCheck(
+                    detail="Selected idea ids must match generated ideas.",
+                    key=IDEA_KEY,
+                    stage_id=stage.id,
+                    status=ExperimentGateCheckStatus.NEEDS_REVIEW,
                     title=IDEA_TITLE,
                 )
             return ExperimentGateCheck(
@@ -203,8 +231,7 @@ def experiment_setup_stage_check(stage: StageCard) -> ExperimentGateCheck:
     fields_ready = all(
         text_present(stage.input_payload.get(field)) for field in EXPERIMENT_SETUP_FIELDS
     )
-    evidence_ready = true_value(stage.evidence_payload.get("experiment_setup_recorded"))
-    if fields_ready and evidence_ready:
+    if fields_ready:
         return ExperimentGateCheck(
             detail="Data path, code repository, and environment notes are recorded.",
             key=SETUP_KEY,
@@ -251,9 +278,23 @@ def experiment_plan_stage_check(stage: StageCard) -> ExperimentGateCheck:
             assert_never(unreachable)
 
 
+def has_experiment_plan_output(stage: StageCard) -> bool:
+    return text_present(stage.output_payload.get("summary")) and all(
+        has_text_value(stage.output_payload.get(field)) for field in EXPERIMENT_PLAN_DETAIL_FIELDS
+    )
+
+
 def experiment_plan_human_review_check(stage: StageCard) -> ExperimentGateCheck:
     match stage.human_approved:
         case True:
+            if not has_experiment_plan_output(stage):
+                return ExperimentGateCheck(
+                    detail="Experiment plan approval is missing generated plan details.",
+                    key=PLAN_KEY,
+                    stage_id=stage.id,
+                    status=ExperimentGateCheckStatus.NEEDS_REVIEW,
+                    title=PLAN_TITLE,
+                )
             return ExperimentGateCheck(
                 detail="Experiment plan is complete and human-approved.",
                 key=PLAN_KEY,

@@ -74,6 +74,28 @@ def complete_demand_review(client: TestClient, stage_id: str) -> None:
     assert review_response.status_code == 200
 
 
+def complete_demand_with_generic_rejected_verdict(client: TestClient, stage_id: str) -> None:
+    running_response = client.patch(f"/stages/{stage_id}", json={"status": "running"})
+    assert running_response.status_code == 200
+    complete_response = client.patch(
+        f"/stages/{stage_id}",
+        json={
+            "evidence_payload": {
+                "human_demand_sources": ["Coach interview notes 2026-07-07"],
+                "human_demand_verdict": "rejected",
+            },
+            "human_approved": True,
+            "output_payload": {
+                "confidence": "medium",
+                "demand_assessment": "plausible",
+                "summary": "Badminton training feedback was reviewed.",
+            },
+            "status": "complete",
+        },
+    )
+    assert complete_response.status_code == 200
+
+
 def complete_idea_selection(client: TestClient, stage_id: str) -> None:
     running_response = client.patch(f"/stages/{stage_id}", json={"status": "running"})
     assert running_response.status_code == 200
@@ -113,6 +135,39 @@ def complete_idea_selection(client: TestClient, stage_id: str) -> None:
     assert selection_response.status_code == 200
 
 
+def complete_idea_selection_with_missing_id(client: TestClient, stage_id: str) -> None:
+    running_response = client.patch(f"/stages/{stage_id}", json={"status": "running"})
+    assert running_response.status_code == 200
+    complete_response = client.patch(
+        f"/stages/{stage_id}",
+        json={
+            "human_approved": True,
+            "output_payload": {
+                "confidence": "medium",
+                "ideas": [
+                    {
+                        "application_value": "Coach-facing training feedback.",
+                        "based_on_which_papers": ["paper-1"],
+                        "confidence": "medium",
+                        "core_hypothesis": "Temporal cues improve recognition.",
+                        "expected_improvement": "Better frame-level stability.",
+                        "experiment_feasibility": "medium",
+                        "idea_id": "idea_temporal_cues",
+                        "idea_title": "Temporal cue badminton action recognition",
+                        "novelty_risk": "medium",
+                        "required_baseline": "Pose-based action classifier",
+                        "required_data": "Badminton training videos",
+                    }
+                ],
+                "selected_idea_ids": ["missing_idea"],
+                "selection_status": "selected_for_experiment_design",
+            },
+            "status": "complete",
+        },
+    )
+    assert complete_response.status_code == 200
+
+
 def record_experiment_setup(client: TestClient, stage_id: str) -> None:
     setup_response = client.post(
         f"/stages/{stage_id}/experiment-setup",
@@ -141,6 +196,48 @@ def complete_experiment_plan(client: TestClient, stage_id: str, approved: bool |
                 "summary": "Experiment plan is ready for human-controlled execution.",
             },
             "review_notes": "Plan reviewed for a first run." if approved is True else "",
+            "status": "complete",
+        },
+    )
+    assert complete_response.status_code == 200
+
+
+def complete_experiment_plan_with_run_evidence(client: TestClient, stage_id: str) -> None:
+    running_response = client.patch(f"/stages/{stage_id}", json={"status": "running"})
+    assert running_response.status_code == 200
+    complete_response = client.patch(
+        f"/stages/{stage_id}",
+        json={
+            "evidence_payload": {
+                "can_run": True,
+                "no_experiment_results": True,
+                "plan_only": True,
+            },
+            "human_approved": True,
+            "output_payload": {
+                "baselines_to_reproduce": ["Pose-based action classifier"],
+                "confidence": "medium",
+                "datasets_needed": ["Badminton training videos"],
+                "first_runnable_script_plan": ["Run train.py with the recorded data path."],
+                "metrics": ["top-1 accuracy", "frame consistency"],
+                "summary": "Experiment plan is ready for human-controlled execution.",
+            },
+            "review_notes": "Plan is ready for the first run.",
+            "status": "complete",
+        },
+    )
+    assert complete_response.status_code == 200
+
+
+def complete_empty_experiment_plan(client: TestClient, stage_id: str) -> None:
+    running_response = client.patch(f"/stages/{stage_id}", json={"status": "running"})
+    assert running_response.status_code == 200
+    complete_response = client.patch(
+        f"/stages/{stage_id}",
+        json={
+            "human_approved": True,
+            "output_payload": {},
+            "review_notes": "Approved without plan details.",
             "status": "complete",
         },
     )
@@ -222,6 +319,111 @@ def test_experiment_gate_requires_human_plan_review(
     assert body["ready_for_experiment"] is False
     assert check_statuses(body)["experiment_plan"] == "needs_review"
     assert body["blocking_reasons"] == ["Experiment plan is complete but needs human approval."]
+
+
+def test_experiment_gate_blocks_rejected_demand_verdict(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'experiment-gate-demand.db'}")
+
+    with TestClient(app) as client:
+        register_and_login(client, "GATE-DEMAND", "gate-demand@example.com")
+        quest_id, stage_ids = create_quest_with_stage_ids(client)
+        complete_demand_with_generic_rejected_verdict(
+            client,
+            stage_ids[DEMAND_VALIDATOR_AGENT_ID],
+        )
+        complete_idea_selection(client, stage_ids[IDEA_GENERATOR_AGENT_ID])
+        record_experiment_setup(client, stage_ids[EXPERIMENT_PLANNER_AGENT_ID])
+        complete_experiment_plan(client, stage_ids[EXPERIMENT_PLANNER_AGENT_ID], True)
+
+        response = client.get(f"/quests/{quest_id}/experiment-gate")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["gate_status"] == "blocked"
+    assert body["ready_for_experiment"] is False
+    assert check_statuses(body)["demand_validation"] == "blocked"
+    assert "Demand verdict must be plausible or verified before experiments." in body[
+        "blocking_reasons"
+    ]
+
+
+def test_experiment_gate_requires_selected_generated_idea(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'experiment-gate-idea.db'}")
+
+    with TestClient(app) as client:
+        register_and_login(client, "GATE-IDEA", "gate-idea@example.com")
+        quest_id, stage_ids = create_quest_with_stage_ids(client)
+        complete_demand_review(client, stage_ids[DEMAND_VALIDATOR_AGENT_ID])
+        complete_idea_selection_with_missing_id(client, stage_ids[IDEA_GENERATOR_AGENT_ID])
+        record_experiment_setup(client, stage_ids[EXPERIMENT_PLANNER_AGENT_ID])
+        complete_experiment_plan(client, stage_ids[EXPERIMENT_PLANNER_AGENT_ID], True)
+
+        response = client.get(f"/quests/{quest_id}/experiment-gate")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["gate_status"] == "needs_review"
+    assert body["ready_for_experiment"] is False
+    assert check_statuses(body)["idea_selection"] == "needs_review"
+    assert "Selected idea ids must match generated ideas." in body["blocking_reasons"]
+
+
+def test_experiment_gate_keeps_setup_ready_after_run_replaces_evidence(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'experiment-gate-run-evidence.db'}")
+
+    with TestClient(app) as client:
+        register_and_login(client, "GATE-RUN", "gate-run@example.com")
+        quest_id, stage_ids = create_quest_with_stage_ids(client)
+        complete_demand_review(client, stage_ids[DEMAND_VALIDATOR_AGENT_ID])
+        complete_idea_selection(client, stage_ids[IDEA_GENERATOR_AGENT_ID])
+        record_experiment_setup(client, stage_ids[EXPERIMENT_PLANNER_AGENT_ID])
+        complete_experiment_plan_with_run_evidence(
+            client,
+            stage_ids[EXPERIMENT_PLANNER_AGENT_ID],
+        )
+
+        response = client.get(f"/quests/{quest_id}/experiment-gate")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["gate_status"] == "ready"
+    assert body["ready_for_experiment"] is True
+    assert check_statuses(body)["experiment_setup"] == "pass"
+
+
+def test_experiment_gate_requires_generated_plan_details_before_approval_passes(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'experiment-gate-empty-plan.db'}")
+
+    with TestClient(app) as client:
+        register_and_login(client, "GATE-PLAN", "gate-plan@example.com")
+        quest_id, stage_ids = create_quest_with_stage_ids(client)
+        complete_demand_review(client, stage_ids[DEMAND_VALIDATOR_AGENT_ID])
+        complete_idea_selection(client, stage_ids[IDEA_GENERATOR_AGENT_ID])
+        record_experiment_setup(client, stage_ids[EXPERIMENT_PLANNER_AGENT_ID])
+        complete_empty_experiment_plan(client, stage_ids[EXPERIMENT_PLANNER_AGENT_ID])
+
+        response = client.get(f"/quests/{quest_id}/experiment-gate")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["gate_status"] == "needs_review"
+    assert body["ready_for_experiment"] is False
+    assert check_statuses(body)["experiment_plan"] == "needs_review"
+    assert "Experiment plan approval is missing generated plan details." in body[
+        "blocking_reasons"
+    ]
 
 
 def test_experiment_gate_rejects_other_users_quest(
