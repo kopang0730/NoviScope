@@ -15,7 +15,7 @@ def build_chat_completion_payload(request: PaperMeetingWriterRequest) -> ChatCom
     result_context = experiment_results_context(request.experiment_plan)
     prompt_payload = {
         "demand_validation": compact_payload(request.demand_validation),
-        "experiment_plan": compact_payload(request.experiment_plan),
+        "experiment_plan": experiment_plan_prompt_payload(request.experiment_plan),
         "experiment_result_context": result_context.as_prompt_payload(),
         "papers": request.papers[:MAX_PAPERS_FOR_PROMPT],
         "quest": {
@@ -54,6 +54,14 @@ def build_chat_completion_payload(request: PaperMeetingWriterRequest) -> ChatCom
         "model": request.model,
         "temperature": 0.25,
     }
+
+
+def experiment_plan_prompt_payload(experiment_plan: JsonObject) -> JsonObject:
+    payload = compact_payload(experiment_plan)
+    if "experiment_results" in payload:
+        del payload["experiment_results"]
+        payload["experiment_results_redacted"] = True
+    return payload
 
 
 def compact_payload(payload: JsonObject) -> JsonObject:

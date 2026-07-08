@@ -55,7 +55,9 @@ def constrain_output(
 ) -> PaperMeetingWriterOutput:
     result_context = experiment_results_context(request.experiment_plan)
     warnings = list(output.warnings)
-    verified_facts = list(output.verified_facts)
+    verified_facts = [
+        fact for fact in output.verified_facts if not is_experiment_result_fact(fact)
+    ]
     experiment_results_not_available = list(output.experiment_results_not_available)
     human_review_required = list(output.human_review_required)
     if result_context.has_verified_results:
@@ -85,6 +87,10 @@ def constrain_output(
             "warnings": warnings,
         }
     )
+
+
+def is_experiment_result_fact(fact: str) -> bool:
+    return fact.startswith("Verified experiment result:")
 
 
 def cap_confidence(confidence: str) -> Confidence:

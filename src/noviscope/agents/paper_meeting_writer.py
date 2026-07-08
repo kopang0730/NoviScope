@@ -143,7 +143,7 @@ class PaperMeetingWriterStageRunner(StageRunner):
                 demand_validation=compact_payload(
                     demand_stage.output_payload if demand_stage is not None else {}
                 ),
-                experiment_plan=compact_payload(experiment_stage.output_payload),
+                experiment_plan=experiment_stage.output_payload,
                 initial_direction=context.quest.initial_direction,
                 model=context.provider.model,
                 papers=papers[:MAX_PAPERS_FOR_PROMPT],

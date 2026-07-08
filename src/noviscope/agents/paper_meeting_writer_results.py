@@ -9,6 +9,7 @@ from noviscope.core.json_types import JsonObject
 NEEDS_REVIEW_WARNING = (
     "Some experiment result records require human review and were excluded from verified facts."
 )
+TRUSTED_RESULT_SOURCE_AGENT_IDS = frozenset({"code_runner", "evidence_auditor"})
 
 
 class ExperimentResultStatus(StrEnum):
@@ -50,6 +51,8 @@ def experiment_results_context(experiment_plan: JsonObject) -> ExperimentResults
                 fact = verified_result_fact(record)
                 if fact is not None:
                     verified_facts.append(fact)
+                else:
+                    human_review_required.append(needs_review_note(record))
             case ExperimentResultStatus.NEEDS_REVIEW:
                 human_review_required.append(needs_review_note(record))
             case ExperimentResultStatus.REJECTED | None:
@@ -105,6 +108,7 @@ def verified_result_fact(record: JsonObject) -> str | None:
     baseline_name = string_field(record, "baseline_name")
     run_id = string_field(record, "run_id")
     artifact_uri = string_field(record, "artifact_uri")
+    source_agent_id = string_field(record, "source_agent_id")
     if (
         metric_name is None
         or metric_value is None
@@ -113,6 +117,7 @@ def verified_result_fact(record: JsonObject) -> str | None:
         or baseline_name is None
         or run_id is None
         or artifact_uri is None
+        or source_agent_id not in TRUSTED_RESULT_SOURCE_AGENT_IDS
     ):
         return None
     return (
@@ -125,10 +130,9 @@ def verified_result_fact(record: JsonObject) -> str | None:
 def needs_review_note(record: JsonObject) -> str:
     metric_name = string_field(record, "metric_name") or "unknown metric"
     run_id = string_field(record, "run_id") or "unknown run"
-    artifact_uri = string_field(record, "artifact_uri") or "missing artifact"
     return (
         f"Experiment result run {run_id} for {metric_name} requires human review "
-        f"before paper claims; artifact {artifact_uri}."
+        "before paper claims."
     )
 
 
