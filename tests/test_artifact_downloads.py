@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from stage_test_helpers import complete_stage_in_database
 
 from noviscope.core.stage_policy import PAPER_MEETING_WRITER_AGENT_ID
 from noviscope.main import create_app
@@ -46,49 +47,41 @@ def create_quest_with_paper_stage(client: TestClient) -> str:
     return paper_stage["id"]
 
 
-def complete_paper_stage_with_artifacts(client: TestClient, stage_id: str) -> None:
-    running_response = client.patch(f"/stages/{stage_id}", json={"status": "running"})
-    assert running_response.status_code == 200
-    complete_response = client.patch(
-        f"/stages/{stage_id}",
-        json={
-            "output_payload": {
-                "chinese_research_brief_markdown": (
-                    "# 中文研究 Brief\n\n## 已验证事实\n- 有真实场景。"
-                ),
-                "confidence": "medium",
-                "english_research_brief_markdown": (
-                    "# Research Brief\n\n## Verified Facts\n- Real scenario."
-                ),
-                "experiment_results_not_available": [
-                    "No experiment results are available yet."
-                ],
-                "human_review_required": ["Confirm data access."],
-                "ieee_paper_skeleton_markdown": "# IEEE Paper Skeleton\n\n## Results\nTBD.",
-                "meeting_outline_markdown": "# Group Meeting Outline\n\n1. Motivation",
-                "model_generated_hypotheses": [
-                    "Temporal consistency may improve action labels."
-                ],
-                "summary": "Generated traceable draft artifacts.",
-                "verified_facts": ["The demand scenario is coach feedback."],
-                "warnings": [],
-            },
-            "status": "complete",
+def complete_paper_stage_with_artifacts(database_url: str, stage_id: str) -> None:
+    complete_stage_in_database(
+        database_url,
+        stage_id,
+        output_payload={
+            "chinese_research_brief_markdown": (
+                "# 中文研究 Brief\n\n## 已验证事实\n- 有真实场景。"
+            ),
+            "confidence": "medium",
+            "english_research_brief_markdown": (
+                "# Research Brief\n\n## Verified Facts\n- Real scenario."
+            ),
+            "experiment_results_not_available": ["No experiment results are available yet."],
+            "human_review_required": ["Confirm data access."],
+            "ieee_paper_skeleton_markdown": "# IEEE Paper Skeleton\n\n## Results\nTBD.",
+            "meeting_outline_markdown": "# Group Meeting Outline\n\n1. Motivation",
+            "model_generated_hypotheses": ["Temporal consistency may improve action labels."],
+            "summary": "Generated traceable draft artifacts.",
+            "verified_facts": ["The demand scenario is coach feedback."],
+            "warnings": [],
         },
     )
-    assert complete_response.status_code == 200
 
 
 def test_download_paper_markdown_artifact_returns_attachment(
     tmp_path,
     dev_admin_header_enabled: None,
 ) -> None:
-    app = create_app(database_url=f"sqlite:///{tmp_path / 'artifact-download.db'}")
+    database_url = f"sqlite:///{tmp_path / 'artifact-download.db'}"
+    app = create_app(database_url=database_url)
 
     with TestClient(app) as client:
         register_and_login(client, "ARTIFACT-DOWNLOAD", "artifact@example.com")
         paper_stage_id = create_quest_with_paper_stage(client)
-        complete_paper_stage_with_artifacts(client, paper_stage_id)
+        complete_paper_stage_with_artifacts(database_url, paper_stage_id)
 
         response = client.get(
             f"/stages/{paper_stage_id}/artifacts/chinese_research_brief_markdown/download"
@@ -106,12 +99,13 @@ def test_list_paper_markdown_artifacts_returns_download_manifest(
     tmp_path,
     dev_admin_header_enabled: None,
 ) -> None:
-    app = create_app(database_url=f"sqlite:///{tmp_path / 'artifact-manifest.db'}")
+    database_url = f"sqlite:///{tmp_path / 'artifact-manifest.db'}"
+    app = create_app(database_url=database_url)
 
     with TestClient(app) as client:
         register_and_login(client, "ARTIFACT-MANIFEST", "manifest@example.com")
         paper_stage_id = create_quest_with_paper_stage(client)
-        complete_paper_stage_with_artifacts(client, paper_stage_id)
+        complete_paper_stage_with_artifacts(database_url, paper_stage_id)
 
         response = client.get(f"/stages/{paper_stage_id}/artifacts")
 
@@ -183,12 +177,13 @@ def test_download_paper_markdown_artifact_rejects_other_users_stage(
     tmp_path,
     dev_admin_header_enabled: None,
 ) -> None:
-    app = create_app(database_url=f"sqlite:///{tmp_path / 'artifact-permission.db'}")
+    database_url = f"sqlite:///{tmp_path / 'artifact-permission.db'}"
+    app = create_app(database_url=database_url)
 
     with TestClient(app) as client:
         register_and_login(client, "ARTIFACT-OWNER", "owner@example.com")
         paper_stage_id = create_quest_with_paper_stage(client)
-        complete_paper_stage_with_artifacts(client, paper_stage_id)
+        complete_paper_stage_with_artifacts(database_url, paper_stage_id)
         logout_response = client.post("/auth/logout")
         assert logout_response.status_code == 204
         register_and_login(client, "ARTIFACT-OTHER", "other@example.com")

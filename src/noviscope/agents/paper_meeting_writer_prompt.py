@@ -12,7 +12,10 @@ from noviscope.core.json_types import JsonObject
 
 
 def build_chat_completion_payload(request: PaperMeetingWriterRequest) -> ChatCompletionPayload:
-    result_context = experiment_results_context(request.experiment_plan)
+    result_context = experiment_results_context(
+        request.experiment_plan,
+        request.verified_experiment_results,
+    )
     prompt_payload = {
         "demand_validation": compact_payload(request.demand_validation),
         "experiment_plan": experiment_plan_prompt_payload(request.experiment_plan),

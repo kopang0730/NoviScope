@@ -2,6 +2,10 @@ import json
 
 from pydantic import ValidationError
 
+from noviscope.agents.paper_meeting_writer_artifacts import (
+    MODEL_MARKDOWN_REPLACED_WARNING,
+    build_guardrailed_artifacts,
+)
 from noviscope.agents.paper_meeting_writer_results import (
     NEEDS_REVIEW_WARNING,
     experiment_results_context,
@@ -53,22 +57,21 @@ def constrain_output(
     output: PaperMeetingWriterOutput,
     request: PaperMeetingWriterRequest,
 ) -> PaperMeetingWriterOutput:
-    result_context = experiment_results_context(request.experiment_plan)
+    result_context = experiment_results_context(
+        request.experiment_plan,
+        request.verified_experiment_results,
+    )
     warnings = list(output.warnings)
-    verified_facts = [
-        fact for fact in output.verified_facts if not is_experiment_result_fact(fact)
-    ]
+    if MODEL_MARKDOWN_REPLACED_WARNING not in warnings:
+        warnings.append(MODEL_MARKDOWN_REPLACED_WARNING)
+    verified_facts = list(result_context.verified_facts)
+    artifacts = build_guardrailed_artifacts(request, result_context)
     experiment_results_not_available = list(output.experiment_results_not_available)
     human_review_required = list(output.human_review_required)
     if result_context.has_verified_results:
         experiment_results_not_available = [
-            notice
-            for notice in experiment_results_not_available
-            if notice != NO_RESULTS_NOTICE
+            notice for notice in experiment_results_not_available if notice != NO_RESULTS_NOTICE
         ]
-        for fact in result_context.verified_facts:
-            if fact not in verified_facts:
-                verified_facts.append(fact)
     elif NO_RESULTS_NOTICE not in experiment_results_not_available:
         experiment_results_not_available.append(NO_RESULTS_NOTICE)
     for review_note in result_context.human_review_required:
@@ -80,17 +83,17 @@ def constrain_output(
         human_review_required.append(HUMAN_REVIEW_NOTICE)
     return output.model_copy(
         update={
+            "chinese_research_brief_markdown": artifacts.chinese_research_brief_markdown,
             "confidence": cap_confidence(output.confidence),
+            "english_research_brief_markdown": artifacts.english_research_brief_markdown,
             "experiment_results_not_available": experiment_results_not_available,
             "human_review_required": human_review_required,
+            "ieee_paper_skeleton_markdown": artifacts.ieee_paper_skeleton_markdown,
+            "meeting_outline_markdown": artifacts.meeting_outline_markdown,
             "verified_facts": verified_facts,
             "warnings": warnings,
         }
     )
-
-
-def is_experiment_result_fact(fact: str) -> bool:
-    return fact.startswith("Verified experiment result:")
 
 
 def cap_confidence(confidence: str) -> Confidence:

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from noviscope.core.json_types import JsonObject
 from noviscope.models.provider import ProviderKind
@@ -35,6 +35,7 @@ class PaperMeetingWriterRequest(BaseModel):
     selected_ideas: list[JsonObject]
     experiment_plan: JsonObject
     source_stage_ids: JsonObject
+    verified_experiment_results: list[JsonObject] = Field(default_factory=list)
 
 
 class PaperMeetingWriterOutput(BaseModel):

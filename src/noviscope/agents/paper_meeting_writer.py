@@ -7,11 +7,18 @@ from noviscope.agents.literature_scout import LITERATURE_SCOUT_AGENT_ID
 from noviscope.agents.paper_meeting_writer_output import (
     build_stage_evidence_payload,
     build_stage_output_payload,
+    constrain_output,
     parse_paper_meeting_writer_output,
 )
 from noviscope.agents.paper_meeting_writer_prompt import (
     build_chat_completion_payload,
     compact_payload,
+)
+from noviscope.agents.paper_meeting_writer_sources import (
+    build_source_stage_ids,
+    find_stage,
+    require_complete_experiment_stage,
+    trusted_experiment_result_records,
 )
 from noviscope.agents.paper_meeting_writer_types import (
     HUMAN_REVIEW_NOTICE,
@@ -31,12 +38,10 @@ from noviscope.agents.stage_runner import StageRunContext, StageRunner, StageRun
 from noviscope.core.json_types import JsonObject
 from noviscope.core.stage_policy import (
     DEMAND_VALIDATOR_AGENT_ID,
-    EXPERIMENT_PLANNER_AGENT_ID,
     IDEA_GENERATOR_AGENT_ID,
     PAPER_MEETING_WRITER_AGENT_ID,
 )
 from noviscope.models.provider import ProviderKind
-from noviscope.models.quest import StageCard, StageStatus
 
 __all__ = (
     "HUMAN_REVIEW_NOTICE",
@@ -96,10 +101,8 @@ class PaperMeetingWriterStageRunner(StageRunner):
         )
 
     def build_input_payload(self, context: StageRunContext) -> JsonObject:
-        demand_stage = find_stage(context.workflow_stages, DEMAND_VALIDATOR_AGENT_ID)
         literature_stage = find_stage(context.workflow_stages, LITERATURE_SCOUT_AGENT_ID)
         idea_stage = find_stage(context.workflow_stages, IDEA_GENERATOR_AGENT_ID)
-        experiment_stage = find_stage(context.workflow_stages, EXPERIMENT_PLANNER_AGENT_ID)
         return {
             "agent_id": context.stage.agent_id,
             "artifact_keys": [
@@ -113,12 +116,7 @@ class PaperMeetingWriterStageRunner(StageRunner):
             "provider_model": context.provider.model,
             "provider_name": context.provider.name,
             "selected_idea_count": len(read_selected_ideas(idea_stage)),
-            "source_stage_ids": build_source_stage_ids(
-                demand_stage,
-                literature_stage,
-                idea_stage,
-                experiment_stage,
-            ),
+            "source_stage_ids": build_source_stage_ids(context.workflow_stages),
         }
 
     def run(self, context: StageRunContext) -> StageRunResult:
@@ -128,34 +126,29 @@ class PaperMeetingWriterStageRunner(StageRunner):
         experiment_stage = require_complete_experiment_stage(context.workflow_stages)
         papers = read_literature_papers(literature_stage)
         selected_ideas = read_selected_ideas(idea_stage)
-        source_stage_ids = build_source_stage_ids(
-            demand_stage,
-            literature_stage,
-            idea_stage,
-            experiment_stage,
-        )
+        source_stage_ids = build_source_stage_ids(context.workflow_stages)
         input_payload = self.build_input_payload(context)
 
-        output = self.paper_runner.run(
-            PaperMeetingWriterRequest(
-                api_key=context.provider.api_key,
-                base_url=context.provider.base_url,
-                demand_validation=compact_payload(
-                    demand_stage.output_payload if demand_stage is not None else {}
-                ),
-                experiment_plan=experiment_stage.output_payload,
-                initial_direction=context.quest.initial_direction,
-                model=context.provider.model,
-                papers=papers[:MAX_PAPERS_FOR_PROMPT],
-                provider_id=context.provider.id,
-                provider_kind=context.provider.kind,
-                provider_name=context.provider.name,
-                quest_title=context.quest.title,
-                selected_ideas=selected_ideas,
-                source_stage_ids=source_stage_ids,
-                stage_id=context.stage.id,
-            )
+        request = PaperMeetingWriterRequest(
+            api_key=context.provider.api_key,
+            base_url=context.provider.base_url,
+            demand_validation=compact_payload(
+                demand_stage.output_payload if demand_stage is not None else {}
+            ),
+            experiment_plan=experiment_stage.output_payload,
+            initial_direction=context.quest.initial_direction,
+            model=context.provider.model,
+            papers=papers[:MAX_PAPERS_FOR_PROMPT],
+            provider_id=context.provider.id,
+            provider_kind=context.provider.kind,
+            provider_name=context.provider.name,
+            quest_title=context.quest.title,
+            selected_ideas=selected_ideas,
+            source_stage_ids=source_stage_ids,
+            stage_id=context.stage.id,
+            verified_experiment_results=trusted_experiment_result_records(context.workflow_stages),
         )
+        output = constrain_output(self.paper_runner.run(request), request)
 
         return StageRunResult(
             confidence=output.confidence,
@@ -164,33 +157,6 @@ class PaperMeetingWriterStageRunner(StageRunner):
             output_payload=build_stage_output_payload(output),
             summary=output.summary,
         )
-
-
-def find_stage(stages: tuple[StageCard, ...], agent_id: str) -> StageCard | None:
-    return next((stage for stage in stages if stage.agent_id == agent_id), None)
-
-
-def require_complete_experiment_stage(stages: tuple[StageCard, ...]) -> StageCard:
-    stage = find_stage(stages, EXPERIMENT_PLANNER_AGENT_ID)
-    if stage is None or stage.status != StageStatus.COMPLETE:
-        raise PaperMeetingWriterRunError(
-            "Experiment Planner must complete before Paper & Meeting Writer runs."
-        )
-    return stage
-
-
-def build_source_stage_ids(
-    demand_stage: StageCard | None,
-    literature_stage: StageCard | None,
-    idea_stage: StageCard | None,
-    experiment_stage: StageCard | None,
-) -> JsonObject:
-    return {
-        "demand_validation": demand_stage.id if demand_stage is not None else "",
-        "experiment_planner": experiment_stage.id if experiment_stage is not None else "",
-        "idea_generator": idea_stage.id if idea_stage is not None else "",
-        "literature_scout": literature_stage.id if literature_stage is not None else "",
-    }
 
 
 def get_paper_meeting_writer_runner() -> PaperMeetingWriterRunner:

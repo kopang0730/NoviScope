@@ -1,5 +1,7 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+from math import isfinite
 from typing import assert_never
 
 from pydantic import JsonValue
@@ -9,7 +11,7 @@ from noviscope.core.json_types import JsonObject
 NEEDS_REVIEW_WARNING = (
     "Some experiment result records require human review and were excluded from verified facts."
 )
-TRUSTED_RESULT_SOURCE_AGENT_IDS = frozenset({"code_runner", "evidence_auditor"})
+MAX_RESULT_ITEMS_FOR_PROMPT = 10
 
 
 class ExperimentResultStatus(StrEnum):
@@ -36,16 +38,27 @@ class ExperimentResultsContext:
                 "Only verified_result_facts may be written as completed experiment "
                 "results. Results requiring review must stay in human_review_required."
             ),
-            "results_requiring_review": self.human_review_required,
+            "results_requiring_review": self.human_review_required[:MAX_RESULT_ITEMS_FOR_PROMPT],
             "verified_result_count": self.verified_count,
-            "verified_result_facts": self.verified_facts,
+            "verified_result_facts": self.verified_facts[:MAX_RESULT_ITEMS_FOR_PROMPT],
         }
 
 
-def experiment_results_context(experiment_plan: JsonObject) -> ExperimentResultsContext:
+def experiment_results_context(
+    experiment_plan: JsonObject,
+    verified_experiment_results: Sequence[JsonObject] = (),
+) -> ExperimentResultsContext:
     verified_facts: list[str] = []
     human_review_required: list[str] = []
     for record in experiment_result_records(experiment_plan.get("experiment_results")):
+        match experiment_result_status(record):
+            case ExperimentResultStatus.VERIFIED | ExperimentResultStatus.NEEDS_REVIEW:
+                human_review_required.append(needs_review_note(record))
+            case ExperimentResultStatus.REJECTED | None:
+                continue
+            case unreachable:
+                assert_never(unreachable)
+    for record in verified_experiment_results:
         match experiment_result_status(record):
             case ExperimentResultStatus.VERIFIED:
                 fact = verified_result_fact(record)
@@ -108,7 +121,6 @@ def verified_result_fact(record: JsonObject) -> str | None:
     baseline_name = string_field(record, "baseline_name")
     run_id = string_field(record, "run_id")
     artifact_uri = string_field(record, "artifact_uri")
-    source_agent_id = string_field(record, "source_agent_id")
     if (
         metric_name is None
         or metric_value is None
@@ -117,11 +129,10 @@ def verified_result_fact(record: JsonObject) -> str | None:
         or baseline_name is None
         or run_id is None
         or artifact_uri is None
-        or source_agent_id not in TRUSTED_RESULT_SOURCE_AGENT_IDS
     ):
         return None
     return (
-        f"Verified experiment result: {metric_name} = {metric_value:g}{metric_unit} "
+        f"Verified experiment result: {metric_name} = {metric_value}{metric_unit} "
         f"on {dataset_name} using {baseline_name} "
         f"(run {run_id}; artifact {artifact_uri})."
     )
@@ -146,11 +157,13 @@ def string_field(record: JsonObject, key: str) -> str | None:
             assert_never(unreachable)
 
 
-def number_field(record: JsonObject, key: str) -> float | None:
+def number_field(record: JsonObject, key: str) -> int | float | None:
     match record.get(key):
         case bool() | None | str() | list() | dict():
             return None
-        case (int() | float()) as value:
-            return float(value)
+        case int() as value:
+            return value
+        case float() as value:
+            return value if isfinite(value) else None
         case unreachable:
             assert_never(unreachable)
