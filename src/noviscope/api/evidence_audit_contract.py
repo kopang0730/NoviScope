@@ -187,3 +187,12 @@ PAPER_DRAFT_NEEDS_REVIEW: Final = EvidenceAuditIssueSpec(
     message="Generated writing artifacts still need human review.",
     severity=EvidenceAuditIssueSeverity.REVIEW,
 )
+PAPER_RESULTS_NOT_ALIGNED: Final = EvidenceAuditIssueSpec(
+    agent_id=PAPER_MEETING_WRITER_AGENT_ID,
+    code="paper_results_not_aligned",
+    fallback_stage_title="Paper & meeting writer",
+    message=(
+        "Approved writing artifacts must be regenerated from the verified experiment result."
+    ),
+    severity=EvidenceAuditIssueSeverity.REVIEW,
+)

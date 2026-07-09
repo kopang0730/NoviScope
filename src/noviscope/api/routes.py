@@ -9,6 +9,10 @@ from sqlmodel import Session
 from noviscope.agents.assignments import AgentAssignmentService
 from noviscope.agents.registry import AGENT_REGISTRY, AgentSpec
 from noviscope.api.dependencies import get_session
+from noviscope.api.stage_patch_policy import (
+    PaperWriterExecutionPatch,
+    paper_writer_execution_content_changed,
+)
 from noviscope.auth.dependencies import (
     clear_session_cookie,
     create_session_token,
@@ -604,6 +608,20 @@ def update_stage(
             if request.output_payload is not None
             else None
         )
+        human_approved = request.human_approved
+        human_approved_set = "human_approved" in request.model_fields_set
+        if existing_stage.human_approved is True and paper_writer_execution_content_changed(
+            existing_stage,
+            PaperWriterExecutionPatch(
+                evidence_payload=request.evidence_payload,
+                fields=frozenset(request.model_fields_set),
+                input_payload=request.input_payload,
+                output_payload=output_payload,
+                summary=request.summary,
+            ),
+        ):
+            human_approved = None
+            human_approved_set = True
         stage = service.update_stage_card(
             stage_id,
             status=request.status,
@@ -611,8 +629,8 @@ def update_stage(
             input_payload=request.input_payload,
             output_payload=output_payload,
             evidence_payload=request.evidence_payload,
-            human_approved=request.human_approved,
-            human_approved_set="human_approved" in request.model_fields_set,
+            human_approved=human_approved,
+            human_approved_set=human_approved_set,
             review_notes=request.review_notes,
         )
         return stage_response(stage)

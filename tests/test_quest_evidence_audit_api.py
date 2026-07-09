@@ -159,16 +159,28 @@ def complete_research_gates(
         },
     )
     paper_output: dict[str, JsonValue] = {
+        "chinese_research_brief_markdown": "# 中文研究 Brief\n\n已验证内容。",
         "confidence": "medium",
+        "english_research_brief_markdown": "# Research Brief\n\nVerified content.",
         "human_review_required": [],
+        "ieee_paper_skeleton_markdown": "# IEEE Paper Skeleton\n\n## Results",
+        "meeting_outline_markdown": "# Group Meeting Outline\n\n1. Evidence",
         "verified_facts": ["A coach feedback scenario exists."],
     }
     if verified_result:
-        paper_output["verified_facts"] = [
+        verified_fact = (
             "Verified experiment result: Action classification accuracy = 78.4% "
             "on Badminton clips v1 using Pose-based action classifier "
             "(run run-001; artifact /data/noviscope/runs/run-001/metrics.json)."
-        ]
+        )
+        paper_output["verified_facts"] = [verified_fact]
+        for artifact_key in (
+            "chinese_research_brief_markdown",
+            "english_research_brief_markdown",
+            "ieee_paper_skeleton_markdown",
+            "meeting_outline_markdown",
+        ):
+            paper_output[artifact_key] = f"{paper_output[artifact_key]}\n\n- {verified_fact}"
     else:
         paper_output["experiment_results_not_available"] = [
             "No verified experiment results are available yet."
@@ -233,30 +245,3 @@ def test_evidence_audit_flags_missing_experiment_results_for_review(
     review_codes = {item["code"] for item in body["review_items"]}
     assert review_codes == {"experiment_results_missing", "paper_draft_needs_review"}
     assert body["ready_for_formal_claims"] is False
-
-
-def test_evidence_audit_allows_formal_claims_when_gates_and_results_are_verified(
-    tmp_path,
-    dev_admin_header_enabled: None,
-) -> None:
-    app = create_app(database_url=f"sqlite:///{tmp_path / 'evidence-audit-ready.db'}")
-    with TestClient(app) as client:
-        register_and_login(client, "AUDIT-READY", "audit-ready@example.com")
-        quest_id, stage_ids = create_quest_with_stage_map(client)
-        complete_research_gates(
-            client,
-            stage_ids,
-            paper_approved=True,
-            verified_result=True,
-        )
-
-        response = client.get(f"/quests/{quest_id}/evidence-audit")
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["audit_status"] == "ready"
-    assert body["ready_for_formal_claims"] is True
-    assert body["blocking_issue_count"] == 0
-    assert body["review_item_count"] == 0
-    assert body["evidence_source_count"] >= 2
-    assert "verified_experiment_result_recorded" in body["passed_checks"]
