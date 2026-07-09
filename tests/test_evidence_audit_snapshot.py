@@ -1,6 +1,7 @@
 import math
 
 import pytest
+from pydantic import JsonValue
 
 from noviscope.api.evidence_audit_contract import EVIDENCE_AUDIT_POLICY_VERSION
 from noviscope.api.evidence_audit_readers import evidence_auditor_is_approved
@@ -26,6 +27,39 @@ def test_snapshot_rejects_non_finite_json_numbers(metric_value: float) -> None:
     )
 
     assert evidence_audit_stage_fingerprint([stage]) is None
+
+
+@pytest.mark.parametrize("metric_value", [math.nan, math.inf, -math.inf])
+@pytest.mark.parametrize("include_null_fingerprint", [False, True])
+def test_evidence_auditor_rejects_non_finite_snapshot_without_a_real_fingerprint(
+    metric_value: float,
+    include_null_fingerprint: bool,
+) -> None:
+    upstream = StageCard(
+        agent_id=DEMAND_VALIDATOR_AGENT_ID,
+        output_payload={"metric_value": metric_value},
+        quest_id="quest-non-finite",
+        status=StageStatus.COMPLETE,
+        title="Demand validator",
+    )
+    evidence_payload: dict[str, JsonValue] = {
+        "audit_artifact_uri": "/data/noviscope/audits/non-finite.json",
+        "audit_policy_version": EVIDENCE_AUDIT_POLICY_VERSION,
+        "claim_reference_alignment": "verified",
+        "experiment_claim_alignment": "verified",
+    }
+    if include_null_fingerprint:
+        evidence_payload[EVIDENCE_AUDIT_FINGERPRINT_KEY] = None
+    auditor = StageCard(
+        agent_id=EVIDENCE_AUDITOR_AGENT_ID,
+        evidence_payload=evidence_payload,
+        human_approved=True,
+        quest_id="quest-non-finite",
+        status=StageStatus.COMPLETE,
+        title="Evidence auditor",
+    )
+
+    assert evidence_auditor_is_approved(auditor, [upstream, auditor]) is False
 
 
 @pytest.mark.parametrize(

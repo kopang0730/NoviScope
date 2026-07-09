@@ -191,12 +191,15 @@ def evidence_auditor_is_approved(
     if complete_stage is None or complete_stage.human_approved is not True:
         return False
     evidence = complete_stage.evidence_payload
+    computed_fingerprint = evidence_audit_stage_fingerprint(stages)
+    stored_fingerprint = evidence.get(EVIDENCE_AUDIT_FINGERPRINT_KEY)
     return (
         evidence.get("audit_policy_version") == EVIDENCE_AUDIT_POLICY_VERSION
         and evidence.get("claim_reference_alignment") == "verified"
         and evidence.get("experiment_claim_alignment") == "verified"
-        and evidence.get(EVIDENCE_AUDIT_FINGERPRINT_KEY)
-        == evidence_audit_stage_fingerprint(stages)
+        and isinstance(computed_fingerprint, str)
+        and isinstance(stored_fingerprint, str)
+        and stored_fingerprint == computed_fingerprint
         and audit_artifact_uri_is_valid(evidence.get("audit_artifact_uri"))
     )
 
