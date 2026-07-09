@@ -4,8 +4,17 @@ from typing import Final, assert_never
 from pydantic import JsonValue
 
 from noviscope.agents.paper_meeting_writer_artifacts import PAPER_ARTIFACT_POLICY_VERSION
-from noviscope.agents.paper_meeting_writer_results import verified_result_fact
+from noviscope.agents.paper_meeting_writer_results import (
+    ExperimentResultStatus,
+    experiment_result_status,
+    verified_result_fact,
+)
 from noviscope.api.artifacts import MARKDOWN_ARTIFACT_KEYS
+from noviscope.api.evidence_audit_contract import EVIDENCE_AUDIT_POLICY_VERSION
+from noviscope.api.evidence_audit_snapshot import (
+    EVIDENCE_AUDIT_FINGERPRINT_KEY,
+    evidence_audit_stage_fingerprint,
+)
 from noviscope.api.evidence_ledger import collect_source_refs
 from noviscope.core.json_types import JsonObject
 from noviscope.core.stage_policy import CODE_RUNNER_AGENT_ID, EVIDENCE_AUDITOR_AGENT_ID
@@ -88,14 +97,62 @@ def trusted_verified_experiment_result_records(
 ) -> tuple[JsonObject, ...]:
     return tuple(
         record
+        for stage in trusted_result_stages(stages)
+        for record in verified_experiment_result_records(stage)
+    )
+
+
+def trusted_result_stages(stages: Sequence[StageCard]) -> tuple[StageCard, ...]:
+    return tuple(
+        stage
         for stage in stages
         if (
             stage.agent_id in TRUSTED_RESULT_AGENT_IDS
             and stage.status == StageStatus.COMPLETE
             and stage.human_approved is True
         )
-        for record in verified_experiment_result_records(stage)
     )
+
+
+def trusted_result_stage_with_invalid_entries(
+    stages: Sequence[StageCard],
+) -> StageCard | None:
+    for stage in trusted_result_stages(stages):
+        if result_collection_has_invalid_entries(
+            stage.output_payload.get("experiment_results")
+        ):
+            return stage
+    return None
+
+
+def result_collection_has_invalid_entries(value: JsonValue | None) -> bool:
+    match value:
+        case None:
+            return False
+        case list() as items:
+            return any(result_record_is_invalid(item) for item in items)
+        case bool() | int() | float() | str() | dict():
+            return True
+        case unreachable:
+            assert_never(unreachable)
+
+
+def result_record_is_invalid(value: JsonValue) -> bool:
+    match value:
+        case dict() as record:
+            match experiment_result_status(record):
+                case ExperimentResultStatus.VERIFIED:
+                    return verified_result_fact(record) is None
+                case ExperimentResultStatus.NEEDS_REVIEW | ExperimentResultStatus.REJECTED:
+                    return False
+                case None:
+                    return True
+                case unreachable:
+                    assert_never(unreachable)
+        case None | bool() | int() | float() | str() | list():
+            return True
+        case unreachable:
+            assert_never(unreachable)
 
 
 def json_value_is_verified_result(value: JsonValue) -> bool:
@@ -122,6 +179,24 @@ def has_trusted_paper_artifact_policy(stage: StageCard) -> bool:
     return (
         stage.evidence_payload.get("artifact_policy_version")
         == PAPER_ARTIFACT_POLICY_VERSION
+    )
+
+
+def evidence_auditor_is_approved(
+    stage: StageCard | None,
+    stages: Sequence[StageCard],
+) -> bool:
+    complete_stage = completed_stage(stage)
+    if complete_stage is None or complete_stage.human_approved is not True:
+        return False
+    evidence = complete_stage.evidence_payload
+    return (
+        evidence.get("audit_policy_version") == EVIDENCE_AUDIT_POLICY_VERSION
+        and evidence.get("claim_reference_alignment") == "verified"
+        and evidence.get("experiment_claim_alignment") == "verified"
+        and evidence.get(EVIDENCE_AUDIT_FINGERPRINT_KEY)
+        == evidence_audit_stage_fingerprint(stages)
+        and bool(read_payload_refs(evidence, "audit_artifact_uri"))
     )
 
 

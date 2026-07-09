@@ -1,12 +1,24 @@
 from dataclasses import dataclass
+from typing import Final
 
 from pydantic import JsonValue
 
 from noviscope.core.json_types import JsonObject
-from noviscope.core.stage_policy import PAPER_MEETING_WRITER_AGENT_ID
+from noviscope.core.stage_policy import (
+    CODE_RUNNER_AGENT_ID,
+    EVIDENCE_AUDITOR_AGENT_ID,
+    PAPER_MEETING_WRITER_AGENT_ID,
+)
 from noviscope.models.quest import StageCard, StageStatus
 
-PAPER_WRITER_REVIEW_FIELDS = frozenset({"human_approved", "review_notes"})
+RUNNER_REVIEW_FIELDS: Final = frozenset({"human_approved", "review_notes"})
+RUNNER_MANAGED_AGENT_IDS: Final = frozenset(
+    {
+        CODE_RUNNER_AGENT_ID,
+        EVIDENCE_AUDITOR_AGENT_ID,
+        PAPER_MEETING_WRITER_AGENT_ID,
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,7 +30,7 @@ class StagePatchPolicyError(Exception):
 
 
 @dataclass(frozen=True, slots=True)
-class PaperWriterPatch:
+class RunnerManagedStagePatch:
     fields: frozenset[str]
     evidence_payload: JsonObject | None
     input_payload: JsonObject | None
@@ -27,19 +39,21 @@ class PaperWriterPatch:
     target_status: StageStatus | None
 
 
-def ensure_paper_writer_patch_is_review_only(
+def ensure_runner_managed_stage_patch_is_review_only(
     stage: StageCard,
     *,
-    patch: PaperWriterPatch,
+    patch: RunnerManagedStagePatch,
 ) -> None:
-    if stage.agent_id != PAPER_MEETING_WRITER_AGENT_ID:
+    if stage.agent_id not in RUNNER_MANAGED_AGENT_IDS:
         return
-    if paper_writer_runner_content_changed(stage, patch):
+    if runner_content_changed(stage, patch):
         raise StagePatchPolicyError(
-            "Paper Writer execution fields can only be changed by the server-side stage runner."
+            "Trusted execution fields can only be changed by the server-side stage runner."
         )
-    if patch.fields & PAPER_WRITER_REVIEW_FIELDS and stage.status != StageStatus.COMPLETE:
-        raise StagePatchPolicyError("Paper Writer can only be reviewed after it completes.")
+    if patch.fields & RUNNER_REVIEW_FIELDS and stage.status != StageStatus.COMPLETE:
+        raise StagePatchPolicyError(
+            "A runner-managed stage can only be reviewed after it completes."
+        )
     if (
         "status" in patch.fields
         and patch.target_status is not None
@@ -51,11 +65,11 @@ def ensure_paper_writer_patch_is_review_only(
         )
     ):
         raise StagePatchPolicyError(
-            "Paper Writer status can only be changed by the server-side stage runner."
+            "Trusted stage status can only be changed by the server-side stage runner."
         )
 
 
-def paper_writer_runner_content_changed(stage: StageCard, patch: PaperWriterPatch) -> bool:
+def runner_content_changed(stage: StageCard, patch: RunnerManagedStagePatch) -> bool:
     return (
         "evidence_payload" in patch.fields
         and not json_values_are_type_strict_equal(

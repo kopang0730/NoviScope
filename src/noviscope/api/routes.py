@@ -10,9 +10,9 @@ from noviscope.agents.assignments import AgentAssignmentService
 from noviscope.agents.registry import AGENT_REGISTRY, AgentSpec
 from noviscope.api.dependencies import get_session
 from noviscope.api.stage_patch_policy import (
-    PaperWriterPatch,
+    RunnerManagedStagePatch,
     StagePatchPolicyError,
-    ensure_paper_writer_patch_is_review_only,
+    ensure_runner_managed_stage_patch_is_review_only,
 )
 from noviscope.auth.dependencies import (
     clear_session_cookie,
@@ -604,9 +604,9 @@ def update_stage(
     service = QuestService(session)
     try:
         existing_stage = service.get_stage_card_for_user(stage_id, current_user)
-        ensure_paper_writer_patch_is_review_only(
+        ensure_runner_managed_stage_patch_is_review_only(
             existing_stage,
-            patch=PaperWriterPatch(
+            patch=RunnerManagedStagePatch(
                 evidence_payload=request.evidence_payload,
                 fields=frozenset(request.model_fields_set),
                 input_payload=request.input_payload,

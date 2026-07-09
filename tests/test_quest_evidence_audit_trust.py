@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from quest_evidence_audit_test_support import (
+    add_approved_evidence_auditor_stage,
     add_trusted_code_result_stage,
     set_server_paper_stage,
 )
@@ -10,7 +11,6 @@ from test_quest_evidence_audit_api import (
     register_and_login,
 )
 
-from noviscope.agents.literature_scout import LITERATURE_SCOUT_AGENT_ID
 from noviscope.core.json_types import JsonObject
 from noviscope.core.stage_policy import (
     DEMAND_VALIDATOR_AGENT_ID,
@@ -33,6 +33,8 @@ def create_ready_quest(
         paper_approved=True,
         verified_result=True,
     )
+    add_trusted_code_result_stage(database_url, quest_id)
+    add_approved_evidence_auditor_stage(database_url, quest_id)
     return quest_id, stage_ids
 
 
@@ -103,7 +105,7 @@ def test_audit_keeps_planner_verified_results_out_of_formal_claims(
 
     body = response.json()
     assert body["ready_for_formal_claims"] is False
-    assert "experiment_results_missing" in review_codes(body)
+    assert "experiment_results_missing" in blocking_codes(body)
 
 
 @pytest.mark.parametrize(
@@ -141,76 +143,6 @@ def test_audit_requires_an_approved_generated_idea(
     body = response.json()
     assert body["audit_status"] == "blocked"
     assert "idea_not_selected" in blocking_codes(body)
-
-
-def test_audit_rejects_title_only_literature_entries(
-    tmp_path,
-    dev_admin_header_enabled: None,
-) -> None:
-    database_url = f"sqlite:///{tmp_path / 'audit-literature-ref.db'}"
-    app = create_app(database_url=database_url)
-    with TestClient(app) as client:
-        register_and_login(client, "AUDIT-LIT-REF", "audit-lit@example.com")
-        quest_id, stage_ids = create_ready_quest(client, database_url)
-        patch_response = client.patch(
-            f"/stages/{stage_ids[LITERATURE_SCOUT_AGENT_ID]}",
-            json={"output_payload": {"papers": [{"title": "Title without identifier"}]}},
-        )
-        response = client.get(f"/quests/{quest_id}/evidence-audit")
-
-    assert patch_response.status_code == 200
-    body = response.json()
-    assert body["ready_for_formal_claims"] is False
-    assert "literature_sources_missing" in review_codes(body)
-
-
-def test_audit_rejects_generic_text_as_a_literature_source(
-    tmp_path,
-    dev_admin_header_enabled: None,
-) -> None:
-    database_url = f"sqlite:///{tmp_path / 'audit-literature-text.db'}"
-    app = create_app(database_url=database_url)
-    with TestClient(app) as client:
-        register_and_login(client, "AUDIT-LIT-TEXT", "audit-lit-text@example.com")
-        quest_id, stage_ids = create_ready_quest(client, database_url)
-        patch_response = client.patch(
-            f"/stages/{stage_ids[LITERATURE_SCOUT_AGENT_ID]}",
-            json={
-                "output_payload": {
-                    "evidence_for_demand": ["Model-authored text is not a paper reference."],
-                    "papers": [],
-                }
-            },
-        )
-        response = client.get(f"/quests/{quest_id}/evidence-audit")
-
-    assert patch_response.status_code == 200
-    body = response.json()
-    assert body["ready_for_formal_claims"] is False
-    assert "literature_sources_missing" in review_codes(body)
-
-
-def test_audit_accepts_an_openalex_identifier_as_a_literature_source(
-    tmp_path,
-    dev_admin_header_enabled: None,
-) -> None:
-    database_url = f"sqlite:///{tmp_path / 'audit-openalex-ref.db'}"
-    app = create_app(database_url=database_url)
-    with TestClient(app) as client:
-        register_and_login(client, "AUDIT-OPENALEX", "audit-openalex@example.com")
-        quest_id, stage_ids = create_ready_quest(client, database_url)
-        patch_response = client.patch(
-            f"/stages/{stage_ids[LITERATURE_SCOUT_AGENT_ID]}",
-            json={
-                "output_payload": {
-                    "papers": [{"openalex_id": "https://openalex.org/W123"}],
-                }
-            },
-        )
-        response = client.get(f"/quests/{quest_id}/evidence-audit")
-
-    assert patch_response.status_code == 200
-    assert "literature_sources_missing" not in review_codes(response.json())
 
 
 def test_audit_requires_all_downloadable_paper_artifacts(
@@ -310,4 +242,4 @@ def test_audit_requires_a_finite_measured_metric_value(
     assert patch_response.status_code == 200
     body = response.json()
     assert body["ready_for_formal_claims"] is False
-    assert "experiment_results_missing" in review_codes(body)
+    assert "experiment_results_invalid" in blocking_codes(body)

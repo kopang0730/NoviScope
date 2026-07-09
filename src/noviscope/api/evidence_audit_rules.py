@@ -6,14 +6,18 @@ from noviscope.api.evidence_audit_contract import (
     DEMAND_APPROVED,
     DEMAND_NOT_APPROVED,
     DEMAND_SOURCES_MISSING,
+    EVIDENCE_AUDIT_APPROVED,
+    EVIDENCE_AUDIT_NOT_APPROVED,
     EXPERIMENT_PLAN_APPROVED,
     EXPERIMENT_PLAN_MISSING_METRICS,
     EXPERIMENT_PLAN_MISSING_SCRIPT,
     EXPERIMENT_PLAN_NOT_APPROVED,
+    EXPERIMENT_RESULTS_INVALID,
     EXPERIMENT_RESULTS_MISSING,
     IDEA_NOT_SELECTED,
     IDEA_SELECTED,
     LITERATURE_NOT_COMPLETE,
+    LITERATURE_SOURCES_INVALID,
     LITERATURE_SOURCES_MISSING,
     LITERATURE_SOURCES_PRESENT,
     PAPER_ARTIFACTS_UNTRUSTED,
@@ -32,6 +36,7 @@ from noviscope.api.evidence_audit_contract import (
 from noviscope.api.evidence_audit_readers import (
     completed_stage,
     count_evidence_sources,
+    evidence_auditor_is_approved,
     find_stage,
     has_downloadable_paper_artifacts,
     has_recorded_human_demand_evidence,
@@ -39,12 +44,17 @@ from noviscope.api.evidence_audit_readers import (
     paper_results_are_aligned,
     read_payload_refs,
     stage_is_complete,
+    trusted_result_stage_with_invalid_entries,
     trusted_verified_experiment_result_records,
+)
+from noviscope.api.evidence_audit_reference_rules import (
+    paper_collections_have_invalid_references,
 )
 from noviscope.api.evidence_ledger import collect_paper_source_refs
 from noviscope.core.json_types import JsonObject
 from noviscope.core.stage_policy import (
     DEMAND_VALIDATOR_AGENT_ID,
+    EVIDENCE_AUDITOR_AGENT_ID,
     EXPERIMENT_PLANNER_AGENT_ID,
     IDEA_GENERATOR_AGENT_ID,
     PAPER_MEETING_WRITER_AGENT_ID,
@@ -68,7 +78,13 @@ def audit_literature(stage: StageCard | None) -> StageAuditOutcome:
     complete_stage = completed_stage(stage)
     if complete_stage is None:
         return make_outcome(blocking_issues=(make_issue(stage, LITERATURE_NOT_COMPLETE),))
-    if collect_paper_source_refs(complete_stage):
+    source_refs = collect_paper_source_refs(complete_stage)
+    if paper_collections_have_invalid_references(complete_stage):
+        return make_outcome(
+            passed_checks=(LITERATURE_SOURCES_PRESENT,) if source_refs else (),
+            review_items=(make_issue(complete_stage, LITERATURE_SOURCES_INVALID),),
+        )
+    if source_refs:
         return make_outcome(passed_checks=(LITERATURE_SOURCES_PRESENT,))
     return make_outcome(
         review_items=(make_issue(complete_stage, LITERATURE_SOURCES_MISSING),),
@@ -85,6 +101,7 @@ def audit_idea(stage: StageCard | None) -> StageAuditOutcome:
 def audit_experiment(
     stage: StageCard | None,
     *,
+    invalid_result_stage: StageCard | None,
     verified_results: Sequence[JsonObject],
 ) -> StageAuditOutcome:
     complete_stage = completed_stage(stage)
@@ -92,17 +109,38 @@ def audit_experiment(
         return make_outcome(
             blocking_issues=(make_issue(stage, EXPERIMENT_PLAN_NOT_APPROVED),),
         )
+    blocking_issues: list[EvidenceAuditIssueResponse] = []
     review_items: list[EvidenceAuditIssueResponse] = []
     if not read_payload_refs(complete_stage.output_payload, "metrics"):
         review_items.append(make_issue(complete_stage, EXPERIMENT_PLAN_MISSING_METRICS))
     if not read_payload_refs(complete_stage.output_payload, "first_runnable_script_plan"):
         review_items.append(make_issue(complete_stage, EXPERIMENT_PLAN_MISSING_SCRIPT))
     passed_checks = (EXPERIMENT_PLAN_APPROVED,)
+    if invalid_result_stage is not None:
+        blocking_issues.append(
+            make_issue(invalid_result_stage, EXPERIMENT_RESULTS_INVALID)
+        )
     if verified_results:
         passed_checks = (EXPERIMENT_PLAN_APPROVED, VERIFIED_EXPERIMENT_RESULT_RECORDED)
     else:
-        review_items.append(make_issue(complete_stage, EXPERIMENT_RESULTS_MISSING))
-    return make_outcome(passed_checks=passed_checks, review_items=tuple(review_items))
+        blocking_issues.append(make_issue(None, EXPERIMENT_RESULTS_MISSING))
+    return make_outcome(
+        blocking_issues=tuple(blocking_issues),
+        passed_checks=passed_checks,
+        review_items=tuple(review_items),
+    )
+
+
+def audit_evidence_auditor(
+    stage: StageCard | None,
+    *,
+    stages: Sequence[StageCard],
+) -> StageAuditOutcome:
+    if not evidence_auditor_is_approved(stage, stages):
+        return make_outcome(
+            blocking_issues=(make_issue(stage, EVIDENCE_AUDIT_NOT_APPROVED),)
+        )
+    return make_outcome(passed_checks=(EVIDENCE_AUDIT_APPROVED,))
 
 
 def audit_paper(
@@ -157,15 +195,24 @@ def build_quest_evidence_audit(
 ) -> QuestEvidenceAuditResponse:
     experiment_stage = find_stage(stages, EXPERIMENT_PLANNER_AGENT_ID)
     verified_results = trusted_verified_experiment_result_records(stages)
+    invalid_result_stage = trusted_result_stage_with_invalid_entries(stages)
     outcome = combine_outcomes(
         (
             audit_demand(find_stage(stages, DEMAND_VALIDATOR_AGENT_ID)),
             audit_literature(find_stage(stages, LITERATURE_SCOUT_AGENT_ID)),
             audit_idea(find_stage(stages, IDEA_GENERATOR_AGENT_ID)),
-            audit_experiment(experiment_stage, verified_results=verified_results),
+            audit_experiment(
+                experiment_stage,
+                invalid_result_stage=invalid_result_stage,
+                verified_results=verified_results,
+            ),
             audit_paper(
                 find_stage(stages, PAPER_MEETING_WRITER_AGENT_ID),
                 verified_results=verified_results,
+            ),
+            audit_evidence_auditor(
+                find_stage(stages, EVIDENCE_AUDITOR_AGENT_ID),
+                stages=stages,
             ),
         )
     )

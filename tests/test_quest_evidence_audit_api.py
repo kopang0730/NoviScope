@@ -1,6 +1,9 @@
 from fastapi.testclient import TestClient
 from pydantic import JsonValue
-from quest_evidence_audit_test_support import set_server_paper_stage
+from quest_evidence_audit_test_support import (
+    add_approved_evidence_auditor_stage,
+    set_server_paper_stage,
+)
 
 from noviscope.agents.literature_scout import LITERATURE_SCOUT_AGENT_ID
 from noviscope.core.stage_policy import (
@@ -212,6 +215,7 @@ def test_evidence_audit_blocks_draft_quest(
     issue_codes = {issue["code"] for issue in body["blocking_issues"]}
     assert issue_codes == {
         "demand_not_approved",
+        "evidence_audit_not_approved",
         "experiment_plan_not_approved",
         "idea_not_selected",
         "literature_not_complete",
@@ -236,13 +240,16 @@ def test_evidence_audit_flags_missing_experiment_results_for_review(
             paper_approved=False,
             verified_result=False,
         )
+        add_approved_evidence_auditor_stage(database_url, quest_id)
 
         response = client.get(f"/quests/{quest_id}/evidence-audit")
 
     assert response.status_code == 200
     body = response.json()
-    assert body["audit_status"] == "needs_review"
-    assert body["blocking_issue_count"] == 0
+    assert body["audit_status"] == "blocked"
+    assert {item["code"] for item in body["blocking_issues"]} == {
+        "experiment_results_missing"
+    }
     review_codes = {item["code"] for item in body["review_items"]}
-    assert review_codes == {"experiment_results_missing", "paper_draft_needs_review"}
+    assert review_codes == {"paper_draft_needs_review"}
     assert body["ready_for_formal_claims"] is False

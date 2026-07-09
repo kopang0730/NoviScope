@@ -150,8 +150,9 @@ def doi_is_valid(value: str) -> bool:
 
 def openalex_id_is_valid(value: str) -> bool:
     normalized = value.strip()
-    if normalized.lower().startswith("https://openalex.org/"):
-        normalized = normalized.removeprefix("https://openalex.org/")
+    prefix = "https://openalex.org/"
+    if normalized.lower().startswith(prefix):
+        normalized = normalized[len(prefix) :]
     return OPENALEX_ID_PATTERN.fullmatch(normalized) is not None
 
 

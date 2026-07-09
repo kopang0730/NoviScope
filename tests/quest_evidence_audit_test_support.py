@@ -1,8 +1,13 @@
 from pydantic import JsonValue
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from noviscope.agents.paper_meeting_writer_artifacts import PAPER_ARTIFACT_POLICY_VERSION
-from noviscope.core.stage_policy import CODE_RUNNER_AGENT_ID
+from noviscope.api.evidence_audit_contract import EVIDENCE_AUDIT_POLICY_VERSION
+from noviscope.api.evidence_audit_snapshot import (
+    EVIDENCE_AUDIT_FINGERPRINT_KEY,
+    evidence_audit_stage_fingerprint,
+)
+from noviscope.core.stage_policy import CODE_RUNNER_AGENT_ID, EVIDENCE_AUDITOR_AGENT_ID
 from noviscope.db.session import create_db_engine
 from noviscope.models.quest import StageCard, StageStatus
 
@@ -33,6 +38,46 @@ def add_trusted_code_result_stage(
                     quest_id=quest_id,
                     status=StageStatus.COMPLETE,
                     title="Code runner",
+                )
+            )
+            session.commit()
+    finally:
+        engine.dispose()
+
+
+def add_approved_evidence_auditor_stage(
+    database_url: str,
+    quest_id: str,
+    *,
+    valid_contract: bool = True,
+) -> None:
+    evidence_payload: dict[str, JsonValue] = {}
+    if valid_contract:
+        evidence_payload = {
+            "audit_artifact_uri": "/data/noviscope/audits/quest-audit.json",
+            "audit_policy_version": EVIDENCE_AUDIT_POLICY_VERSION,
+            "claim_reference_alignment": "verified",
+            "experiment_claim_alignment": "verified",
+        }
+    engine = create_db_engine(database_url)
+    try:
+        with Session(engine) as session:
+            stages = list(
+                session.exec(select(StageCard).where(StageCard.quest_id == quest_id)).all()
+            )
+            if valid_contract:
+                evidence_payload[EVIDENCE_AUDIT_FINGERPRINT_KEY] = (
+                    evidence_audit_stage_fingerprint(stages)
+                )
+            session.add(
+                StageCard(
+                    agent_id=EVIDENCE_AUDITOR_AGENT_ID,
+                    evidence_payload=evidence_payload,
+                    human_approved=True,
+                    output_payload={},
+                    quest_id=quest_id,
+                    status=StageStatus.COMPLETE,
+                    title="Evidence auditor",
                 )
             )
             session.commit()

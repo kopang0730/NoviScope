@@ -25,7 +25,6 @@ def test_public_paper_output_mutation_is_rejected(
     with TestClient(app) as client:
         register_and_login(client, "AUDIT-STALE-APPROVAL", "audit-stale-approval@example.com")
         quest_id, stage_ids = create_ready_quest(client, database_url)
-        add_trusted_code_result_stage(database_url, quest_id)
         patch_response = client.patch(
             f"/stages/{stage_ids[PAPER_MEETING_WRITER_AGENT_ID]}",
             json={
