@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from pathlib import PurePosixPath
 from typing import Final, assert_never
 
 from pydantic import JsonValue
@@ -196,8 +197,26 @@ def evidence_auditor_is_approved(
         and evidence.get("experiment_claim_alignment") == "verified"
         and evidence.get(EVIDENCE_AUDIT_FINGERPRINT_KEY)
         == evidence_audit_stage_fingerprint(stages)
-        and bool(read_payload_refs(evidence, "audit_artifact_uri"))
+        and audit_artifact_uri_is_valid(evidence.get("audit_artifact_uri"))
     )
+
+
+def audit_artifact_uri_is_valid(value: JsonValue | None) -> bool:
+    match value:
+        case str() as uri:
+            normalized = uri.strip()
+            if (
+                not normalized.startswith("/")
+                or normalized.startswith("//")
+                or "\x00" in normalized
+            ):
+                return False
+            path = PurePosixPath(normalized)
+            return ".." not in path.parts and bool(path.name)
+        case None | bool() | int() | float() | list() | dict():
+            return False
+        case unreachable:
+            assert_never(unreachable)
 
 
 def paper_results_are_aligned(

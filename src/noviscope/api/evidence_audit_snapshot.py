@@ -9,7 +9,7 @@ from noviscope.models.quest import StageCard
 EVIDENCE_AUDIT_FINGERPRINT_KEY: Final = "audited_stage_fingerprint"
 
 
-def evidence_audit_stage_fingerprint(stages: Sequence[StageCard]) -> str:
+def evidence_audit_stage_fingerprint(stages: Sequence[StageCard]) -> str | None:
     snapshot = [
         {
             "agent_id": stage.agent_id,
@@ -26,11 +26,14 @@ def evidence_audit_stage_fingerprint(stages: Sequence[StageCard]) -> str:
         for stage in sorted(stages, key=lambda item: item.id)
         if stage.agent_id != EVIDENCE_AUDITOR_AGENT_ID
     ]
-    canonical_snapshot = json.dumps(
-        snapshot,
-        allow_nan=True,
-        ensure_ascii=True,
-        separators=(",", ":"),
-        sort_keys=True,
-    ).encode()
+    try:
+        canonical_snapshot = json.dumps(
+            snapshot,
+            allow_nan=False,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode()
+    except ValueError:
+        return None
     return hashlib.sha256(canonical_snapshot).hexdigest()

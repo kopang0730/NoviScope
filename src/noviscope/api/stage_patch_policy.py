@@ -58,11 +58,6 @@ def ensure_runner_managed_stage_patch_is_review_only(
         "status" in patch.fields
         and patch.target_status is not None
         and patch.target_status != stage.status
-        and not (
-            stage.status == StageStatus.COMPLETE
-            and stage.human_approved is False
-            and patch.target_status == StageStatus.BLOCKED
-        )
     ):
         raise StagePatchPolicyError(
             "Trusted stage status can only be changed by the server-side stage runner."
