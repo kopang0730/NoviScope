@@ -1,6 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
-from quest_evidence_audit_test_support import add_trusted_code_result_stage
+from quest_evidence_audit_test_support import (
+    add_trusted_code_result_stage,
+    set_server_paper_stage,
+)
 from test_quest_evidence_audit_api import (
     complete_research_gates,
     create_quest_with_stage_map,
@@ -18,11 +21,15 @@ from noviscope.core.stage_policy import (
 from noviscope.main import create_app
 
 
-def create_ready_quest(client: TestClient) -> tuple[str, dict[str, str]]:
+def create_ready_quest(
+    client: TestClient,
+    database_url: str,
+) -> tuple[str, dict[str, str]]:
     quest_id, stage_ids = create_quest_with_stage_map(client)
     complete_research_gates(
         client,
         stage_ids,
+        database_url=database_url,
         paper_approved=True,
         verified_result=True,
     )
@@ -53,10 +60,11 @@ def test_audit_rejects_model_only_demand_evidence(
     tmp_path,
     dev_admin_header_enabled: None,
 ) -> None:
-    app = create_app(database_url=f"sqlite:///{tmp_path / 'audit-demand-trust.db'}")
+    database_url = f"sqlite:///{tmp_path / 'audit-demand-trust.db'}"
+    app = create_app(database_url=database_url)
     with TestClient(app) as client:
         register_and_login(client, "AUDIT-DEMAND-TRUST", "audit-demand@example.com")
-        quest_id, stage_ids = create_ready_quest(client)
+        quest_id, stage_ids = create_ready_quest(client, database_url)
         patch_response = client.patch(
             f"/stages/{stage_ids[DEMAND_VALIDATOR_AGENT_ID]}",
             json={
@@ -79,13 +87,15 @@ def test_audit_keeps_planner_verified_results_out_of_formal_claims(
     tmp_path,
     dev_admin_header_enabled: None,
 ) -> None:
-    app = create_app(database_url=f"sqlite:///{tmp_path / 'audit-planner-result.db'}")
+    database_url = f"sqlite:///{tmp_path / 'audit-planner-result.db'}"
+    app = create_app(database_url=database_url)
     with TestClient(app) as client:
         register_and_login(client, "AUDIT-PLANNER-RESULT", "audit-planner@example.com")
         quest_id, stage_ids = create_quest_with_stage_map(client)
         complete_research_gates(
             client,
             stage_ids,
+            database_url=database_url,
             paper_approved=True,
             verified_result=True,
         )
@@ -106,14 +116,15 @@ def test_audit_requires_an_approved_generated_idea(
     human_approved: bool,
     selected_idea_id: str,
 ) -> None:
-    app = create_app(database_url=f"sqlite:///{tmp_path / f'audit-idea-{selected_idea_id}.db'}")
+    database_url = f"sqlite:///{tmp_path / f'audit-idea-{selected_idea_id}.db'}"
+    app = create_app(database_url=database_url)
     with TestClient(app) as client:
         register_and_login(
             client,
             f"AUDIT-IDEA-{selected_idea_id}",
             f"audit-idea-{selected_idea_id}@example.com",
         )
-        quest_id, stage_ids = create_ready_quest(client)
+        quest_id, stage_ids = create_ready_quest(client, database_url)
         patch_response = client.patch(
             f"/stages/{stage_ids[IDEA_GENERATOR_AGENT_ID]}",
             json={
@@ -136,10 +147,11 @@ def test_audit_rejects_title_only_literature_entries(
     tmp_path,
     dev_admin_header_enabled: None,
 ) -> None:
-    app = create_app(database_url=f"sqlite:///{tmp_path / 'audit-literature-ref.db'}")
+    database_url = f"sqlite:///{tmp_path / 'audit-literature-ref.db'}"
+    app = create_app(database_url=database_url)
     with TestClient(app) as client:
         register_and_login(client, "AUDIT-LIT-REF", "audit-lit@example.com")
-        quest_id, stage_ids = create_ready_quest(client)
+        quest_id, stage_ids = create_ready_quest(client, database_url)
         patch_response = client.patch(
             f"/stages/{stage_ids[LITERATURE_SCOUT_AGENT_ID]}",
             json={"output_payload": {"papers": [{"title": "Title without identifier"}]}},
@@ -156,10 +168,11 @@ def test_audit_rejects_generic_text_as_a_literature_source(
     tmp_path,
     dev_admin_header_enabled: None,
 ) -> None:
-    app = create_app(database_url=f"sqlite:///{tmp_path / 'audit-literature-text.db'}")
+    database_url = f"sqlite:///{tmp_path / 'audit-literature-text.db'}"
+    app = create_app(database_url=database_url)
     with TestClient(app) as client:
         register_and_login(client, "AUDIT-LIT-TEXT", "audit-lit-text@example.com")
-        quest_id, stage_ids = create_ready_quest(client)
+        quest_id, stage_ids = create_ready_quest(client, database_url)
         patch_response = client.patch(
             f"/stages/{stage_ids[LITERATURE_SCOUT_AGENT_ID]}",
             json={
@@ -181,10 +194,11 @@ def test_audit_accepts_an_openalex_identifier_as_a_literature_source(
     tmp_path,
     dev_admin_header_enabled: None,
 ) -> None:
-    app = create_app(database_url=f"sqlite:///{tmp_path / 'audit-openalex-ref.db'}")
+    database_url = f"sqlite:///{tmp_path / 'audit-openalex-ref.db'}"
+    app = create_app(database_url=database_url)
     with TestClient(app) as client:
         register_and_login(client, "AUDIT-OPENALEX", "audit-openalex@example.com")
-        quest_id, stage_ids = create_ready_quest(client)
+        quest_id, stage_ids = create_ready_quest(client, database_url)
         patch_response = client.patch(
             f"/stages/{stage_ids[LITERATURE_SCOUT_AGENT_ID]}",
             json={
@@ -203,28 +217,57 @@ def test_audit_requires_all_downloadable_paper_artifacts(
     tmp_path,
     dev_admin_header_enabled: None,
 ) -> None:
-    app = create_app(database_url=f"sqlite:///{tmp_path / 'audit-paper-artifacts.db'}")
+    database_url = f"sqlite:///{tmp_path / 'audit-paper-artifacts.db'}"
+    app = create_app(database_url=database_url)
     with TestClient(app) as client:
         register_and_login(client, "AUDIT-PAPER-ARTIFACT", "audit-paper@example.com")
-        quest_id, stage_ids = create_ready_quest(client)
-        patch_response = client.patch(
-            f"/stages/{stage_ids[PAPER_MEETING_WRITER_AGENT_ID]}",
-            json={
-                "output_payload": {
-                    "chinese_research_brief_markdown": "",
-                    "english_research_brief_markdown": "# Research Brief",
-                    "ieee_paper_skeleton_markdown": "# IEEE Paper Skeleton",
-                    "meeting_outline_markdown": "# Group Meeting Outline",
-                    "verified_facts": ["Verified experiment result: accuracy = 78.4%."],
-                }
+        quest_id, stage_ids = create_ready_quest(client, database_url)
+        set_server_paper_stage(
+            database_url,
+            stage_ids[PAPER_MEETING_WRITER_AGENT_ID],
+            {
+                "chinese_research_brief_markdown": "",
+                "english_research_brief_markdown": "# Research Brief",
+                "ieee_paper_skeleton_markdown": "# IEEE Paper Skeleton",
+                "meeting_outline_markdown": "# Group Meeting Outline",
+                "verified_facts": ["Verified experiment result: accuracy = 78.4%."],
             },
+            human_approved=True,
         )
         response = client.get(f"/quests/{quest_id}/evidence-audit")
 
-    assert patch_response.status_code == 200
     body = response.json()
     assert body["audit_status"] == "blocked"
     assert "paper_draft_not_generated" in blocking_codes(body)
+
+
+def test_audit_rejects_paper_artifacts_without_server_guardrail_provenance(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    database_url = f"sqlite:///{tmp_path / 'audit-paper-provenance.db'}"
+    app = create_app(database_url=database_url)
+    with TestClient(app) as client:
+        register_and_login(client, "AUDIT-PAPER-PROVENANCE", "audit-provenance@example.com")
+        quest_id, stage_ids = create_ready_quest(client, database_url)
+        set_server_paper_stage(
+            database_url,
+            stage_ids[PAPER_MEETING_WRITER_AGENT_ID],
+            {
+                "chinese_research_brief_markdown": "# 中文研究 Brief",
+                "english_research_brief_markdown": "# Research Brief",
+                "ieee_paper_skeleton_markdown": "# IEEE Paper Skeleton",
+                "meeting_outline_markdown": "# Group Meeting Outline",
+                "verified_facts": [],
+            },
+            human_approved=True,
+            guardrailed=False,
+        )
+        response = client.get(f"/quests/{quest_id}/evidence-audit")
+
+    body = response.json()
+    assert body["audit_status"] == "blocked"
+    assert "paper_artifacts_untrusted" in blocking_codes(body)
 
 
 def test_audit_requires_a_finite_measured_metric_value(
@@ -235,7 +278,7 @@ def test_audit_requires_a_finite_measured_metric_value(
     app = create_app(database_url=database_url)
     with TestClient(app) as client:
         register_and_login(client, "AUDIT-METRIC-VALUE", "audit-metric@example.com")
-        quest_id, stage_ids = create_ready_quest(client)
+        quest_id, stage_ids = create_ready_quest(client, database_url)
         add_trusted_code_result_stage(
             database_url,
             quest_id,

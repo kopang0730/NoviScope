@@ -32,7 +32,7 @@ def test_audit_rejects_list_valued_result_identity_fields(
             f"AUDIT-LIST-{field.upper()}",
             f"audit-list-{field}@example.com",
         )
-        quest_id, _ = create_ready_quest(client)
+        quest_id, _ = create_ready_quest(client, database_url)
         result_record: dict[str, JsonValue] = {
             "artifact_uri": "/data/noviscope/runs/run-001/metrics.json",
             "baseline_name": "Pose-based action classifier",

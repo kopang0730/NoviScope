@@ -16,6 +16,7 @@ from noviscope.api.evidence_audit_contract import (
     LITERATURE_NOT_COMPLETE,
     LITERATURE_SOURCES_MISSING,
     LITERATURE_SOURCES_PRESENT,
+    PAPER_ARTIFACTS_UNTRUSTED,
     PAPER_DRAFT_GENERATED,
     PAPER_DRAFT_NEEDS_REVIEW,
     PAPER_DRAFT_NOT_GENERATED,
@@ -34,6 +35,7 @@ from noviscope.api.evidence_audit_readers import (
     find_stage,
     has_downloadable_paper_artifacts,
     has_recorded_human_demand_evidence,
+    has_trusted_paper_artifact_policy,
     paper_results_are_aligned,
     read_payload_refs,
     stage_is_complete,
@@ -111,6 +113,10 @@ def audit_paper(
     complete_stage = completed_stage(stage)
     if complete_stage is None or not has_downloadable_paper_artifacts(complete_stage):
         return make_outcome(blocking_issues=(make_issue(stage, PAPER_DRAFT_NOT_GENERATED),))
+    if not has_trusted_paper_artifact_policy(complete_stage):
+        return make_outcome(
+            blocking_issues=(make_issue(complete_stage, PAPER_ARTIFACTS_UNTRUSTED),)
+        )
     if complete_stage.human_approved is not True:
         return make_outcome(
             passed_checks=(PAPER_DRAFT_GENERATED,),

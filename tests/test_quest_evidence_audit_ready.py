@@ -21,6 +21,7 @@ def test_evidence_audit_allows_formal_claims_when_gates_and_results_are_verified
         complete_research_gates(
             client,
             stage_ids,
+            database_url=database_url,
             paper_approved=True,
             verified_result=True,
         )

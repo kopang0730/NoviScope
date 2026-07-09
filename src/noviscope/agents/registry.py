@@ -3,6 +3,7 @@ from types import MappingProxyType
 
 from pydantic import BaseModel, ConfigDict, field_serializer
 
+from noviscope.core.stage_policy import CODE_RUNNER_AGENT_ID, EVIDENCE_AUDITOR_AGENT_ID
 from noviscope.models.agent import ToolPermission
 
 
@@ -95,8 +96,8 @@ AGENT_REGISTRY: Mapping[str, AgentSpec] = MappingProxyType(
             ),
             constraints=("Do not execute code.",),
         ),
-        "code_runner": AgentSpec(
-            agent_id="code_runner",
+        CODE_RUNNER_AGENT_ID: AgentSpec(
+            agent_id=CODE_RUNNER_AGENT_ID,
             display_name="Code Runner",
             goal="Run local reproduction, training, evaluation, and ablation jobs.",
             outputs=("experiment_provenance", "run_logs", "metric_records"),
@@ -110,8 +111,8 @@ AGENT_REGISTRY: Mapping[str, AgentSpec] = MappingProxyType(
             ),
             constraints=("Private code, data, logs, and checkpoints must not be uploaded.",),
         ),
-        "evidence_auditor": AgentSpec(
-            agent_id="evidence_auditor",
+        EVIDENCE_AUDITOR_AGENT_ID: AgentSpec(
+            agent_id=EVIDENCE_AUDITOR_AGENT_ID,
             display_name="Evidence Auditor",
             goal="Audit source truth, claim-reference alignment, and experiment-claim alignment.",
             outputs=("source_verification_report", "claim_alignment_report", "blocking_issues"),

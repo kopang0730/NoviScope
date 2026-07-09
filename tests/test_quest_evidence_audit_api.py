@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 from pydantic import JsonValue
+from quest_evidence_audit_test_support import set_server_paper_stage
 
 from noviscope.agents.literature_scout import LITERATURE_SCOUT_AGENT_ID
 from noviscope.core.stage_policy import (
@@ -70,6 +71,7 @@ def complete_research_gates(
     client: TestClient,
     stage_ids: dict[str, str],
     *,
+    database_url: str,
     paper_approved: bool,
     verified_result: bool,
 ) -> None:
@@ -185,14 +187,11 @@ def complete_research_gates(
         paper_output["experiment_results_not_available"] = [
             "No verified experiment results are available yet."
         ]
-    complete_stage(
-        client,
+    set_server_paper_stage(
+        database_url,
         stage_ids[PAPER_MEETING_WRITER_AGENT_ID],
-        {
-            "human_approved": paper_approved,
-            "output_payload": paper_output,
-            "summary": "Generated review-only writing artifacts.",
-        },
+        paper_output,
+        human_approved=paper_approved,
     )
 
 
@@ -225,13 +224,15 @@ def test_evidence_audit_flags_missing_experiment_results_for_review(
     tmp_path,
     dev_admin_header_enabled: None,
 ) -> None:
-    app = create_app(database_url=f"sqlite:///{tmp_path / 'evidence-audit-review.db'}")
+    database_url = f"sqlite:///{tmp_path / 'evidence-audit-review.db'}"
+    app = create_app(database_url=database_url)
     with TestClient(app) as client:
         register_and_login(client, "AUDIT-REVIEW", "audit-review@example.com")
         quest_id, stage_ids = create_quest_with_stage_map(client)
         complete_research_gates(
             client,
             stage_ids,
+            database_url=database_url,
             paper_approved=False,
             verified_result=False,
         )

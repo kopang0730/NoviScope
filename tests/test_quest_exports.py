@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from stage_test_helpers import complete_stage_in_database
 
 from noviscope.core.stage_policy import (
     DEMAND_VALIDATOR_AGENT_ID,
@@ -30,7 +31,7 @@ def register_and_login(client: TestClient, invite_code: str, email: str) -> None
     assert login_response.status_code == 200
 
 
-def create_traceable_quest(client: TestClient) -> str:
+def create_traceable_quest(client: TestClient, database_url: str) -> str:
     quest_response = client.post(
         "/quests",
         json={
@@ -74,27 +75,22 @@ def create_traceable_quest(client: TestClient) -> str:
         },
     )
     assert demand_response.status_code == 200
-    running_response = client.patch(f"/stages/{paper_stage['id']}", json={"status": "running"})
-    assert running_response.status_code == 200
-    paper_response = client.patch(
-        f"/stages/{paper_stage['id']}",
-        json={
-            "output_payload": {
-                "chinese_research_brief_markdown": "# 中文研究 Brief\n\n## 已验证事实",
-                "confidence": "medium",
-                "english_research_brief_markdown": "# Research Brief\n\n## Verified Facts",
-                "experiment_results_not_available": ["No training run has been executed."],
-                "human_review_required": ["Review claims before group meeting."],
-                "ieee_paper_skeleton_markdown": "# IEEE Paper Skeleton\n\n## Results\nTBD.",
-                "meeting_outline_markdown": "# Group Meeting Outline\n\n1. Motivation",
-                "model_generated_hypotheses": ["Temporal consistency may reduce jitter."],
-                "verified_facts": ["A coach feedback scenario exists."],
-            },
-            "status": "complete",
-            "summary": "Generated review-only writing artifacts.",
+    complete_stage_in_database(
+        database_url,
+        paper_stage["id"],
+        output_payload={
+            "chinese_research_brief_markdown": "# 中文研究 Brief\n\n## 已验证事实",
+            "confidence": "medium",
+            "english_research_brief_markdown": "# Research Brief\n\n## Verified Facts",
+            "experiment_results_not_available": ["No training run has been executed."],
+            "human_review_required": ["Review claims before group meeting."],
+            "ieee_paper_skeleton_markdown": "# IEEE Paper Skeleton\n\n## Results\nTBD.",
+            "meeting_outline_markdown": "# Group Meeting Outline\n\n1. Motivation",
+            "model_generated_hypotheses": ["Temporal consistency may reduce jitter."],
+            "verified_facts": ["A coach feedback scenario exists."],
         },
+        summary="Generated review-only writing artifacts.",
     )
-    assert paper_response.status_code == 200
     return quest_id
 
 
@@ -103,10 +99,11 @@ def test_export_quest_returns_traceable_package(
     dev_admin_header_enabled: None,
 ) -> None:
     # Given: an owner has a quest with reviewed demand evidence and draft artifacts.
-    app = create_app(database_url=f"sqlite:///{tmp_path / 'quest-export.db'}")
+    database_url = f"sqlite:///{tmp_path / 'quest-export.db'}"
+    app = create_app(database_url=database_url)
     with TestClient(app) as client:
         register_and_login(client, "QUEST-EXPORT", "export-owner@example.com")
-        quest_id = create_traceable_quest(client)
+        quest_id = create_traceable_quest(client, database_url)
 
         # When: the owner exports the traceability package.
         response = client.get(f"/quests/{quest_id}/export")
@@ -145,10 +142,11 @@ def test_export_quest_rejects_other_member(
     dev_admin_header_enabled: None,
 ) -> None:
     # Given: one member owns a quest and a second member is logged in.
-    app = create_app(database_url=f"sqlite:///{tmp_path / 'quest-export-access.db'}")
+    database_url = f"sqlite:///{tmp_path / 'quest-export-access.db'}"
+    app = create_app(database_url=database_url)
     with TestClient(app) as client:
         register_and_login(client, "QUEST-EXPORT-OWNER", "owner@example.com")
-        quest_id = create_traceable_quest(client)
+        quest_id = create_traceable_quest(client, database_url)
         logout_response = client.post("/auth/logout")
         assert logout_response.status_code == 204
         register_and_login(client, "QUEST-EXPORT-OTHER", "other@example.com")

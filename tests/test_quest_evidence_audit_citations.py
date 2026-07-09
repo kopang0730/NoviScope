@@ -30,7 +30,7 @@ def test_audit_rejects_malformed_literature_identifiers(
             f"AUDIT-{reference_key.upper()}-REF",
             f"audit-{reference_key}@example.com",
         )
-        quest_id, stage_ids = create_ready_quest(client)
+        quest_id, stage_ids = create_ready_quest(client, database_url)
         patch_response = client.patch(
             f"/stages/{stage_ids[LITERATURE_SCOUT_AGENT_ID]}",
             json={"output_payload": {"papers": [{reference_key: reference_value}]}},

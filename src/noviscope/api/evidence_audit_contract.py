@@ -187,6 +187,13 @@ PAPER_DRAFT_NEEDS_REVIEW: Final = EvidenceAuditIssueSpec(
     message="Generated writing artifacts still need human review.",
     severity=EvidenceAuditIssueSeverity.REVIEW,
 )
+PAPER_ARTIFACTS_UNTRUSTED: Final = EvidenceAuditIssueSpec(
+    agent_id=PAPER_MEETING_WRITER_AGENT_ID,
+    code="paper_artifacts_untrusted",
+    fallback_stage_title="Paper & meeting writer",
+    message="Paper artifacts must come from the server guardrail before formal claims.",
+    severity=EvidenceAuditIssueSeverity.BLOCKER,
+)
 PAPER_RESULTS_NOT_ALIGNED: Final = EvidenceAuditIssueSpec(
     agent_id=PAPER_MEETING_WRITER_AGENT_ID,
     code="paper_results_not_aligned",

@@ -1,16 +1,20 @@
 from collections.abc import Sequence
-from math import isfinite
 from typing import Final, assert_never
 
 from pydantic import JsonValue
 
+from noviscope.agents.paper_meeting_writer_artifacts import PAPER_ARTIFACT_POLICY_VERSION
+from noviscope.agents.paper_meeting_writer_results import verified_result_fact
 from noviscope.api.artifacts import MARKDOWN_ARTIFACT_KEYS
 from noviscope.api.evidence_ledger import collect_source_refs
 from noviscope.core.json_types import JsonObject
+from noviscope.core.stage_policy import CODE_RUNNER_AGENT_ID, EVIDENCE_AUDITOR_AGENT_ID
 from noviscope.models.quest import StageCard, StageStatus
 
 ACCEPTED_HUMAN_DEMAND_VERDICTS: Final = frozenset({"plausible", "verified"})
-TRUSTED_RESULT_AGENT_IDS: Final = frozenset({"code_runner", "evidence_auditor"})
+TRUSTED_RESULT_AGENT_IDS: Final = frozenset(
+    {CODE_RUNNER_AGENT_ID, EVIDENCE_AUDITOR_AGENT_ID}
+)
 VERIFIED_RESULT_FACT_PREFIX: Final = "Verified experiment result:"
 
 
@@ -107,22 +111,17 @@ def json_value_is_verified_result(value: JsonValue) -> bool:
             assert_never(unreachable)
 
 
-def is_finite_number(value: JsonValue | None) -> bool:
-    match value:
-        case bool() | None | str() | list() | dict():
-            return False
-        case int():
-            return True
-        case float() as number:
-            return isfinite(number)
-        case unreachable:
-            assert_never(unreachable)
-
-
 def has_downloadable_paper_artifacts(stage: StageCard) -> bool:
     return all(
         isinstance(content := stage.output_payload.get(key.value), str) and bool(content.strip())
         for key in MARKDOWN_ARTIFACT_KEYS
+    )
+
+
+def has_trusted_paper_artifact_policy(stage: StageCard) -> bool:
+    return (
+        stage.evidence_payload.get("artifact_policy_version")
+        == PAPER_ARTIFACT_POLICY_VERSION
     )
 
 
@@ -152,53 +151,6 @@ def paper_results_are_aligned(
         artifact_verified_facts(str(paper_stage.output_payload[key.value])) == expected_facts
         for key in MARKDOWN_ARTIFACT_KEYS
     )
-
-
-def verified_result_fact(record: JsonObject) -> str | None:
-    metric_name = read_single_string(record.get("metric_name"))
-    run_id = read_single_string(record.get("run_id"))
-    artifact_uri = read_single_string(record.get("artifact_uri"))
-    metric_unit_valid, metric_unit = read_optional_single_string(record.get("metric_unit"))
-    dataset_name_valid, dataset_name = read_optional_single_string(
-        record.get("dataset_name")
-    )
-    baseline_name_valid, baseline_name = read_optional_single_string(
-        record.get("baseline_name")
-    )
-    metric_value = record.get("metric_value")
-    if (
-        metric_name is None
-        or run_id is None
-        or artifact_uri is None
-        or not metric_unit_valid
-        or not dataset_name_valid
-        or not baseline_name_valid
-        or not is_finite_number(metric_value)
-    ):
-        return None
-    measurement = f"{metric_value}{metric_unit}"
-    dataset_context = f" on {dataset_name}" if dataset_name else ""
-    baseline_context = f" using {baseline_name}" if baseline_name else ""
-    return (
-        f"{VERIFIED_RESULT_FACT_PREFIX} {metric_name} = {measurement}"
-        f"{dataset_context}{baseline_context} "
-        f"(run {run_id}; artifact {artifact_uri})."
-    )
-
-
-def read_single_string(value: JsonValue | None) -> str | None:
-    if not isinstance(value, str):
-        return None
-    stripped_value = value.strip()
-    return stripped_value or None
-
-
-def read_optional_single_string(value: JsonValue | None) -> tuple[bool, str]:
-    if value is None:
-        return True, ""
-    if not isinstance(value, str):
-        return False, ""
-    return True, value.strip()
 
 
 def artifact_verified_facts(markdown: str) -> frozenset[str]:

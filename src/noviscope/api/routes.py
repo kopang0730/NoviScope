@@ -10,8 +10,9 @@ from noviscope.agents.assignments import AgentAssignmentService
 from noviscope.agents.registry import AGENT_REGISTRY, AgentSpec
 from noviscope.api.dependencies import get_session
 from noviscope.api.stage_patch_policy import (
-    PaperWriterExecutionPatch,
-    paper_writer_execution_content_changed,
+    PaperWriterPatch,
+    StagePatchPolicyError,
+    ensure_paper_writer_patch_is_review_only,
 )
 from noviscope.auth.dependencies import (
     clear_session_cookie,
@@ -603,25 +604,22 @@ def update_stage(
     service = QuestService(session)
     try:
         existing_stage = service.get_stage_card_for_user(stage_id, current_user)
+        ensure_paper_writer_patch_is_review_only(
+            existing_stage,
+            patch=PaperWriterPatch(
+                evidence_payload=request.evidence_payload,
+                fields=frozenset(request.model_fields_set),
+                input_payload=request.input_payload,
+                output_payload=request.output_payload,
+                summary=request.summary,
+                target_status=request.status,
+            ),
+        )
         output_payload = (
             normalize_stage_output_payload(existing_stage.agent_id, request.output_payload)
             if request.output_payload is not None
             else None
         )
-        human_approved = request.human_approved
-        human_approved_set = "human_approved" in request.model_fields_set
-        if existing_stage.human_approved is True and paper_writer_execution_content_changed(
-            existing_stage,
-            PaperWriterExecutionPatch(
-                evidence_payload=request.evidence_payload,
-                fields=frozenset(request.model_fields_set),
-                input_payload=request.input_payload,
-                output_payload=output_payload,
-                summary=request.summary,
-            ),
-        ):
-            human_approved = None
-            human_approved_set = True
         stage = service.update_stage_card(
             stage_id,
             status=request.status,
@@ -629,8 +627,8 @@ def update_stage(
             input_payload=request.input_payload,
             output_payload=output_payload,
             evidence_payload=request.evidence_payload,
-            human_approved=human_approved,
-            human_approved_set=human_approved_set,
+            human_approved=request.human_approved,
+            human_approved_set="human_approved" in request.model_fields_set,
             review_notes=request.review_notes,
         )
         return stage_response(stage)
@@ -638,5 +636,7 @@ def update_stage(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except PermissionError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except StagePatchPolicyError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
