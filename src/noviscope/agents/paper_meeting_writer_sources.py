@@ -3,14 +3,14 @@ from noviscope.agents.paper_meeting_writer_results import experiment_result_reco
 from noviscope.agents.paper_meeting_writer_types import PaperMeetingWriterRunError
 from noviscope.core.json_types import JsonObject
 from noviscope.core.stage_policy import (
+    CODE_RUNNER_AGENT_ID,
     DEMAND_VALIDATOR_AGENT_ID,
+    EVIDENCE_AUDITOR_AGENT_ID,
     EXPERIMENT_PLANNER_AGENT_ID,
     IDEA_GENERATOR_AGENT_ID,
 )
 from noviscope.models.quest import StageCard, StageStatus
 
-CODE_RUNNER_AGENT_ID = "code_runner"
-EVIDENCE_AUDITOR_AGENT_ID = "evidence_auditor"
 TRUSTED_RESULT_STAGE_AGENT_IDS = frozenset({CODE_RUNNER_AGENT_ID, EVIDENCE_AUDITOR_AGENT_ID})
 
 

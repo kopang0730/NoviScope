@@ -4,6 +4,7 @@ from pydantic import ValidationError
 
 from noviscope.agents.paper_meeting_writer_artifacts import (
     MODEL_MARKDOWN_REPLACED_WARNING,
+    PAPER_ARTIFACT_POLICY_VERSION,
     build_guardrailed_artifacts,
 )
 from noviscope.agents.paper_meeting_writer_results import (
@@ -69,9 +70,7 @@ def constrain_output(
     experiment_results_not_available = list(output.experiment_results_not_available)
     human_review_required = list(output.human_review_required)
     if result_context.has_verified_results:
-        experiment_results_not_available = [
-            notice for notice in experiment_results_not_available if notice != NO_RESULTS_NOTICE
-        ]
+        experiment_results_not_available = []
     elif NO_RESULTS_NOTICE not in experiment_results_not_available:
         experiment_results_not_available.append(NO_RESULTS_NOTICE)
     for review_note in result_context.human_review_required:
@@ -126,6 +125,7 @@ def build_stage_evidence_payload(
 ) -> JsonObject:
     return {
         "artifact_count": 4,
+        "artifact_policy_version": PAPER_ARTIFACT_POLICY_VERSION,
         "can_run": True,
         "download_format": "markdown",
         "experiment_results_require_review": has_result_review_items(output),

@@ -11,6 +11,7 @@ MODEL_MARKDOWN_REPLACED_WARNING = (
     "Model-generated Markdown was retained only in raw_response; downloadable "
     "artifacts were rebuilt from trusted result context."
 )
+PAPER_ARTIFACT_POLICY_VERSION = "server-guardrailed-v1"
 
 
 @dataclass(frozen=True, slots=True)

@@ -123,8 +123,10 @@ def test_stage_run_and_download_never_publish_runner_markdown(
 
     assert run_response.status_code == 200
     output_payload = run_response.json()["output_payload"]
+    evidence_payload = run_response.json()["evidence_payload"]
     assert all(UNTRUSTED_SENTINEL not in output_payload[key] for key in ARTIFACT_KEYS)
     assert output_payload["verified_facts"] == []
     assert output_payload["raw_response"] == UNTRUSTED_SENTINEL
+    assert evidence_payload["artifact_policy_version"] == "server-guardrailed-v1"
     assert download_response.status_code == 200
     assert UNTRUSTED_SENTINEL not in download_response.text

@@ -10,6 +10,7 @@ from noviscope.agents.assignments import AgentAssignmentService
 from noviscope.agents.registry import AGENT_REGISTRY, AgentSpec
 from noviscope.api.dependencies import get_session
 from noviscope.api.stage_patch_policy import (
+    PaperWriterPatch,
     StagePatchPolicyError,
     ensure_paper_writer_patch_is_review_only,
 )
@@ -605,8 +606,14 @@ def update_stage(
         existing_stage = service.get_stage_card_for_user(stage_id, current_user)
         ensure_paper_writer_patch_is_review_only(
             existing_stage,
-            fields=request.model_fields_set,
-            target_status=request.status,
+            patch=PaperWriterPatch(
+                evidence_payload=request.evidence_payload,
+                fields=frozenset(request.model_fields_set),
+                input_payload=request.input_payload,
+                output_payload=request.output_payload,
+                summary=request.summary,
+                target_status=request.status,
+            ),
         )
         output_payload = (
             normalize_stage_output_payload(existing_stage.agent_id, request.output_payload)

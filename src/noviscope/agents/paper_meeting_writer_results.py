@@ -54,7 +54,9 @@ def experiment_results_context(
         match experiment_result_status(record):
             case ExperimentResultStatus.VERIFIED | ExperimentResultStatus.NEEDS_REVIEW:
                 human_review_required.append(needs_review_note(record))
-            case ExperimentResultStatus.REJECTED | None:
+            case None:
+                human_review_required.append(needs_review_note(record))
+            case ExperimentResultStatus.REJECTED:
                 continue
             case unreachable:
                 assert_never(unreachable)
@@ -68,7 +70,9 @@ def experiment_results_context(
                     human_review_required.append(needs_review_note(record))
             case ExperimentResultStatus.NEEDS_REVIEW:
                 human_review_required.append(needs_review_note(record))
-            case ExperimentResultStatus.REJECTED | None:
+            case None:
+                human_review_required.append(needs_review_note(record))
+            case ExperimentResultStatus.REJECTED:
                 continue
             case unreachable:
                 assert_never(unreachable)
@@ -116,7 +120,7 @@ def experiment_result_status(record: JsonObject) -> ExperimentResultStatus | Non
 def verified_result_fact(record: JsonObject) -> str | None:
     metric_name = string_field(record, "metric_name")
     metric_value = number_field(record, "metric_value")
-    metric_unit = string_field(record, "metric_unit")
+    metric_unit = optional_string_field(record, "metric_unit")
     dataset_name = string_field(record, "dataset_name")
     baseline_name = string_field(record, "baseline_name")
     run_id = string_field(record, "run_id")
@@ -150,8 +154,21 @@ def needs_review_note(record: JsonObject) -> str:
 def string_field(record: JsonObject, key: str) -> str | None:
     match record.get(key):
         case str() as value:
-            return value
+            stripped_value = value.strip()
+            return stripped_value or None
         case None | bool() | int() | float() | list() | dict():
+            return None
+        case unreachable:
+            assert_never(unreachable)
+
+
+def optional_string_field(record: JsonObject, key: str) -> str | None:
+    match record.get(key):
+        case None:
+            return ""
+        case str() as value:
+            return value.strip()
+        case bool() | int() | float() | list() | dict():
             return None
         case unreachable:
             assert_never(unreachable)
