@@ -3,7 +3,9 @@ from collections.abc import Sequence
 from typing import Final
 
 from pydantic import BaseModel, ConfigDict, SecretStr
-from sqlmodel import Session, select
+from sqlalchemy import inspect, select
+from sqlalchemy.engine import Engine
+from sqlmodel import Session, SQLModel
 
 from noviscope.agents.assignments import AgentAssignmentService
 from noviscope.auth.passwords import hash_password
@@ -46,6 +48,17 @@ class SeededIds(BaseModel):
     stage_ids: tuple[str, ...]
 
 
+def _contains_noviscope_data(engine: Engine) -> bool:
+    with engine.connect() as connection:
+        existing_tables = set(inspect(connection).get_table_names())
+        for table in SQLModel.metadata.sorted_tables:
+            if table.name not in existing_tables:
+                continue
+            if connection.execute(select(table).limit(1)).first() is not None:
+                return True
+    return False
+
+
 def seed_workbench_e2e(
     database_url: str,
     provider_base_url: str,
@@ -55,11 +68,11 @@ def seed_workbench_e2e(
         raise E2ESeedError("E2E seeding accepts SQLite database URLs only")
 
     engine = create_db_engine(database_url)
+    if _contains_noviscope_data(engine):
+        raise E2ESeedError("E2E database already contains NoviScope data; refusing to seed")
+
     create_schema(engine)
     with Session(engine) as session:
-        if session.exec(select(User)).first() is not None:
-            raise E2ESeedError("E2E database already contains users; refusing to seed")
-
         admin = User(
             display_name="E2E Admin",
             email=ADMIN_EMAIL,

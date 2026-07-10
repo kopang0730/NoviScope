@@ -8,11 +8,11 @@ from sqlmodel import Session, select
 from noviscope.agents.demand_validation import DemandValidationOutput
 from noviscope.auth.passwords import verify_password
 from noviscope.core.crypto import SecretBox
-from noviscope.db.session import create_db_engine
+from noviscope.db.session import create_db_engine, create_schema
 from noviscope.models.agent import AgentAssignment
 from noviscope.models.provider import ModelProvider, ProviderScope
 from noviscope.models.quest import Quest, StageCard, StageStatus
-from noviscope.models.user import User, UserRole
+from noviscope.models.user import InviteCode, User, UserRole
 from scripts.seed_workbench_e2e import E2ESeedError, seed_workbench_e2e
 from tests.e2e_support.fake_openai_provider import app as fake_provider_app
 
@@ -37,8 +37,28 @@ def test_seed_refuses_a_database_that_already_contains_users(tmp_path: Path) -> 
     database_url = sqlite_url(tmp_path / "refusal.db")
     seed_workbench_e2e(database_url, PROVIDER_BASE_URL, PROVIDER_SECRET)
 
-    with pytest.raises(E2ESeedError, match="already contains users"):
+    with pytest.raises(E2ESeedError, match="already contains NoviScope data"):
         seed_workbench_e2e(database_url, PROVIDER_BASE_URL, PROVIDER_SECRET)
+
+
+def test_seed_refuses_non_user_application_data_before_mutation(tmp_path: Path) -> None:
+    database_url = sqlite_url(tmp_path / "invite-refusal.db")
+    engine = create_db_engine(database_url)
+    create_schema(engine)
+    with Session(engine) as session:
+        session.add(InviteCode(code="EXISTING-INVITE"))
+        session.commit()
+
+    with pytest.raises(E2ESeedError, match="already contains NoviScope data"):
+        seed_workbench_e2e(database_url, PROVIDER_BASE_URL, PROVIDER_SECRET)
+
+    with Session(engine) as session:
+        assert [invite.code for invite in session.exec(select(InviteCode)).all()] == [
+            "EXISTING-INVITE"
+        ]
+        assert list(session.exec(select(User)).all()) == []
+        assert list(session.exec(select(ModelProvider)).all()) == []
+        assert list(session.exec(select(Quest)).all()) == []
 
 
 def test_seed_creates_exact_provider_and_quest_ownership(tmp_path: Path) -> None:
