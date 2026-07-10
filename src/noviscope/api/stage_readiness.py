@@ -215,6 +215,7 @@ def build_stage_readiness_response(
     selection = select_provider(
         ProviderSelectionContext(
             current_user=context.current_user,
+            explicit_provider_override=request.provider_id is not None,
             model_name=effective_model_name,
             provider_id=effective_provider_id,
             provider_service=provider_service,
