@@ -4,6 +4,7 @@ from noviscope.core.json_types import JsonObject
 
 DEMAND_VALIDATOR_AGENT_ID = "demand_validator"
 CODE_RUNNER_AGENT_ID = "code_runner"
+CODE_RUNNER_METRIC_RECORDS_KEY = "metric_records"
 EVIDENCE_AUDITOR_AGENT_ID = "evidence_auditor"
 IDEA_GENERATOR_AGENT_ID = "idea_generator"
 EXPERIMENT_PLANNER_AGENT_ID = "experiment_planner"

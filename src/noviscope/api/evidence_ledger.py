@@ -1,5 +1,7 @@
+import re
 from dataclasses import dataclass
 from typing import Annotated, ClassVar, Final
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, JsonValue
@@ -22,7 +24,19 @@ SOURCE_REF_KEYS: Final[tuple[str, ...]] = (
     "sources",
 )
 PAPER_COLLECTION_KEYS: Final[tuple[str, ...]] = ("papers", "top_papers")
-PAPER_REF_KEYS: Final[tuple[str, ...]] = ("arxiv_id", "doi", "paper_ref", "title", "url")
+PAPER_REF_KEYS: Final[tuple[str, ...]] = (
+    "arxiv_id",
+    "doi",
+    "openalex_id",
+    "paper_ref",
+    "url",
+)
+ARXIV_ID_PATTERN: Final = re.compile(
+    r"^(?:arxiv:)?(?:\d{4}\.\d{4,5}|[a-z-]+(?:\.[a-z]{2})?/\d{7})(?:v\d+)?$",
+    re.IGNORECASE,
+)
+DOI_PATTERN: Final = re.compile(r"^10\.\d{4,9}/\S+$", re.IGNORECASE)
+OPENALEX_ID_PATTERN: Final = re.compile(r"^W\d+$", re.IGNORECASE)
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,8 +113,68 @@ def read_paper_refs(value: JsonValue | None) -> tuple[str, ...]:
     refs: list[str] = []
     for item in value:
         if isinstance(item, dict):
-            refs.extend(read_string(item, key) for key in PAPER_REF_KEYS)
-    return tuple(ref for ref in refs if ref)
+            refs.extend(
+                reference
+                for key in PAPER_REF_KEYS
+                if isinstance((reference := item.get(key)), str)
+                and paper_reference_is_valid(key, reference)
+            )
+    return tuple(refs)
+
+
+def paper_reference_is_valid(key: str, value: str) -> bool:
+    if any(character.isspace() for character in value):
+        return False
+    if key == "doi":
+        return doi_is_valid(value)
+    if key == "openalex_id":
+        return openalex_id_is_valid(value)
+    if key == "arxiv_id":
+        return arxiv_id_is_valid(value)
+    if key == "paper_ref":
+        return (
+            url_is_valid(value)
+            or doi_is_valid(value)
+            or openalex_id_is_valid(value)
+            or arxiv_id_is_valid(value)
+        )
+    return url_is_valid(value)
+
+
+def doi_is_valid(value: str) -> bool:
+    normalized = value.strip()
+    for prefix in ("https://doi.org/", "http://doi.org/", "http://dx.doi.org/", "doi:"):
+        if normalized.lower().startswith(prefix):
+            normalized = normalized[len(prefix) :]
+            break
+    return DOI_PATTERN.fullmatch(normalized) is not None
+
+
+def openalex_id_is_valid(value: str) -> bool:
+    normalized = value.strip()
+    prefix = "https://openalex.org/"
+    if normalized.lower().startswith(prefix):
+        normalized = normalized[len(prefix) :]
+    return OPENALEX_ID_PATTERN.fullmatch(normalized) is not None
+
+
+def arxiv_id_is_valid(value: str) -> bool:
+    normalized = value.strip()
+    for prefix in ("https://arxiv.org/abs/", "http://arxiv.org/abs/"):
+        if normalized.lower().startswith(prefix):
+            normalized = normalized[len(prefix) :]
+            break
+    return ARXIV_ID_PATTERN.fullmatch(normalized) is not None
+
+
+def url_is_valid(value: str) -> bool:
+    if any(character.isspace() for character in value):
+        return False
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return False
+    return parsed.scheme in {"http", "https"} and parsed.hostname is not None
 
 
 def collect_source_refs(stage: StageCard) -> tuple[str, ...]:
@@ -108,6 +182,12 @@ def collect_source_refs(stage: StageCard) -> tuple[str, ...]:
     for key in SOURCE_REF_KEYS:
         refs.extend(read_source_refs(stage.evidence_payload.get(key)))
         refs.extend(read_source_refs(stage.output_payload.get(key)))
+    refs.extend(collect_paper_source_refs(stage))
+    return tuple(dict.fromkeys(refs))
+
+
+def collect_paper_source_refs(stage: StageCard) -> tuple[str, ...]:
+    refs: list[str] = []
     for key in PAPER_COLLECTION_KEYS:
         refs.extend(read_paper_refs(stage.output_payload.get(key)))
     return tuple(dict.fromkeys(refs))

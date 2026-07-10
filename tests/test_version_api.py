@@ -42,6 +42,17 @@ def promote_user_to_admin(database_url: str, email: str) -> None:
         session.commit()
 
 
+def test_package_version_uses_source_version_when_distribution_metadata_is_missing(
+    monkeypatch,
+):
+    def missing_distribution_metadata(_: str) -> str:
+        raise versioning.PackageNotFoundError
+
+    monkeypatch.setattr(versioning, "version", missing_distribution_metadata)
+
+    assert versioning.package_version() == "0.1.0"
+
+
 def test_public_version_endpoint_returns_only_version(monkeypatch):
     monkeypatch.setattr("noviscope.versioning.package_version", lambda: "9.9.9")
 

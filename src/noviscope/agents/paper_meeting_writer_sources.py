@@ -4,6 +4,7 @@ from noviscope.agents.paper_meeting_writer_types import PaperMeetingWriterRunErr
 from noviscope.core.json_types import JsonObject
 from noviscope.core.stage_policy import (
     CODE_RUNNER_AGENT_ID,
+    CODE_RUNNER_METRIC_RECORDS_KEY,
     DEMAND_VALIDATOR_AGENT_ID,
     EVIDENCE_AUDITOR_AGENT_ID,
     EXPERIMENT_PLANNER_AGENT_ID,
@@ -49,5 +50,7 @@ def trusted_experiment_result_records(stages: tuple[StageCard, ...]) -> list[Jso
             or stage.human_approved is not True
         ):
             continue
-        records.extend(experiment_result_records(stage.output_payload.get("metric_records")))
+        records.extend(
+            experiment_result_records(stage.output_payload.get(CODE_RUNNER_METRIC_RECORDS_KEY))
+        )
     return records

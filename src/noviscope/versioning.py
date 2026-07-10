@@ -7,6 +7,7 @@ from typing import Final, Literal, assert_never
 import httpx
 from pydantic import BaseModel, ConfigDict, ValidationError
 
+from noviscope import __version__
 from noviscope.core.config import Settings
 
 GitHubCompareStatus = Literal["ahead", "behind", "diverged", "identical"]
@@ -54,7 +55,7 @@ def package_version() -> str:
     try:
         return version("noviscope")
     except PackageNotFoundError:
-        return "0.0.0"
+        return __version__
 
 
 def deployed_version(settings: Settings) -> str:
