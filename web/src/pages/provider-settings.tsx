@@ -12,38 +12,57 @@ import {
   type ProviderConnectionTestResult,
 } from "../api/providers";
 import { getErrorMessage } from "../api/client";
-import type { AgentAssignment, Provider } from "../api/types";
+import type { AgentAssignment, Provider, WorkflowAgentCapability } from "../api/types";
+import { getWorkflowCapabilities } from "../api/workflow";
 import { useAuth } from "../auth/auth-context";
-import { AgentAssignmentCard } from "../components/agent-assignment-card";
+import { AgentAssignmentMatrix } from "../components/agent-assignment-matrix";
 import { ProviderFormCard } from "../components/provider-form-card";
 import { ProviderListCard } from "../components/provider-list-card";
+import { ProviderScopeTabs } from "../components/provider-scope-tabs";
+import { useI18n } from "../i18n/i18n-context";
 import {
   initialProviderFormState,
   providerToFormState,
   type ProviderFormState,
 } from "../lib/provider-form";
+import {
+  filterProviders,
+  type ProviderScopeTab,
+} from "../lib/provider-settings-view";
 
 export function ProviderSettingsPage() {
   const { currentUser } = useAuth();
-  const [assignments, setAssignments] = useState<AgentAssignment[]>([]);
-  const [providers, setProviders] = useState<Provider[]>([]);
+  const { t } = useI18n();
+  const [assignments, setAssignments] = useState<readonly AgentAssignment[]>([]);
+  const [capabilities, setCapabilities] = useState<readonly WorkflowAgentCapability[]>([]);
+  const [providers, setProviders] = useState<readonly Provider[]>([]);
+  const [activeScope, setActiveScope] = useState<ProviderScopeTab>("personal");
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
-  const [assignmentSaveError, setAssignmentSaveError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [editingProviderId, setEditingProviderId] = useState<string | null>(null);
   const [formState, setFormState] = useState<ProviderFormState>(initialProviderFormState);
-  const [savingAssignmentAgentId, setSavingAssignmentAgentId] = useState<string | null>(null);
   const [testingProviderId, setTestingProviderId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, ProviderConnectionTestResult>>({});
 
   const isEditing = editingProviderId !== null;
+  const visibleProviders = filterProviders(providers, activeScope);
+
+  useEffect(() => {
+    if (!currentUser) {
+      return;
+    }
+    const defaultScope = currentUser.role === "admin" ? "shared" : "personal";
+    setActiveScope(defaultScope);
+    setFormState({ ...initialProviderFormState, scope: defaultScope });
+  }, [currentUser]);
 
   const loadProviderData = useCallback(async () => {
     if (!currentUser) {
       setAssignments([]);
+      setCapabilities([]);
       setProviders([]);
       setAssignmentError(null);
       setLoading(false);
@@ -56,12 +75,14 @@ export function ProviderSettingsPage() {
     setAssignmentError(null);
 
     try {
-      const [nextProviders, nextAssignments] = await Promise.all([
+      const [nextProviders, nextAssignments, nextCapabilities] = await Promise.all([
         getProviders(),
         getAgentAssignments(),
+        getWorkflowCapabilities(),
       ]);
       setProviders(nextProviders);
       setAssignments(nextAssignments);
+      setCapabilities(nextCapabilities);
     } catch (error) {
       const message = getErrorMessage(error);
       setAssignmentError(message);
@@ -75,10 +96,28 @@ export function ProviderSettingsPage() {
     void loadProviderData();
   }, [loadProviderData]);
 
+  const reloadAssignments = useCallback(async () => {
+    try {
+      const nextAssignments = await getAgentAssignments();
+      setAssignments(nextAssignments);
+      setAssignmentError(null);
+    } catch (error) {
+      setAssignmentError(getErrorMessage(error));
+      throw error;
+    }
+  }, []);
+
   function resetForm() {
     setSubmitError(null);
     setEditingProviderId(null);
-    setFormState(initialProviderFormState);
+    setFormState({ ...initialProviderFormState, scope: activeScope });
+  }
+
+  function changeScope(scope: ProviderScopeTab) {
+    setActiveScope(scope);
+    setSubmitError(null);
+    setEditingProviderId(null);
+    setFormState({ ...initialProviderFormState, scope });
   }
 
   function startEditingProvider(provider: Provider) {
@@ -116,6 +155,7 @@ export function ProviderSettingsPage() {
           ...initialProviderFormState,
           baseUrl: formState.baseUrl,
           kind: formState.kind,
+          scope: activeScope,
         });
       }
       await loadProviderData();
@@ -146,31 +186,13 @@ export function ProviderSettingsPage() {
     }
   }
 
-  async function handleSaveAssignment(
-    agentId: string,
-    draft: { readonly modelName: string; readonly providerId: string },
-  ) {
-    setAssignmentSaveError(null);
-    setSavingAssignmentAgentId(agentId);
-    try {
-      const updatedAssignment = await updateAgentAssignment(agentId, {
-        model_name: draft.providerId ? draft.modelName || null : null,
-        provider_id: draft.providerId || null,
-      });
-      setAssignments((current) =>
-        current.map((assignment) =>
-          assignment.agent_id === agentId ? updatedAssignment : assignment,
-        ),
-      );
-    } catch (error) {
-      setAssignmentSaveError(getErrorMessage(error));
-    } finally {
-      setSavingAssignmentAgentId(null);
-    }
-  }
-
   return (
     <div className="grid gap-4">
+      <ProviderScopeTabs
+        activeScope={activeScope}
+        onChange={changeScope}
+        providers={providers}
+      />
       <div className="grid gap-4 2xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.65fr)]">
         <ProviderListCard
           currentUser={currentUser}
@@ -178,7 +200,8 @@ export function ProviderSettingsPage() {
           loadingError={loadingError}
           onEdit={startEditingProvider}
           onTest={(provider) => void handleTestProvider(provider)}
-          providers={providers}
+          providers={visibleProviders}
+          scope={activeScope}
           testResults={testResults}
           testingProviderId={testingProviderId}
         />
@@ -189,20 +212,27 @@ export function ProviderSettingsPage() {
           onCancelEdit={resetForm}
           onSubmit={(event) => void handleSubmit(event)}
           onUpdate={setFormState}
+          scope={activeScope}
           submitError={submitError}
           submitting={submitting}
         />
       </div>
-      <AgentAssignmentCard
-        assignments={assignments}
-        currentUser={currentUser}
-        error={assignmentError}
-        loading={loading}
-        onSave={(agentId, draft) => void handleSaveAssignment(agentId, draft)}
-        providers={providers}
-        saveError={assignmentSaveError}
-        savingAgentId={savingAssignmentAgentId}
-      />
+      {activeScope === "shared" ? (
+        <AgentAssignmentMatrix
+          assignments={assignments}
+          capabilities={capabilities}
+          currentUser={currentUser}
+          error={assignmentError}
+          loading={loading}
+          onReload={reloadAssignments}
+          onUpdate={updateAgentAssignment}
+          providers={providers}
+        />
+      ) : (
+        <p className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+          {t("providerPersonalOverrideDescription")}
+        </p>
+      )}
     </div>
   );
 }

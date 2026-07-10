@@ -3,6 +3,7 @@ import type { Provider, User } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
 import { canManageProvider } from "../lib/provider-form";
 import { formatDateTime, labelFromEnum } from "../lib/format";
+import type { ProviderScopeTab } from "../lib/provider-settings-view";
 import { Badge } from "./badge";
 import { Button } from "./button";
 import { Card, CardHeading } from "./card";
@@ -15,13 +16,10 @@ type ProviderListCardProps = {
   readonly onEdit: (provider: Provider) => void;
   readonly onTest: (provider: Provider) => void;
   readonly providers: readonly Provider[];
+  readonly scope: ProviderScopeTab;
   readonly testResults: Readonly<Record<string, ProviderConnectionTestResult>>;
   readonly testingProviderId: string | null;
 };
-
-function scopeBadgeTone(provider: Provider) {
-  return provider.scope === "shared" ? "teal" : "blue";
-}
 
 function statusTone(provider: Provider) {
   return provider.is_active ? "green" : "gray";
@@ -78,6 +76,7 @@ export function ProviderListCard({
   onEdit,
   onTest,
   providers,
+  scope,
   testResults,
   testingProviderId,
 }: ProviderListCardProps) {
@@ -85,7 +84,18 @@ export function ProviderListCard({
 
   return (
     <Card>
-      <CardHeading description={t("providerListDescription")} title={t("navProviders")} />
+      <CardHeading
+        description={
+          scope === "shared"
+            ? t("providerSharedDefaultsDescription")
+            : t("providerPersonalOverrideDescription")
+        }
+        title={
+          scope === "shared"
+            ? t("providerSharedCredentialsTitle")
+            : t("providerPersonalCredentialsTitle")
+        }
+      />
       {!currentUser ? (
         <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
           {t("providerSignInPrompt")}
@@ -106,7 +116,6 @@ export function ProviderListCard({
                 <TableHead>{t("tableName")}</TableHead>
                 <TableHead>{t("tableKind")}</TableHead>
                 <TableHead>{t("tableModel")}</TableHead>
-                <TableHead>{t("tableScope")}</TableHead>
                 <TableHead>{t("tableStatus")}</TableHead>
                 <TableHead>{t("providerActions")}</TableHead>
               </tr>
@@ -121,9 +130,6 @@ export function ProviderListCard({
                   </TableCell>
                   <TableCell className="min-w-[120px]">{labelFromEnum(provider.kind)}</TableCell>
                   <TableCell className="min-w-[130px]">{provider.default_model}</TableCell>
-                  <TableCell>
-                    <Badge tone={scopeBadgeTone(provider)}>{provider.scope === "shared" ? t("scopeShared") : t("scopePersonal")}</Badge>
-                  </TableCell>
                   <TableCell>
                     <Badge tone={statusTone(provider)}>{provider.is_active ? t("providerActive") : t("providerInactive")}</Badge>
                     <p className="mt-2 text-xs text-slate-500">
@@ -148,12 +154,9 @@ export function ProviderListCard({
                   <Badge tone={statusTone(provider)}>{provider.is_active ? t("providerActive") : t("providerInactive")}</Badge>
                 </div>
                 <p className="mt-3 text-sm text-slate-600">{provider.base_url}</p>
-                <div className="mt-3 flex items-center gap-2">
-                  <Badge tone={scopeBadgeTone(provider)}>{provider.scope === "shared" ? t("scopeShared") : t("scopePersonal")}</Badge>
-                  <span className="text-xs text-slate-500">
-                    {t("updated")} {formatDateTime(provider.updated_at)}
-                  </span>
-                </div>
+                <p className="mt-3 text-xs text-slate-500">
+                  {t("updated")} {formatDateTime(provider.updated_at)}
+                </p>
                 <ProviderTestResult result={testResults[provider.id]} />
                 <div className="mt-4">
                   <ProviderActions currentUser={currentUser} onEdit={onEdit} onTest={onTest} provider={provider} testingProviderId={testingProviderId} />

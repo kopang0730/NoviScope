@@ -1,8 +1,10 @@
 import type { FormEvent } from "react";
-import type { ProviderKind, ProviderScope, User } from "../api/types";
+import type { ProviderKind, User } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
 import { labelFromEnum } from "../lib/format";
 import type { ProviderFormState } from "../lib/provider-form";
+import type { ProviderScopeTab } from "../lib/provider-settings-view";
+import { Badge } from "./badge";
 import { Button } from "./button";
 import { Card, CardHeading } from "./card";
 import { Input, Select } from "./input";
@@ -16,6 +18,7 @@ type ProviderFormCardProps = {
   readonly onCancelEdit: () => void;
   readonly onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   readonly onUpdate: (formState: ProviderFormState) => void;
+  readonly scope: ProviderScopeTab;
   readonly submitError: string | null;
   readonly submitting: boolean;
 };
@@ -27,6 +30,7 @@ export function ProviderFormCard({
   onCancelEdit,
   onSubmit,
   onUpdate,
+  scope,
   submitError,
   submitting,
 }: ProviderFormCardProps) {
@@ -34,6 +38,26 @@ export function ProviderFormCard({
 
   function updateField<Key extends keyof ProviderFormState>(key: Key, value: ProviderFormState[Key]) {
     onUpdate({ ...formState, [key]: value });
+  }
+
+  function providerKindFromValue(value: string): ProviderKind {
+    return providerKinds.find((kind) => kind === value) ?? "openai_compatible";
+  }
+
+  const canCreateInScope = scope === "personal" || currentUser?.role === "admin";
+
+  if (!isEditing && !canCreateInScope) {
+    return (
+      <Card>
+        <CardHeading
+          description={t("providerSharedCreateAdminOnly")}
+          title={t("providerAddTitle")}
+        />
+        <p className="mt-5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+          {t("providerSharedCreatePersonalPrompt")}
+        </p>
+      </Card>
+    );
   }
 
   return (
@@ -59,7 +83,7 @@ export function ProviderFormCard({
         />
         <Select
           label={t("providerKind")}
-          onChange={(event) => updateField("kind", event.target.value as ProviderKind)}
+          onChange={(event) => updateField("kind", providerKindFromValue(event.target.value))}
           value={formState.kind}
         >
           {providerKinds.map((kind) => (
@@ -101,24 +125,21 @@ export function ProviderFormCard({
             <span className="text-sm font-medium text-slate-700">{t("providerEnabled")}</span>
           </label>
         ) : null}
-        <Select
-          disabled={isEditing}
-          hint={
-            isEditing
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-medium text-slate-700">{t("providerScope")}</span>
+            <Badge tone={formState.scope === "shared" ? "teal" : "blue"}>
+              {formState.scope === "shared" ? t("scopeShared") : t("scopePersonal")}
+            </Badge>
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            {isEditing
               ? t("providerScopeLockedHint")
-              : currentUser?.role === "admin"
-                ? t("providerScopeSharedHint")
-                : t("providerScopePersonalHint")
-          }
-          label={t("providerScope")}
-          onChange={(event) => updateField("scope", event.target.value as ProviderScope)}
-          value={formState.scope}
-        >
-          <option value="personal">{t("scopePersonal")}</option>
-          <option disabled={currentUser?.role !== "admin"} value="shared">
-            {t("scopeShared")}
-          </option>
-        </Select>
+              : formState.scope === "shared"
+                ? t("providerSharedDefaultsDescription")
+                : t("providerPersonalOverrideDescription")}
+          </p>
+        </div>
         {submitError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{submitError}</p> : null}
         <Button className="w-full" loading={submitting} type="submit">
           {isEditing ? t("providerUpdate") : t("providerSave")}
