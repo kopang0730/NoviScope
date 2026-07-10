@@ -196,7 +196,24 @@ export function StageWorkbenchTabs({
           </section>
         );
       case "artifacts":
-        return <StageOutputPanel onStageChange={setCurrentStage} stage={currentStage} stageRunGate={stageRunGate} workflowStages={stages} />;
+        return mode === "full" ? (
+          <StageOutputPanel
+            onStageChange={setCurrentStage}
+            stage={currentStage}
+            stageRunGate={stageRunGate}
+            workflowStages={stages}
+          />
+        ) : (
+          <section className="rounded-lg border border-slate-200 bg-white p-4">
+            <StageRunSummary stage={currentStage} stageRunGate={stageRunGate} />
+            <Link
+              className={buttonClassName({ className: "mt-3", size: "sm", variant: "secondary" })}
+              to={`/stages/${currentStage.id}?quest=${currentStage.quest_id}`}
+            >
+              {t("stageWorkbenchOpenDetail")}
+            </Link>
+          </section>
+        );
     }
   }
 

@@ -4,7 +4,7 @@ import {
   buildMacroPhasePresentation,
   macroPhaseStateKey,
   type MacroPhaseState,
-} from "../lib/research-canvas-data";
+} from "../lib/research-phase-projection";
 import type { ProviderReadinessData } from "../lib/provider-readiness-data";
 import type { MacroPhaseId, MacroPhaseView } from "../lib/research-workbench";
 import type { StageCard } from "../api/types";

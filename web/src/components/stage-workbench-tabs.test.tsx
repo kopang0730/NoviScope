@@ -54,12 +54,16 @@ function stage(overrides: Partial<StageCard> = {}): StageCard {
   };
 }
 
-function renderTabs(currentStage: StageCard, onRunStage = vi.fn()) {
+function renderTabs(
+  currentStage: StageCard,
+  onRunStage = vi.fn(),
+  mode: "compact" | "full" = "compact",
+) {
   return render(
     <MemoryRouter>
       <I18nProvider>
         <StageWorkbenchTabs
-          mode="compact"
+          mode={mode}
           onRunStage={onRunStage}
           providerReadinessData={providerReadinessData}
           stage={currentStage}
@@ -133,5 +137,46 @@ describe("StageWorkbenchTabs", () => {
     await user.click(screen.getByRole("button", { name: "Run stage" }));
 
     expect(onRunStage).toHaveBeenCalledWith("stage-1", undefined);
+  });
+
+  it("keeps compact Artifacts read-only and links to Stage Detail", async () => {
+    const user = userEvent.setup();
+    renderTabs(
+      stage({
+        agent_id: "idea_generator",
+        output_payload: {
+          gaps: [],
+          ideas: [
+            {
+              application_value: "high",
+              based_on_which_papers: ["Paper A"],
+              confidence: "high",
+              core_hypothesis: "A constrained model preserves document structure.",
+              expected_improvement: "Higher OCR recovery.",
+              experiment_feasibility: "high",
+              idea_id: "idea-1",
+              idea_title: "Structure-aware restoration",
+              novelty_risk: "medium",
+              required_baseline: "Inpainting baseline",
+              required_data: "Paired worksheet scans",
+            },
+          ],
+          selection_status: "pending_human_selection",
+          selected_idea_ids: [],
+          summary: "One experiment-ready idea.",
+        },
+        title: "Idea Generator",
+      }),
+    );
+
+    await user.click(screen.getByRole("tab", { name: "Artifacts" }));
+
+    expect(
+      screen.queryByRole("button", { name: "Select for experiment design" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Stage Detail" })).toHaveAttribute(
+      "href",
+      "/stages/stage-1?quest=quest-1",
+    );
   });
 });
