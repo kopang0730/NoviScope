@@ -47,6 +47,7 @@ export function StageDetailPage() {
   const providerReadinessData = useProviderReadinessData();
   const {
     applyStageChange,
+    capabilities,
     loadError,
     loading,
     nextAction,
@@ -164,6 +165,7 @@ export function StageDetailPage() {
         <>
           <StageNextActionCard
             action={nextAction}
+            capabilities={capabilities}
             onNavigate={(path) => void navigate(path)}
             onRun={(targetStageId, providerId) => void handleRunStage(targetStageId, providerId)}
             providers={providers}

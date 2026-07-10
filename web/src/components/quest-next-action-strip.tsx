@@ -6,6 +6,7 @@ import type {
   WorkflowNextAction,
 } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
+import { supportsWorkflowProviderOverride } from "../lib/workflow-action-provider";
 import { buildWorkflowActionView } from "../lib/workflow-action-view";
 import { Badge } from "./badge";
 import { Button, buttonClassName } from "./button";
@@ -53,11 +54,7 @@ export function QuestNextActionStrip({
 
   const view = buildWorkflowActionView(action, language);
   const stagePath = `/stages/${action.stage_id}?quest=${questId}`;
-  const capability = capabilities.find((item) => item.agent_id === action.agent_id);
-  const supportsProviderOverride =
-    action.action_type === "run_stage" &&
-    capability?.stage_runner_available === true &&
-    capability.provider_requirement === "model_provider";
+  const supportsProviderOverride = supportsWorkflowProviderOverride(action, capabilities);
   const activeProviders = providers.filter((provider) => provider.is_active);
 
   const primaryCommand = (() => {

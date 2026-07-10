@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from "react";
-import type { Provider, WorkflowNextAction } from "../api/types";
+import type { Provider, WorkflowAgentCapability, WorkflowNextAction } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
+import { supportsWorkflowProviderOverride } from "../lib/workflow-action-provider";
 import { buildWorkflowActionView } from "../lib/workflow-action-view";
 import { Badge } from "./badge";
 import { Button } from "./button";
@@ -9,6 +10,7 @@ import { Select } from "./input";
 
 export type StageNextActionCardProps = {
   readonly action: WorkflowNextAction | null;
+  readonly capabilities: readonly WorkflowAgentCapability[];
   readonly onNavigate: (path: string) => void;
   readonly onRun: (stageId: string, providerId?: string) => void;
   readonly providers: readonly Provider[];
@@ -22,6 +24,7 @@ function unsupportedActionType(actionType: never): never {
 
 export function StageNextActionCard({
   action,
+  capabilities,
   onNavigate,
   onRun,
   providers,
@@ -49,12 +52,8 @@ export function StageNextActionCard({
 
   const view = buildWorkflowActionView(action, language);
   const stagePath = `/stages/${action.stage_id}?quest=${questId}`;
-  const activeProviders = providers.filter(
-    (provider) =>
-      provider.is_active &&
-      (provider.kind === "openai_compatible" || provider.kind === "custom"),
-  );
-  const supportsProviderOverride = action.action_type === "run_stage" && activeProviders.length > 0;
+  const activeProviders = providers.filter((provider) => provider.is_active);
+  const supportsProviderOverride = supportsWorkflowProviderOverride(action, capabilities);
 
   const primaryCommand = (() => {
     switch (action.action_type) {

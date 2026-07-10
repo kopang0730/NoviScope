@@ -7,9 +7,10 @@ import type {
   Quest,
   StageCard,
   User,
+  WorkflowAgentCapability,
   WorkflowNextAction,
 } from "../api/types";
-import { getWorkflowNextActions } from "../api/workflow";
+import { getWorkflowCapabilities, getWorkflowNextActions } from "../api/workflow";
 
 type StageDetailDataOptions = {
   readonly currentUser: User | null;
@@ -34,6 +35,7 @@ export function useStageDetailData({
   const [stage, setStage] = useState<StageCard | null>(null);
   const [stages, setStages] = useState<readonly StageCard[]>([]);
   const [nextAction, setNextAction] = useState<WorkflowNextAction | null>(null);
+  const [capabilities, setCapabilities] = useState<readonly WorkflowAgentCapability[]>([]);
   const [providers, setProviders] = useState<readonly Provider[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -67,6 +69,7 @@ export function useStageDetailData({
       setStage(null);
       setStages([]);
       setNextAction(null);
+      setCapabilities([]);
       setProviders([]);
       setLoading(false);
       return;
@@ -81,8 +84,9 @@ export function useStageDetailData({
       getQuestStages(questId),
       getWorkflowNextActions(questId),
       getProviders(),
+      getWorkflowCapabilities(),
     ])
-      .then(([nextQuest, nextStages, nextActions, visibleProviders]) => {
+      .then(([nextQuest, nextStages, nextActions, visibleProviders, workflowCapabilities]) => {
         if (!active) {
           return;
         }
@@ -92,6 +96,7 @@ export function useStageDetailData({
         setStages(nextStages);
         setNextAction(nextActions.actions[0] ?? null);
         setProviders(visibleProviders);
+        setCapabilities(workflowCapabilities);
       })
       .catch((error: unknown) => {
         if (active) {
@@ -111,6 +116,7 @@ export function useStageDetailData({
 
   return {
     applyStageChange,
+    capabilities,
     loadError,
     loading,
     nextAction,
