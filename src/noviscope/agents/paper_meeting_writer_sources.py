@@ -11,8 +11,6 @@ from noviscope.core.stage_policy import (
 )
 from noviscope.models.quest import StageCard, StageStatus
 
-TRUSTED_RESULT_STAGE_AGENT_IDS = frozenset({CODE_RUNNER_AGENT_ID, EVIDENCE_AUDITOR_AGENT_ID})
-
 
 def find_stage(stages: tuple[StageCard, ...], agent_id: str) -> StageCard | None:
     return next((stage for stage in stages if stage.agent_id == agent_id), None)
@@ -46,10 +44,10 @@ def trusted_experiment_result_records(stages: tuple[StageCard, ...]) -> list[Jso
     records: list[JsonObject] = []
     for stage in stages:
         if (
-            stage.agent_id not in TRUSTED_RESULT_STAGE_AGENT_IDS
+            stage.agent_id != CODE_RUNNER_AGENT_ID
             or stage.status != StageStatus.COMPLETE
             or stage.human_approved is not True
         ):
             continue
-        records.extend(experiment_result_records(stage.output_payload.get("experiment_results")))
+        records.extend(experiment_result_records(stage.output_payload.get("metric_records")))
     return records

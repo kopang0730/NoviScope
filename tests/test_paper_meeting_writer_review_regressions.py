@@ -90,6 +90,20 @@ def test_model_cannot_forge_invalid_structured_response_state() -> None:
     assert output.structured_response_valid is True
 
 
+def test_model_generated_hypotheses_cannot_publish_untrusted_result_claims() -> None:
+    raw_output = json.loads(model_output_without_result_guardrails())
+    raw_output["model_generated_hypotheses"] = [
+        "The completed experiment achieved 99.7% F1 on the private test set."
+    ]
+
+    output = parse_paper_meeting_writer_output(
+        json.dumps(raw_output),
+        request_with_trusted_result(),
+    )
+
+    assert output.model_generated_hypotheses == []
+
+
 @pytest.mark.parametrize(
     "field",
     ["artifact_uri", "baseline_name", "dataset_name", "metric_name", "run_id"],

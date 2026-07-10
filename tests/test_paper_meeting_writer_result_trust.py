@@ -46,10 +46,10 @@ def test_planner_result_cannot_self_assert_trusted_agent() -> None:
     assert any("run-20260707-baseline" in item for item in output.human_review_required)
 
 
-def test_stage_runner_uses_only_approved_result_stage_records() -> None:
+def test_stage_runner_uses_only_approved_code_runner_metric_records() -> None:
     captured_request: PaperMeetingWriterRequest | None = None
     approved_record = result_record("approved-code-run")
-    unapproved_record = result_record("unapproved-audit-run")
+    auditor_record = result_record("auditor-owned-run")
 
     class CapturingPaperRunner:
         def run(self, request: PaperMeetingWriterRequest) -> PaperMeetingWriterOutput:
@@ -82,15 +82,15 @@ def test_stage_runner_uses_only_approved_result_stage_records() -> None:
     approved_code_stage = StageCard(
         agent_id="code_runner",
         human_approved=True,
-        output_payload={"experiment_results": [approved_record]},
+        output_payload={"metric_records": [approved_record]},
         quest_id="quest_1",
         status=StageStatus.COMPLETE,
         title="Code runner",
     )
-    unapproved_audit_stage = StageCard(
+    approved_audit_stage = StageCard(
         agent_id="evidence_auditor",
-        human_approved=False,
-        output_payload={"experiment_results": [unapproved_record]},
+        human_approved=True,
+        output_payload={"experiment_results": [auditor_record]},
         quest_id="quest_1",
         status=StageStatus.COMPLETE,
         title="Evidence auditor",
@@ -116,7 +116,7 @@ def test_stage_runner_uses_only_approved_result_stage_records() -> None:
         workflow_stages=(
             experiment_stage,
             approved_code_stage,
-            unapproved_audit_stage,
+            approved_audit_stage,
         ),
     )
 

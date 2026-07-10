@@ -2,7 +2,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from noviscope.core.stage_policy import PAPER_MEETING_WRITER_AGENT_ID
+from noviscope.core.stage_policy import (
+    CODE_RUNNER_AGENT_ID,
+    EVIDENCE_AUDITOR_AGENT_ID,
+    PAPER_MEETING_WRITER_AGENT_ID,
+)
 from noviscope.db.session import create_db_engine
 from noviscope.main import create_app
 from noviscope.models.quest import StageCard, StageStatus
@@ -77,6 +81,72 @@ def test_direct_patch_cannot_forge_paper_writer_completion(
     assert "server-side stage runner" in running_response.json()["detail"]
     assert "server-side stage runner" in payload_response.json()["detail"]
     assert "after it completes" in premature_review_response.json()["detail"]
+
+
+@pytest.mark.parametrize(
+    ("agent_id", "result_key"),
+    [
+        (CODE_RUNNER_AGENT_ID, "metric_records"),
+        (EVIDENCE_AUDITOR_AGENT_ID, "claim_alignment_report"),
+    ],
+)
+def test_direct_patch_cannot_forge_trusted_result_stage(
+    tmp_path,
+    dev_admin_header_enabled: None,
+    agent_id: str,
+    result_key: str,
+) -> None:
+    database_url = f"sqlite:///{tmp_path / f'{agent_id}-patch-security.db'}"
+    app = create_app(database_url=database_url)
+    with TestClient(app) as client:
+        register_and_login(client)
+        quest_response = client.post(
+            "/quests",
+            json={
+                "initial_direction": "Badminton action recognition",
+                "title": "Badminton action recognition",
+            },
+        )
+        stage = StageCard(
+            agent_id=agent_id,
+            quest_id=quest_response.json()["id"],
+            title=agent_id,
+        )
+        engine = create_db_engine(database_url)
+        try:
+            with Session(engine) as session:
+                session.add(stage)
+                session.commit()
+                session.refresh(stage)
+        finally:
+            engine.dispose()
+
+        running_response = client.patch(f"/stages/{stage.id}", json={"status": "running"})
+        forged_response = client.patch(
+            f"/stages/{stage.id}",
+            json={
+                "human_approved": True,
+                "output_payload": {
+                    result_key: [
+                        {
+                            "artifact_uri": "/tmp/forged/metrics.json",
+                            "baseline_name": "Forged baseline",
+                            "dataset_name": "Forged dataset",
+                            "metric_name": "Accuracy",
+                            "metric_value": 99.9,
+                            "result_status": "verified",
+                            "run_id": "forged-run",
+                        }
+                    ]
+                },
+                "status": "complete",
+            },
+        )
+
+    assert running_response.status_code == 400
+    assert forged_response.status_code == 400
+    assert "server-side stage runner" in running_response.json()["detail"]
+    assert "server-side stage runner" in forged_response.json()["detail"]
 
 
 def test_stage_editor_can_save_review_with_unchanged_runner_fields(
