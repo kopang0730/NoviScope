@@ -49,6 +49,18 @@ const providers: readonly Provider[] = [
     updated_at: "2026-07-10T00:00:00Z",
   },
   {
+    base_url: "https://personal-anthropic.example.com/v1",
+    created_at: "2026-07-10T00:00:00Z",
+    default_model: "claude-sonnet",
+    id: "personal-anthropic",
+    is_active: true,
+    kind: "anthropic",
+    name: "Personal Anthropic Model",
+    owner_user_id: "user-1",
+    scope: "personal",
+    updated_at: "2026-07-10T00:00:00Z",
+  },
+  {
     base_url: "https://inactive.example.com/v1",
     created_at: "2026-07-10T00:00:00Z",
     default_model: "inactive-model",
@@ -56,8 +68,8 @@ const providers: readonly Provider[] = [
     is_active: false,
     kind: "custom",
     name: "Inactive Model",
-    owner_user_id: null,
-    scope: "shared",
+    owner_user_id: "user-1",
+    scope: "personal",
     updated_at: "2026-07-10T00:00:00Z",
   },
 ];
@@ -112,11 +124,12 @@ describe("StageNextActionCard provider override", () => {
     expect(screen.queryByRole("combobox", { name: "Provider override" })).not.toBeInTheDocument();
   });
 
-  it("includes every active visible personal or shared provider when applicable", () => {
+  it("includes only active personal providers when applicable", () => {
     renderCard(capability("model_provider"));
 
     expect(screen.getByRole("option", { name: /Personal Lab Model.*Personal/i })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /Shared Anthropic Model.*Shared/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Personal Anthropic Model.*Personal/i })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Shared Anthropic Model/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: /Inactive Model/i })).not.toBeInTheDocument();
   });
 
@@ -127,10 +140,10 @@ describe("StageNextActionCard provider override", () => {
 
     await user.selectOptions(
       screen.getByRole("combobox", { name: "Provider override" }),
-      "shared-provider",
+      "personal-anthropic",
     );
     await user.click(screen.getByRole("button", { name: "Run agent" }));
 
-    expect(onRun).toHaveBeenCalledWith("stage-1", "shared-provider");
+    expect(onRun).toHaveBeenCalledWith("stage-1", "personal-anthropic");
   });
 });

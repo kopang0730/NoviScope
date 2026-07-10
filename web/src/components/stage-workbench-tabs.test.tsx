@@ -7,14 +7,27 @@ import { I18nProvider } from "../i18n/i18n-context";
 import type { ProviderReadinessData } from "../lib/provider-readiness-data";
 import { StageWorkbenchTabs } from "./stage-workbench-tabs";
 
-const provider: Provider = {
+const personalProvider: Provider = {
+  base_url: "https://personal.example.com/v1",
+  created_at: "2026-07-10T00:00:00Z",
+  default_model: "personal-model",
+  id: "personal-provider",
+  is_active: true,
+  kind: "openai_compatible",
+  name: "Personal Lab Model",
+  owner_user_id: "user-1",
+  scope: "personal",
+  updated_at: "2026-07-10T00:00:00Z",
+};
+
+const sharedProvider: Provider = {
   base_url: "https://model.example.com/v1",
   created_at: "2026-07-10T00:00:00Z",
   default_model: "research-model",
-  id: "provider-1",
+  id: "shared-provider",
   is_active: true,
   kind: "openai_compatible",
-  name: "Lab Model",
+  name: "Shared Lab Model",
   owner_user_id: null,
   scope: "shared",
   updated_at: "2026-07-10T00:00:00Z",
@@ -25,7 +38,7 @@ const providerReadinessData: ProviderReadinessData = {
   error: null,
   loaded: true,
   loading: false,
-  providers: [provider],
+  providers: [sharedProvider, personalProvider],
 };
 
 function stage(overrides: Partial<StageCard> = {}): StageCard {
@@ -136,9 +149,15 @@ describe("StageWorkbenchTabs", () => {
     renderTabs(stage({ status: "pending" }), onRunStage);
 
     await user.click(screen.getByRole("tab", { name: "Run" }));
+    expect(screen.getByRole("option", { name: "Personal Lab Model" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Shared Lab Model" })).not.toBeInTheDocument();
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Provider override" }),
+      "personal-provider",
+    );
     await user.click(screen.getByRole("button", { name: "Run stage" }));
 
-    expect(onRunStage).toHaveBeenCalledWith("stage-1", undefined);
+    expect(onRunStage).toHaveBeenCalledWith("stage-1", "personal-provider");
   });
 
   it("keeps compact Artifacts read-only and links to Stage Detail", async () => {

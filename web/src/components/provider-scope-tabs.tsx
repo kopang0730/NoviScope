@@ -30,10 +30,10 @@ export function ProviderScopeTabs({
           <button
             aria-selected={isActive}
             className={[
-              "min-h-11 rounded-md px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500",
+              "min-h-11 rounded-md px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500",
               isActive
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-600 hover:bg-white hover:text-slate-900",
+                ? "bg-teal-600 text-white shadow-sm"
+                : "bg-white text-slate-700 hover:text-slate-950",
             ].join(" ")}
             key={scope}
             onClick={() => onChange(scope)}

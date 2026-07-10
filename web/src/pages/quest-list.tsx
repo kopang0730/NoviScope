@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { getQuest, getQuestStages, getQuests, runStage } from "../api/quests";
+import { getQuest, getQuestStages, getQuests } from "../api/quests";
 import { getErrorMessage } from "../api/client";
 import type { Quest, QuestStatus, StageCard } from "../api/types";
 import { useAuth } from "../auth/auth-context";
@@ -9,7 +9,6 @@ import { buttonClassName } from "../components/button";
 import { Card, CardHeading } from "../components/card";
 import { Input, Select } from "../components/input";
 import { QuestOverviewPanel } from "../components/quest-overview-panel";
-import { QuestWorkflowPanel } from "../components/quest-workflow-panel";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
 import { questTone } from "../lib/status-tones";
@@ -42,8 +41,6 @@ export function QuestListPage() {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [selectedQuest, setSelectedQuest] = useState<Quest | null>(null);
   const [stages, setStages] = useState<StageCard[]>([]);
-  const [runningStageId, setRunningStageId] = useState<string | null>(null);
-  const [stageRunError, setStageRunError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<QuestStatus | "all">("all");
 
@@ -65,7 +62,11 @@ export function QuestListPage() {
     try {
       setQuests(await getQuests());
     } catch (error) {
-      setQuestsError(getErrorMessage(error));
+      if (error instanceof Error) {
+        setQuestsError(getErrorMessage(error));
+        return;
+      }
+      throw error;
     } finally {
       setQuestsLoading(false);
     }
@@ -101,7 +102,6 @@ export function QuestListPage() {
       setSelectedQuest(null);
       setStages([]);
       setDetailError(null);
-      setStageRunError(null);
       setDetailLoading(false);
       return;
     }
@@ -109,7 +109,6 @@ export function QuestListPage() {
     let active = true;
     setDetailLoading(true);
     setDetailError(null);
-    setStageRunError(null);
 
     void Promise.all([getQuest(selectedQuestId), getQuestStages(selectedQuestId)])
       .then(([quest, questStages]) => {
@@ -125,7 +124,11 @@ export function QuestListPage() {
         }
         setSelectedQuest(null);
         setStages([]);
-        setDetailError(getErrorMessage(error));
+        if (error instanceof Error) {
+          setDetailError(getErrorMessage(error));
+          return;
+        }
+        throw error;
       })
       .finally(() => {
         if (active) {
@@ -137,22 +140,6 @@ export function QuestListPage() {
       active = false;
     };
   }, [currentUser, selectedQuestId]);
-
-  async function handleRunStage(stageId: string) {
-    setRunningStageId(stageId);
-    setStageRunError(null);
-
-    try {
-      const updatedStage = await runStage(stageId);
-      setStages((currentStages) =>
-        currentStages.map((stage) => (stage.id === updatedStage.id ? updatedStage : stage)),
-      );
-    } catch (error) {
-      setStageRunError(getErrorMessage(error));
-    } finally {
-      setRunningStageId(null);
-    }
-  }
 
   return (
     <div className="grid min-w-0 gap-4 xl:grid-cols-[260px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)]">
@@ -229,17 +216,6 @@ export function QuestListPage() {
       </Card>
 
       <div className="grid min-w-0 gap-4">
-        <QuestWorkflowPanel
-          detailError={detailError}
-          detailLoading={detailLoading}
-          onRunStage={(stageId) => void handleRunStage(stageId)}
-          runningStageId={runningStageId}
-          selectedQuest={selectedQuest}
-          selectedQuestId={selectedQuestId}
-          stageRunError={stageRunError}
-          stages={stages}
-        />
-
         <QuestOverviewPanel
           detailError={detailError}
           detailLoading={detailLoading}

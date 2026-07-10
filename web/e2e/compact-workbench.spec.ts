@@ -1,6 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
+import { assertMobileCanvasFocusOrder, canvasRoleNames } from "./support/canvas";
 import {
   assertPageQuality,
+  assertNoControlOverlap,
+  assertTabsFitWithinTablist,
   assertTabsStayOnOneRow,
   assertTextFits,
   captureState,
@@ -8,45 +11,6 @@ import {
 import { loginAs, selectSeededQuest } from "./support/session";
 
 const runtimeErrors = new WeakMap<Page, string[]>();
-const roleNames = [
-  "Demand Validator",
-  "Research Refiner",
-  "Literature Scout",
-  "Gap Analyst",
-  "Idea Generator",
-  "Experiment Planner",
-  "Code Runner",
-  "Evidence Auditor",
-  "Paper & Meeting Writer",
-];
-
-async function assertMobileCanvasFocusOrder(page: Page): Promise<void> {
-  if (page.viewportSize()?.width !== 390) {
-    return;
-  }
-  const targets = [
-    page.getByRole("combobox", { name: "Quest" }),
-    page.getByRole("button", { name: "Run agent" }),
-    page.getByRole("button", { name: /^Phase 1:/ }),
-    page.getByRole("tab", { name: "Overview" }),
-  ];
-  const reached: number[] = [];
-  await page.evaluate(() => {
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
-  });
-  for (let step = 0; step < 80 && reached.length < targets.length; step += 1) {
-    await page.keyboard.press("Tab");
-    for (const [index, target] of targets.entries()) {
-      const isFocused = await target.evaluate((element) => element === document.activeElement);
-      if (isFocused && !reached.includes(index)) {
-        reached.push(index);
-      }
-    }
-  }
-  expect(reached).toEqual([0, 1, 2, 3]);
-}
 
 test.beforeEach(({ page }) => {
   const errors: string[] = [];
@@ -88,7 +52,7 @@ test.describe.serial("compact Canvas workbench", () => {
     await selectSeededQuest(page);
     const phases = page.getByRole("button", { name: /^Phase \d:/ });
     await expect(phases).toHaveCount(5);
-    for (const roleName of roleNames) {
+    for (const roleName of canvasRoleNames) {
       const role = page.getByRole("status", { name: new RegExp(roleName) });
       await expect(role).toBeVisible();
       await assertTextFits(role);
@@ -117,16 +81,25 @@ test.describe.serial("compact Canvas workbench", () => {
     const direction = `Analyze badminton serve technique for ${testInfo.project.name} E2E`;
     await page.getByRole("textbox", { name: /^Research direction/ }).fill(direction);
     await expect(page.getByText(/Human review required/)).toBeVisible();
-    await expect(page.getByRole("button", { name: "Create Quest" })).toBeInViewport();
+    const createQuestButton = page.getByRole("button", { name: "Create Quest" });
+    await expect(createQuestButton).toBeInViewport();
+    await assertNoControlOverlap(createQuestButton);
     await captureState(page, testInfo, "new-quest-collapsed");
     await page.getByRole("button", { name: "Add research context" }).click();
     await expect(page.getByRole("heading", { name: "Demand Reality" })).toBeVisible();
+    await expect(createQuestButton).toBeInViewport();
+    await assertNoControlOverlap(createQuestButton);
     await captureState(page, testInfo, "new-quest-expanded");
     await assertPageQuality(page, testInfo, "new-quest");
     await page.getByRole("button", { name: "Create Quest" }).click();
     await expect(page.getByRole("heading", { exact: true, name: direction })).toBeVisible();
 
-    await page.getByRole("combobox", { name: "Provider override" }).selectOption({
+    const providerOverride = page.getByRole("combobox", { name: "Provider override" });
+    await expect(
+      providerOverride.getByRole("option", { name: "NoviScope E2E Personal · Personal" }),
+    ).toHaveCount(1);
+    await expect(providerOverride.getByRole("option", { name: /NoviScope E2E Shared/ })).toHaveCount(0);
+    await providerOverride.selectOption({
       label: "NoviScope E2E Personal · Personal",
     });
     await page.getByRole("button", { name: "Run agent" }).click();
@@ -139,13 +112,23 @@ test.describe.serial("compact Canvas workbench", () => {
     await page.getByRole("link", { name: "Open Stage Detail" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Demand validation" })).toBeVisible();
     if (page.viewportSize()?.width === 390) {
-      await assertTabsStayOnOneRow(page.getByRole("tablist", { name: "Stage workbench" }));
+      const stageTablist = page.getByRole("tablist", { name: "Stage workbench" });
+      await assertTabsStayOnOneRow(stageTablist);
+      await assertTabsFitWithinTablist(stageTablist);
     }
     await captureState(page, testInfo, "stage-detail-overview");
     await assertPageQuality(page, testInfo, "stage-detail");
     await page.getByRole("tab", { name: "Evidence" }).click();
+    await expect(page.getByRole("tab", { name: "Evidence" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tabpanel", { name: "Evidence" })).toBeVisible();
+    await assertTabsStayOnOneRow(page.getByRole("tablist", { name: "Stage workbench" }));
+    await assertTabsFitWithinTablist(page.getByRole("tablist", { name: "Stage workbench" }));
     await captureState(page, testInfo, "stage-detail-evidence");
     await page.getByRole("tab", { name: "Review" }).click();
+    await expect(page.getByRole("tab", { name: "Review" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tabpanel", { name: "Review" })).toBeVisible();
+    await assertTabsStayOnOneRow(page.getByRole("tablist", { name: "Stage workbench" }));
+    await assertTabsFitWithinTablist(page.getByRole("tablist", { name: "Stage workbench" }));
     await captureState(page, testInfo, "stage-detail-review");
     await page.getByText("Advanced editor", { exact: true }).click();
     await captureState(page, testInfo, "stage-detail-advanced");
@@ -155,6 +138,10 @@ test.describe.serial("compact Canvas workbench", () => {
     await loginAs(page, "member");
     await page.goto("/providers");
     await expect(page.getByRole("tab", { name: /^Personal/ })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tab", { name: /^Personal/ })).toHaveCSS(
+      "background-color",
+      "rgb(11, 118, 111)",
+    );
     await expect(
       page
         .getByRole("region", { name: "Personal credentials" })
@@ -163,6 +150,11 @@ test.describe.serial("compact Canvas workbench", () => {
     ).toBeVisible();
     await captureState(page, testInfo, "providers-personal");
     await page.getByRole("tab", { name: /^Shared/ }).click();
+    await expect(page.getByRole("tab", { name: /^Shared/ })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tab", { name: /^Shared/ })).toHaveCSS(
+      "background-color",
+      "rgb(11, 118, 111)",
+    );
     await expect(
       page
         .getByRole("region", { name: "Shared credentials" })
@@ -242,5 +234,19 @@ test.describe.serial("compact Canvas workbench", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Demand validation" })).toBeVisible();
     await captureState(page, testInfo, "zh-stage-detail");
     await assertPageQuality(page, testInfo, "zh-stage-detail");
+  });
+
+  test("11. keeps /quests read-only and opens backend-authoritative Canvas", async ({ page }, testInfo) => {
+    await loginAs(page, "member");
+    await page.goto("/quests");
+    await expect(page.getByRole("heading", { name: "Quest list" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /canvas/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /list/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /run/i })).toHaveCount(0);
+    await page.getByRole("link", { name: "Open full canvas" }).first().click();
+    await expect(page).toHaveURL(/\/canvas\?quest=/);
+    await expect(page.getByRole("heading", { name: "Next action" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Run agent" })).toBeVisible();
+    await captureState(page, testInfo, "quests-open-full-canvas");
   });
 });

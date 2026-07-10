@@ -124,6 +124,9 @@ export function StageEditor({
       onStageChange(updatedStage);
       setStageSaved(true);
     } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error;
+      }
       if (isCurrentStage()) {
         setSubmitError(getErrorMessage(error));
       }

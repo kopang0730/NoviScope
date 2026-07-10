@@ -87,7 +87,11 @@ export function AgentAssignmentMatrix({ assignments, capabilities, currentUser, 
     try {
       await onReload();
     } catch (error) {
-      reloadError = getErrorMessage(error);
+      if (error instanceof Error) {
+        reloadError = getErrorMessage(error);
+      } else {
+        throw error;
+      }
     }
 
     if (failedRoles.length > 0) {

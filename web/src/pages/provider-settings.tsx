@@ -84,9 +84,13 @@ export function ProviderSettingsPage() {
       setAssignments(nextAssignments);
       setCapabilities(nextCapabilities);
     } catch (error) {
-      const message = getErrorMessage(error);
-      setAssignmentError(message);
-      setLoadingError(message);
+      if (error instanceof Error) {
+        const message = getErrorMessage(error);
+        setAssignmentError(message);
+        setLoadingError(message);
+      } else {
+        throw error;
+      }
     } finally {
       setLoading(false);
     }
@@ -102,7 +106,9 @@ export function ProviderSettingsPage() {
       setAssignments(nextAssignments);
       setAssignmentError(null);
     } catch (error) {
-      setAssignmentError(getErrorMessage(error));
+      if (error instanceof Error) {
+        setAssignmentError(getErrorMessage(error));
+      }
       throw error;
     }
   }, []);
@@ -160,7 +166,11 @@ export function ProviderSettingsPage() {
       }
       await loadProviderData();
     } catch (error) {
-      setSubmitError(getErrorMessage(error));
+      if (error instanceof Error) {
+        setSubmitError(getErrorMessage(error));
+      } else {
+        throw error;
+      }
     } finally {
       setSubmitting(false);
     }
@@ -172,6 +182,9 @@ export function ProviderSettingsPage() {
       const result = await testProviderConnection(provider.id);
       setTestResults((current) => ({ ...current, [provider.id]: result }));
     } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error;
+      }
       setTestResults((current) => ({
         ...current,
         [provider.id]: {

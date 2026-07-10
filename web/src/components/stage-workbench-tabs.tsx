@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { StageCard } from "../api/types";
 import { useI18n, type TranslationKey } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
+import { getActivePersonalProviders } from "../lib/personal-provider-overrides";
 import type { ProviderReadinessData } from "../lib/provider-readiness-data";
 import { isModelBackedStage } from "../lib/provider-readiness";
 import {
@@ -110,7 +111,7 @@ export function StageWorkbenchTabs({
     stage: currentStage,
     stages,
   });
-  const activeProviders = providerReadinessData.providers.filter((provider) => provider.is_active);
+  const overrideProviders = getActivePersonalProviders(providerReadinessData.providers);
 
   useEffect(() => {
     setCurrentStage(stage);
@@ -188,7 +189,7 @@ export function StageWorkbenchTabs({
                 <div className="w-full sm:max-w-sm">
                   <Select label={t("workflowActionProviderOverride")} onChange={(event) => setSelectedProviderId(event.target.value)} value={selectedProviderId}>
                     <option value="">{t("workflowActionProviderDefault")}</option>
-                    {activeProviders.map((provider) => <option key={provider.id} value={provider.id}>{provider.name}</option>)}
+                    {overrideProviders.map((provider) => <option key={provider.id} value={provider.id}>{provider.name}</option>)}
                   </Select>
                 </div>
               ) : <p className="text-sm text-slate-600">{t("providerReadinessReasonServerManaged")}</p>}
@@ -231,14 +232,14 @@ export function StageWorkbenchTabs({
 
   return (
     <div className="min-w-0">
-      <div aria-label={t("stageWorkbenchTabsLabel")} className="flex flex-nowrap gap-1 overflow-x-auto border-b border-slate-200" role="tablist">
+      <div aria-label={t("stageWorkbenchTabsLabel")} className="grid auto-cols-fr grid-flow-col gap-1 border-b border-slate-200" role="tablist">
         {availableTabs.map((tab) => (
           <button
             aria-controls={`${instanceId}-${tab.id}-panel`}
             aria-selected={activeTabId === tab.id}
             className={[
-              "min-h-11 shrink-0 border-b-2 px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500",
-              activeTabId === tab.id ? "border-teal-600 text-teal-800" : "border-transparent text-slate-600 hover:text-slate-900",
+              "min-h-11 min-w-0 border-b-2 px-1 text-center text-xs font-semibold sm:px-3 sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500",
+              activeTabId === tab.id ? "border-teal-600 bg-teal-50 text-teal-900" : "border-transparent text-slate-600 hover:text-slate-900",
             ].join(" ")}
             id={`${instanceId}-${tab.id}-tab`}
             key={tab.id}

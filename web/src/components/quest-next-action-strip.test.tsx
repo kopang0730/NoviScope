@@ -68,6 +68,30 @@ const providers: readonly Provider[] = [
     created_at: "2026-07-10T00:00:00Z",
     updated_at: "2026-07-10T00:00:00Z",
   },
+  {
+    id: "personal-anthropic",
+    name: "Personal Anthropic Model",
+    kind: "anthropic",
+    scope: "personal",
+    owner_user_id: "user-1",
+    base_url: "https://personal-anthropic.example.com/v1",
+    default_model: "claude-sonnet",
+    is_active: true,
+    created_at: "2026-07-10T00:00:00Z",
+    updated_at: "2026-07-10T00:00:00Z",
+  },
+  {
+    id: "inactive-personal-provider",
+    name: "Inactive Personal Model",
+    kind: "openai_compatible",
+    scope: "personal",
+    owner_user_id: "user-1",
+    base_url: "https://inactive.example.com/v1",
+    default_model: "inactive-model",
+    is_active: false,
+    created_at: "2026-07-10T00:00:00Z",
+    updated_at: "2026-07-10T00:00:00Z",
+  },
 ];
 
 function renderStrip(
@@ -105,19 +129,21 @@ describe("QuestNextActionStrip", () => {
     expect(screen.getAllByRole("heading", { name: "Next action" })).toHaveLength(1);
   });
 
-  it("runs a model-provider stage with a visible personal or shared override", async () => {
+  it("runs a model-provider stage with only active personal providers as explicit overrides", async () => {
     const user = userEvent.setup();
     const onRun = vi.fn();
     renderStrip([action("run_stage")], onRun);
 
     const providerSelect = screen.getByRole("combobox", { name: "Provider override" });
     expect(screen.getByRole("option", { name: /Personal Lab Model.*Personal/i })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /Shared Lab Model.*Shared/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Personal Anthropic Model.*Personal/i })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Inactive Personal Model/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Shared Lab Model/i })).not.toBeInTheDocument();
 
-    await user.selectOptions(providerSelect, "shared-provider");
+    await user.selectOptions(providerSelect, "personal-anthropic");
     await user.click(screen.getByRole("button", { name: "Run agent" }));
 
-    expect(onRun).toHaveBeenCalledWith("stage-1", "shared-provider");
+    expect(onRun).toHaveBeenCalledWith("stage-1", "personal-anthropic");
   });
 
   it("links review actions to the authoritative stage detail", () => {

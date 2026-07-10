@@ -82,6 +82,12 @@ export function CreateQuestPage() {
               rows={3}
               value={formState.direction}
             />
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between lg:col-span-2">
+              <p className="text-sm text-slate-500">{t("questSubmitHint")}</p>
+              <Button className="w-full sm:w-auto" loading={submitting} type="submit">
+                {t("questCreate")}
+              </Button>
+            </div>
             <Input
               hint={t("questTitleOptionalHint")}
               label={t("questTitle")}
@@ -111,12 +117,6 @@ export function CreateQuestPage() {
           </div>
 
           {error ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p> : null}
-          <div className="fixed bottom-4 left-4 right-4 z-20 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-2 shadow-panel sm:static sm:flex-row sm:items-center sm:justify-between sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
-            <p className="hidden text-sm text-slate-500 sm:block">{t("questSubmitHint")}</p>
-            <Button className="w-full sm:w-auto" loading={submitting} type="submit">
-              {t("questCreate")}
-            </Button>
-          </div>
 
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="note">
             {t("questDemandReviewNotice")}

@@ -24,6 +24,67 @@ export async function assertTabsStayOnOneRow(tablist: Locator): Promise<void> {
   expect(new Set(tabTopOffsets).size).toBe(1);
 }
 
+export async function assertTabsFitWithinTablist(tablist: Locator): Promise<void> {
+  const defects = await tablist.evaluate((list) => {
+    const listRect = list.getBoundingClientRect();
+    const tabs = Array.from(list.querySelectorAll('[role="tab"]'));
+    return tabs.flatMap((tab) => {
+      const rect = tab.getBoundingClientRect();
+      const label = tab.textContent?.trim() ?? "";
+      const fitsText =
+        tab.scrollWidth <= tab.clientWidth && tab.scrollHeight <= tab.clientHeight;
+      const withinBounds = rect.left >= listRect.left - 1 && rect.right <= listRect.right + 1;
+      if (fitsText && withinBounds) {
+        return [];
+      }
+      return [{
+        fitsText,
+        label,
+        rectRight: Math.round(rect.right),
+        tablistRight: Math.round(listRect.right),
+        withinBounds,
+      }];
+    });
+  });
+  expect(defects).toEqual([]);
+}
+
+export async function assertNoControlOverlap(subject: Locator): Promise<void> {
+  const overlaps = await subject.evaluate((subjectElement) => {
+    const subjectRect = subjectElement.getBoundingClientRect();
+    const candidates = Array.from(
+      document.querySelectorAll(
+        'input, select, textarea, button, [role="alert"], [role="status"]',
+      ),
+    );
+    return candidates.flatMap((candidate) => {
+      if (candidate === subjectElement) {
+        return [];
+      }
+      const rect = candidate.getBoundingClientRect();
+      const style = window.getComputedStyle(candidate);
+      const isVisible =
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.visibility !== "hidden" &&
+        style.display !== "none";
+      const intersects =
+        subjectRect.left < rect.right &&
+        subjectRect.right > rect.left &&
+        subjectRect.top < rect.bottom &&
+        subjectRect.bottom > rect.top;
+      if (!isVisible || !intersects) {
+        return [];
+      }
+      return [{
+        candidate: candidate.getAttribute("aria-label") ?? candidate.textContent?.trim() ?? "",
+        tag: candidate.tagName.toLowerCase(),
+      }];
+    });
+  });
+  expect(overlaps).toEqual([]);
+}
+
 export async function assertPageQuality(
   page: Page,
   testInfo: TestInfo,

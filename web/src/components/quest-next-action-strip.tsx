@@ -6,6 +6,7 @@ import type {
   WorkflowNextAction,
 } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
+import { getActivePersonalProviders } from "../lib/personal-provider-overrides";
 import { supportsWorkflowProviderOverride } from "../lib/workflow-action-provider";
 import { buildWorkflowActionView } from "../lib/workflow-action-view";
 import { Badge } from "./badge";
@@ -55,7 +56,7 @@ export function QuestNextActionStrip({
   const view = buildWorkflowActionView(action, language);
   const stagePath = `/stages/${action.stage_id}?quest=${questId}`;
   const supportsProviderOverride = supportsWorkflowProviderOverride(action, capabilities);
-  const activeProviders = providers.filter((provider) => provider.is_active);
+  const overrideProviders = getActivePersonalProviders(providers);
 
   const primaryCommand = (() => {
     switch (view.command) {
@@ -128,11 +129,9 @@ export function QuestNextActionStrip({
                 value={selectedProviderId}
               >
                 <option value="">{t("workflowActionProviderDefault")}</option>
-                {activeProviders.map((provider) => (
+                {overrideProviders.map((provider) => (
                   <option key={provider.id} value={provider.id}>
-                    {provider.name} · {provider.scope === "personal"
-                      ? t("workflowActionProviderPersonal")
-                      : t("workflowActionProviderShared")}
+                    {provider.name} · {t("workflowActionProviderPersonal")}
                   </option>
                 ))}
               </Select>

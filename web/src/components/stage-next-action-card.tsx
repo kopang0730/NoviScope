@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import type { Provider, WorkflowAgentCapability, WorkflowNextAction } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
+import { getActivePersonalProviders } from "../lib/personal-provider-overrides";
 import { supportsWorkflowProviderOverride } from "../lib/workflow-action-provider";
 import { buildWorkflowActionView } from "../lib/workflow-action-view";
 import { Badge } from "./badge";
@@ -52,7 +53,7 @@ export function StageNextActionCard({
 
   const view = buildWorkflowActionView(action, language);
   const stagePath = `/stages/${action.stage_id}?quest=${questId}`;
-  const activeProviders = providers.filter((provider) => provider.is_active);
+  const overrideProviders = getActivePersonalProviders(providers);
   const supportsProviderOverride = supportsWorkflowProviderOverride(action, capabilities);
 
   const primaryCommand = (() => {
@@ -116,11 +117,9 @@ export function StageNextActionCard({
               value={selectedProviderId}
             >
               <option value="">{t("workflowActionProviderDefault")}</option>
-              {activeProviders.map((provider) => (
+              {overrideProviders.map((provider) => (
                 <option key={provider.id} value={provider.id}>
-                  {provider.name} · {provider.scope === "personal"
-                    ? t("workflowActionProviderPersonal")
-                    : t("workflowActionProviderShared")}
+                  {provider.name} · {t("workflowActionProviderPersonal")}
                 </option>
               ))}
             </Select>

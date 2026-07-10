@@ -131,7 +131,7 @@ describe("StageWorkbenchTabs full mode", () => {
     expect(screen.getByRole("button", { name: "Select for experiment design" })).toBeInTheDocument();
   });
 
-  it("offers Anthropic when it is the only active provider for a model-backed run", async () => {
+  it("keeps shared Anthropic ready as the default while only personal Anthropic is selectable", async () => {
     const user = userEvent.setup();
     const anthropicProvider: Provider = {
       ...provider,
@@ -140,14 +140,23 @@ describe("StageWorkbenchTabs full mode", () => {
       kind: "anthropic",
       name: "Anthropic Lab",
     };
+    const personalAnthropicProvider: Provider = {
+      ...anthropicProvider,
+      id: "provider-personal-anthropic",
+      name: "Personal Anthropic",
+      owner_user_id: "user-1",
+      scope: "personal",
+    };
     renderFull(stage({ status: "pending" }), vi.fn(), {
       ...readiness,
-      providers: [anthropicProvider],
+      providers: [anthropicProvider, personalAnthropicProvider],
     });
 
     await user.click(screen.getByRole("tab", { name: "Run" }));
 
-    expect(screen.getByRole("option", { name: "Anthropic Lab" })).toBeInTheDocument();
+    expect(screen.getByText("Provider ready")).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Anthropic Lab" })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Personal Anthropic" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Run stage" })).toBeEnabled();
   });
 
