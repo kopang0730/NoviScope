@@ -7,9 +7,11 @@ import { useAuth } from "../auth/auth-context";
 import { Button } from "../components/button";
 import { Card, CardHeading } from "../components/card";
 import { Input, Select, TextArea } from "../components/input";
+import { QuestContextFields } from "../components/quest-context-fields";
 import { useI18n } from "../i18n/i18n-context";
 import {
   buildInitialDirection,
+  deriveQuestTitle,
   emptyIntake,
   isOutputLanguage,
   questIntakeExamples,
@@ -43,10 +45,10 @@ export function CreateQuestPage() {
 
     try {
       const quest = await createQuest({
-        initial_direction: preview,
-        title: formState.title,
+        initial_direction: buildInitialDirection(formState, language),
+        title: deriveQuestTitle(formState, language),
       });
-      navigate(`/?quest=${quest.id}`, { replace: true });
+      navigate(`/canvas?quest=${quest.id}`, { replace: true });
     } catch (submitError) {
       if (submitError instanceof Error) {
         setError(getErrorMessage(submitError));
@@ -68,22 +70,24 @@ export function CreateQuestPage() {
           </p>
         ) : null}
 
-        <div className="mt-5 flex flex-wrap gap-2">
-          <Button onClick={() => setFormState(questIntakeExamples[language].erasure)} size="sm" type="button" variant="secondary">
-            {t("questExampleErasure")}
-          </Button>
-          <Button onClick={() => setFormState(questIntakeExamples[language].badminton)} size="sm" type="button" variant="secondary">
-            {t("questExampleBadminton")}
-          </Button>
-        </div>
-
-        <form className="mt-6 space-y-6" onSubmit={(event) => void handleSubmit(event)}>
+        <form className="mt-6 space-y-5" onSubmit={(event) => void handleSubmit(event)}>
           <section className="grid gap-4 lg:grid-cols-2">
+            <TextArea
+              className="lg:col-span-2"
+              hint={t("questDirectionHint")}
+              label={t("questDirection")}
+              onChange={(event) => updateField("direction", event.target.value)}
+              placeholder={t("questDirectionPlaceholder")}
+              required
+              rows={4}
+              value={formState.direction}
+            />
             <Input
+              hint={t("questTitleOptionalHint")}
               label={t("questTitle")}
+              maxLength={80}
               onChange={(event) => updateField("title", event.target.value)}
               placeholder={t("questTitlePlaceholder")}
-              required
               value={formState.title}
             />
             <Select
@@ -95,102 +99,22 @@ export function CreateQuestPage() {
               <option value="zh">{t("questOutputLanguageZh")}</option>
               <option value="en">{t("questOutputLanguageEn")}</option>
             </Select>
-            <TextArea
-              hint={t("questDirectionHint")}
-              label={t("questDirection")}
-              onChange={(event) => updateField("direction", event.target.value)}
-              placeholder={t("questDirectionPlaceholder")}
-              required
-              rows={5}
-              value={formState.direction}
-            />
           </section>
 
-          <section className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-900">{t("questRealitySection")}</h3>
-              <p className="mt-1 text-sm text-slate-600">{t("questRealitySectionDescription")}</p>
-            </div>
-            <div className="grid gap-4 lg:grid-cols-2">
-              <TextArea
-                hint={t("questScenarioHint")}
-                label={t("questScenario")}
-                onChange={(event) => updateField("scenario", event.target.value)}
-                placeholder={t("questScenarioPlaceholder")}
-                rows={4}
-                value={formState.scenario}
-              />
-              <TextArea
-                hint={t("questDemandEvidenceSourcesHint")}
-                label={t("questDemandEvidenceSources")}
-                onChange={(event) => updateField("demandEvidenceSources", event.target.value)}
-                placeholder={t("questDemandEvidenceSourcesPlaceholder")}
-                rows={4}
-                value={formState.demandEvidenceSources}
-              />
-              <TextArea
-                hint={t("questTargetUserHint")}
-                label={t("questTargetUser")}
-                onChange={(event) => updateField("targetUser", event.target.value)}
-                placeholder={t("questTargetUserPlaceholder")}
-                rows={4}
-                value={formState.targetUser}
-              />
-              <TextArea
-                label={t("questTarget")}
-                onChange={(event) => updateField("target", event.target.value)}
-                placeholder={t("questTargetPlaceholder")}
-                rows={4}
-                value={formState.target}
-              />
-              <TextArea
-                label={t("questPainPoint")}
-                onChange={(event) => updateField("painPoint", event.target.value)}
-                placeholder={t("questPainPointPlaceholder")}
-                rows={4}
-                value={formState.painPoint}
-              />
-              <TextArea
-                hint={t("questKnownWorkHint")}
-                label={t("questKnownWork")}
-                onChange={(event) => updateField("knownWork", event.target.value)}
-                placeholder={t("questKnownWorkPlaceholder")}
-                rows={4}
-                value={formState.knownWork}
-              />
-            </div>
-          </section>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => setFormState(questIntakeExamples[language].erasure)} size="sm" type="button" variant="secondary">
+              {t("questExampleErasure")}
+            </Button>
+            <Button onClick={() => setFormState(questIntakeExamples[language].badminton)} size="sm" type="button" variant="secondary">
+              {t("questExampleBadminton")}
+            </Button>
+          </div>
 
-          <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-4">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-900">{t("questExperimentSection")}</h3>
-              <p className="mt-1 text-sm text-slate-600">{t("questExperimentSectionDescription")}</p>
-            </div>
-            <div className="grid gap-4 lg:grid-cols-2">
-              <TextArea
-                hint={t("questDataAssetsHint")}
-                label={t("questDataAssets")}
-                onChange={(event) => updateField("dataAssets", event.target.value)}
-                placeholder={t("questDataAssetsPlaceholder")}
-                rows={4}
-                value={formState.dataAssets}
-              />
-              <TextArea
-                label={t("questMetric")}
-                onChange={(event) => updateField("metric", event.target.value)}
-                placeholder={t("questMetricPlaceholder")}
-                rows={4}
-                value={formState.metric}
-              />
-              <TextArea
-                label={t("questExpectedOutput")}
-                onChange={(event) => updateField("expectedOutput", event.target.value)}
-                placeholder={t("questExpectedOutputPlaceholder")}
-                rows={4}
-                value={formState.expectedOutput}
-              />
-            </div>
-          </section>
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="note">
+            {t("questDemandReviewNotice")}
+          </p>
+
+          <QuestContextFields formState={formState} onFieldChange={updateField} />
 
           {error ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p> : null}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -202,12 +126,19 @@ export function CreateQuestPage() {
         </form>
       </Card>
 
-      <Card>
-        <CardHeading description={t("questSubmitHint")} title={t("initialDirectionPreview")} />
+      <aside className="hidden h-fit min-w-0 rounded-lg border border-slate-200 bg-white p-5 shadow-panel xl:sticky xl:top-4 xl:block xl:p-6">
+        <h2 className="text-lg font-semibold text-slate-900">{t("initialDirectionPreview")}</h2>
+        <p className="mt-1 text-sm text-slate-500">{t("questSubmitHint")}</p>
         <pre className="mt-4 max-h-[760px] overflow-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-950 p-4 text-xs leading-6 text-slate-100">
           {preview}
         </pre>
-      </Card>
+      </aside>
+      <details className="rounded-lg border border-slate-200 bg-white p-5 shadow-panel xl:hidden">
+        <summary className="cursor-pointer text-sm font-semibold text-slate-900">{t("initialDirectionPreview")}</summary>
+        <pre className="mt-4 max-h-[420px] overflow-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-950 p-4 text-xs leading-6 text-slate-100">
+          {preview}
+        </pre>
+      </details>
     </div>
   );
 }

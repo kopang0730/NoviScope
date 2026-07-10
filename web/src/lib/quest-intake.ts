@@ -15,6 +15,20 @@ export type QuestIntakeState = {
   readonly title: string;
 };
 
+const questContextFieldNames = [
+  "scenario",
+  "demandEvidenceSources",
+  "targetUser",
+  "target",
+  "painPoint",
+  "knownWork",
+  "dataAssets",
+  "metric",
+  "expectedOutput",
+] as const;
+
+export type QuestContextField = (typeof questContextFieldNames)[number];
+
 type IntakeLabels = {
   readonly dataAssets: string;
   readonly demandEvidenceSources: string;
@@ -166,6 +180,10 @@ function lineValue(value: string) {
     .join("; ");
 }
 
+function normalizeWhitespace(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
 function optionalLine(label: string, value: string, emptyLabel: string) {
   const trimmedValue = lineValue(value);
   return trimmedValue ? `- ${label}: ${trimmedValue}` : `- ${label}: ${emptyLabel}`;
@@ -173,6 +191,24 @@ function optionalLine(label: string, value: string, emptyLabel: string) {
 
 export function isOutputLanguage(value: string): value is OutputLanguage {
   return value === "both" || value === "zh" || value === "en";
+}
+
+export function deriveQuestTitle(formState: QuestIntakeState, language: "zh" | "en") {
+  const explicitTitle = normalizeWhitespace(formState.title);
+  if (explicitTitle) {
+    return explicitTitle.slice(0, 80);
+  }
+
+  const directionTitle = normalizeWhitespace(formState.direction).replace(/[.。!?！？]+$/, "").trim();
+  if (directionTitle) {
+    return directionTitle.slice(0, 80);
+  }
+
+  return language === "zh" ? "新研究 Quest" : "New research quest";
+}
+
+export function hasAdditionalQuestContext(formState: QuestIntakeState) {
+  return questContextFieldNames.some((fieldName) => Boolean(normalizeWhitespace(formState[fieldName])));
 }
 
 export function buildInitialDirection(formState: QuestIntakeState, language: "zh" | "en") {
