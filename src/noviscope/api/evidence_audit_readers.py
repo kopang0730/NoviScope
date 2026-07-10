@@ -77,10 +77,9 @@ def has_recorded_human_demand_evidence(stage: StageCard) -> bool:
         return False
 
     sources = stage.evidence_payload.get("human_demand_sources")
-    if not isinstance(sources, list):
+    if not isinstance(sources, list) or not sources:
         return False
-
-    return any(isinstance(source, str) and source.strip() for source in sources)
+    return all(isinstance(source, str) and bool(source.strip()) for source in sources)
 
 
 def verified_experiment_result_records(stage: StageCard) -> tuple[JsonObject, ...]:
@@ -207,6 +206,20 @@ def evidence_auditor_is_approved(
         and stored_fingerprint == computed_fingerprint
         and audit_artifact_uri_is_valid(evidence.get("audit_artifact_uri"))
     )
+
+
+def find_current_evidence_auditor(
+    stages: Sequence[StageCard],
+) -> StageCard | None:
+    auditor_stages = sorted(
+        (stage for stage in stages if stage.agent_id == EVIDENCE_AUDITOR_AGENT_ID),
+        key=lambda stage: (stage.created_at, stage.id),
+        reverse=True,
+    )
+    for stage in auditor_stages:
+        if evidence_auditor_is_approved(stage, stages):
+            return stage
+    return auditor_stages[0] if auditor_stages else None
 
 
 def audit_artifact_uri_is_valid(value: JsonValue | None) -> bool:

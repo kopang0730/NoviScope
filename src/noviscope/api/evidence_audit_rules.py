@@ -37,6 +37,7 @@ from noviscope.api.evidence_audit_readers import (
     completed_stage,
     count_evidence_sources,
     evidence_auditor_is_approved,
+    find_current_evidence_auditor,
     find_stage,
     has_downloadable_paper_artifacts,
     has_recorded_human_demand_evidence,
@@ -54,7 +55,6 @@ from noviscope.api.evidence_ledger import collect_paper_source_refs
 from noviscope.core.json_types import JsonObject
 from noviscope.core.stage_policy import (
     DEMAND_VALIDATOR_AGENT_ID,
-    EVIDENCE_AUDITOR_AGENT_ID,
     EXPERIMENT_PLANNER_AGENT_ID,
     IDEA_GENERATOR_AGENT_ID,
     PAPER_MEETING_WRITER_AGENT_ID,
@@ -132,10 +132,10 @@ def audit_experiment(
 
 
 def audit_evidence_auditor(
-    stage: StageCard | None,
     *,
     stages: Sequence[StageCard],
 ) -> StageAuditOutcome:
+    stage = find_current_evidence_auditor(stages)
     if not evidence_auditor_is_approved(stage, stages):
         return make_outcome(
             blocking_issues=(make_issue(stage, EVIDENCE_AUDIT_NOT_APPROVED),)
@@ -210,10 +210,7 @@ def build_quest_evidence_audit(
                 find_stage(stages, PAPER_MEETING_WRITER_AGENT_ID),
                 verified_results=verified_results,
             ),
-            audit_evidence_auditor(
-                find_stage(stages, EVIDENCE_AUDITOR_AGENT_ID),
-                stages=stages,
-            ),
+            audit_evidence_auditor(stages=stages),
         )
     )
     audit_status = build_audit_status(outcome)

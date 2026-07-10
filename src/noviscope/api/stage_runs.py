@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Annotated, Final
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, SecretStr
@@ -45,6 +45,7 @@ from noviscope.agents.stage_runner import (
     StageRunnerRegistry,
 )
 from noviscope.api.dependencies import get_session
+from noviscope.api.evidence_audit_readers import has_recorded_human_demand_evidence
 from noviscope.api.routes import StageCardResponse, get_provider_service, stage_response
 from noviscope.auth.dependencies import get_current_user
 from noviscope.core.json_types import JsonObject
@@ -62,8 +63,6 @@ from noviscope.providers.service import ProviderService
 from noviscope.quests.service import QuestService
 
 router = APIRouter()
-
-ACCEPTED_HUMAN_DEMAND_VERDICTS: Final = frozenset({"plausible", "verified"})
 
 
 class StageRunRequest(BaseModel):
@@ -388,18 +387,6 @@ def find_workflow_stage(stages: list[StageCard], agent_id: str) -> StageCard | N
         (workflow_stage for workflow_stage in stages if workflow_stage.agent_id == agent_id),
         None,
     )
-
-
-def has_recorded_human_demand_evidence(stage: StageCard) -> bool:
-    verdict = stage.evidence_payload.get("human_demand_verdict")
-    if not isinstance(verdict, str) or verdict not in ACCEPTED_HUMAN_DEMAND_VERDICTS:
-        return False
-
-    sources = stage.evidence_payload.get("human_demand_sources")
-    if not isinstance(sources, list):
-        return False
-
-    return any(isinstance(source, str) and source.strip() for source in sources)
 
 
 def build_runner_provider(

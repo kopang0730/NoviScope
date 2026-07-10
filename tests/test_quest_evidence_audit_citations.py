@@ -89,3 +89,32 @@ def test_audit_accepts_mixed_case_openalex_url(
     assert patch_response.status_code == 200
     assert "literature_sources_missing" not in review_codes(response.json())
     assert "literature_sources_invalid" not in review_codes(response.json())
+
+
+def test_audit_ignores_a_null_optional_identifier_when_another_is_valid(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    database_url = f"sqlite:///{tmp_path / 'audit-null-optional-ref.db'}"
+    app = create_app(database_url=database_url)
+    with TestClient(app) as client:
+        register_and_login(client, "AUDIT-NULL-REF", "audit-null-ref@example.com")
+        quest_id, stage_ids = create_ready_quest(client, database_url)
+        patch_response = client.patch(
+            f"/stages/{stage_ids[LITERATURE_SCOUT_AGENT_ID]}",
+            json={
+                "output_payload": {
+                    "papers": [
+                        {
+                            "doi": None,
+                            "openalex_id": "https://openalex.org/W123",
+                        }
+                    ]
+                }
+            },
+        )
+        response = client.get(f"/quests/{quest_id}/evidence-audit")
+
+    assert patch_response.status_code == 200
+    assert "literature_sources_missing" not in review_codes(response.json())
+    assert "literature_sources_invalid" not in review_codes(response.json())

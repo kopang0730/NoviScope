@@ -33,8 +33,10 @@ def paper_record_has_invalid_references(value: JsonValue) -> bool:
             for key in PAPER_REF_KEYS:
                 if key not in record:
                     continue
-                references_found = True
                 reference = record[key]
+                if reference is None:
+                    continue
+                references_found = True
                 if not isinstance(reference, str) or not reference.strip():
                     return True
                 if not paper_reference_is_valid(key, reference):
