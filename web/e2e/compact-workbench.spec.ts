@@ -119,6 +119,23 @@ test.describe.serial("compact Canvas workbench", () => {
     await page.getByRole("tab", { name: "Review" }).click();
     await page.getByRole("link", { name: "Open Stage Detail" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Demand validation" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Review" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await page.getByRole("button", { name: "Approve" }).click();
+    await expect(page.getByRole("tab", { name: "Review" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await page.goBack();
+    const demandPhase = page.getByRole("button", { name: /^Phase 1:/ });
+    await expect(demandPhase).toContainText("Blocked");
+    await page.getByRole("link", { name: "Resolve blocker" }).click();
+    await expect(page.getByRole("tab", { name: "Artifacts" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     if (page.viewportSize()?.width === 390) {
       const stageTablist = page.getByRole("tablist", { name: "Stage workbench" });
       await assertTabsStayOnOneRow(stageTablist);

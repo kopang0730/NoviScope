@@ -170,4 +170,32 @@ describe("StageNextActionCard provider override", () => {
 
     expect(onNavigate).toHaveBeenCalledWith("/stages/stage-1?quest=quest-1#review");
   });
+
+  it("navigates blocker actions directly to the Artifacts tab", async () => {
+    const user = userEvent.setup();
+    const onNavigate = vi.fn();
+    render(
+      <I18nProvider>
+        <StageNextActionCard
+          action={{
+            ...action,
+            action_type: "resolve_blocker",
+            blocking_reason: "missing_experiment_inputs",
+            can_run: false,
+          }}
+          capabilities={[capability("model_provider")]}
+          currentUserId="user-1"
+          onNavigate={onNavigate}
+          onRun={vi.fn()}
+          providers={providers}
+          questId="quest-1"
+          runningStageId={null}
+        />
+      </I18nProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Resolve blocker" }));
+
+    expect(onNavigate).toHaveBeenCalledWith("/stages/stage-1?quest=quest-1#artifacts");
+  });
 });

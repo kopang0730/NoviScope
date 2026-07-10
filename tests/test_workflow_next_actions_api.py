@@ -233,28 +233,24 @@ def test_workflow_next_actions_routes_rejected_demand_to_recovery_blocker(
         register_and_login(client, "NEXT-ACTIONS-REVIEW", "next-actions-review@example.com")
         create_personal_provider(client)
         quest_id, demand_stage_id = create_quest(client)
-        literature_stage_id = stage_id_for_agent(client, quest_id, LITERATURE_SCOUT_AGENT_ID)
         reject_completed_demand_stage(client, demand_stage_id)
 
         # When: the workbench asks what blocks the research workflow.
         response = client.get(f"/quests/{quest_id}/workflow-next-actions")
 
-    # Then: rejected demand does not ask for another review; downstream stages stay blocked.
+    # Then: recovery points to the rejected gate itself, where it can be reopened or rerun.
     assert response.status_code == 200
     body = response.json()
     assert body["action_count"] == 1
     assert body["actions"][0] == {
         "action_type": "resolve_blocker",
-        "agent_id": LITERATURE_SCOUT_AGENT_ID,
-        "blocking_reason": "demand_validation_review_required",
+        "agent_id": DEMAND_VALIDATOR_AGENT_ID,
+        "blocking_reason": "human_review_rejected",
         "can_run": False,
-        "detail": (
-            "Approve Demand validation before running Literature scout. If the demand was "
-            "rejected, revise or rerun Demand validation first."
-        ),
-        "label": "Resolve blocker for Literature scout",
-        "priority": 2,
-        "stage_id": literature_stage_id,
-        "stage_status": "pending",
-        "stage_title": "Literature scout",
+        "detail": "Need stronger customer evidence before continuing.",
+        "label": "Resolve blocker for Demand validation",
+        "priority": 1,
+        "stage_id": demand_stage_id,
+        "stage_status": "complete",
+        "stage_title": "Demand validation",
     }

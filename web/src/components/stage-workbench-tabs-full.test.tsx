@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getStageArtifacts, updateStage } from "../api/quests";
@@ -78,6 +79,26 @@ function renderFull(
   );
 }
 
+function RefreshingStageHarness() {
+  const [currentStage, setCurrentStage] = useState(stage());
+  return (
+    <MemoryRouter>
+      <I18nProvider>
+        <StageWorkbenchTabs
+          currentUserId="user-1"
+          mode="full"
+          onRunStage={vi.fn()}
+          onStageChange={setCurrentStage}
+          providerReadinessData={readiness}
+          runningStageId={null}
+          stage={currentStage}
+          stages={[currentStage]}
+        />
+      </I18nProvider>
+    </MemoryRouter>
+  );
+}
+
 describe("StageWorkbenchTabs full mode", () => {
   afterEach(cleanup);
 
@@ -100,6 +121,22 @@ describe("StageWorkbenchTabs full mode", () => {
     await waitFor(() => expect(onStageChange).toHaveBeenCalledWith(reviewedStage));
     expect(screen.getByRole("button", { name: "Reject" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reset to pending" })).toBeInTheDocument();
+  });
+
+  it("keeps the active tab when a mutation refreshes the same stage", async () => {
+    const user = userEvent.setup();
+    vi.mocked(updateStage).mockResolvedValue(stage({ human_approved: true }));
+    render(<RefreshingStageHarness />);
+
+    await user.click(screen.getByRole("tab", { name: "Review" }));
+    await user.click(screen.getByRole("button", { name: "Approve" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: "Review" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+    });
   });
 
   it("keeps complete output controls available in Artifacts", async () => {

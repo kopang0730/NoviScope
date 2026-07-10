@@ -83,6 +83,7 @@ function PhasePathHarness({ nextActionPhaseId }: { readonly nextActionPhaseId: M
   return (
     <I18nProvider>
       <ResearchPhasePath
+        nextAction={null}
         nextActionPhaseId={nextActionPhaseId}
         onSelectPhase={setSelectedPhaseId}
         phases={phases}

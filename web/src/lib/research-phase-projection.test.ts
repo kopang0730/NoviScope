@@ -3,6 +3,7 @@ import type {
   Provider,
   StageCard,
   WorkflowAgentCapability,
+  WorkflowNextAction,
 } from "../api/types";
 import type { TranslationKey } from "../i18n/i18n-context";
 import type { ProviderReadinessData } from "./provider-readiness-data";
@@ -63,12 +64,13 @@ describe("research phase provider projection", () => {
       return;
     }
 
-    const presentation = buildMacroPhasePresentation(
+    const presentation = buildMacroPhasePresentation({
+      nextAction: null,
       phase,
-      readiness,
-      [stage],
-      (key: TranslationKey) => key,
-    );
+      providerReadinessData: readiness,
+      stages: [stage],
+      t: (key: TranslationKey) => key,
+    });
 
     expect(presentation.state).toBe("runnable");
   });
@@ -86,13 +88,51 @@ describe("research phase provider projection", () => {
       return;
     }
 
-    const presentation = buildMacroPhasePresentation(
+    const presentation = buildMacroPhasePresentation({
+      nextAction: null,
       phase,
-      readiness,
-      [rejectedStage],
-      (key: TranslationKey) => key,
-    );
+      providerReadinessData: readiness,
+      stages: [rejectedStage],
+      t: (key: TranslationKey) => key,
+    });
 
     expect(presentation.state).toBe("blocked");
+  });
+
+  it("projects a complete phase with an authoritative blocker as blocked", () => {
+    const completeStage = {
+      ...stage,
+      human_approved: true,
+      status: "complete" as const,
+      summary: "Demand approved without a recorded source.",
+    };
+    const phase = buildMacroPhaseViews([completeStage], [capability])[0];
+    const nextAction: WorkflowNextAction = {
+      action_type: "resolve_blocker",
+      agent_id: completeStage.agent_id,
+      blocking_reason: "demand_evidence_review_required",
+      can_run: false,
+      detail: "Record at least one demand evidence source.",
+      label: "Resolve demand evidence blocker",
+      priority: 2,
+      stage_id: completeStage.id,
+      stage_status: completeStage.status,
+      stage_title: completeStage.title,
+    };
+    expect(phase).toBeDefined();
+    if (!phase) {
+      return;
+    }
+
+    const presentation = buildMacroPhasePresentation({
+      nextAction,
+      phase,
+      providerReadinessData: readiness,
+      stages: [completeStage],
+      t: (key: TranslationKey) => key,
+    });
+
+    expect(presentation.state).toBe("blocked");
+    expect(presentation.signal).toBe(nextAction.detail);
   });
 });

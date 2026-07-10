@@ -8,7 +8,10 @@ import type {
 import { useI18n } from "../i18n/i18n-context";
 import { getActivePersonalProviders } from "../lib/personal-provider-overrides";
 import { supportsWorkflowProviderOverride } from "../lib/workflow-action-provider";
-import { buildWorkflowActionView } from "../lib/workflow-action-view";
+import {
+  buildWorkflowActionView,
+  workflowActionStagePath,
+} from "../lib/workflow-action-view";
 import { Badge } from "./badge";
 import { Button, buttonClassName } from "./button";
 import { Select } from "./input";
@@ -57,7 +60,7 @@ export function QuestNextActionStrip({
 
   const view = buildWorkflowActionView(action, language);
   const stagePath = `/stages/${action.stage_id}?quest=${questId}`;
-  const primaryStagePath = action.action_type === "review_stage" ? `${stagePath}#review` : stagePath;
+  const primaryStagePath = workflowActionStagePath(action, questId);
   const supportsProviderOverride = supportsWorkflowProviderOverride(action, capabilities);
   const overrideProviders = getActivePersonalProviders(providers, currentUserId);
 

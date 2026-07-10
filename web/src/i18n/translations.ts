@@ -163,7 +163,11 @@ const en = {
     "Literature and gap prerequisites must complete before this stage can run.",
   workflowActionReasonHumanReviewRequired:
     "Human review is required before the workflow can continue.",
+  workflowActionReasonHumanReviewRejected:
+    "This review was rejected. Reopen or rerun the stage before continuing.",
   workflowActionReasonInactiveProvider: "The configured provider is inactive.",
+  workflowActionReasonIdeaSelectionRequired:
+    "Select at least one generated idea before continuing.",
   workflowActionReasonMissingExperimentInputs:
     "Required experiment inputs are missing.",
   workflowActionReasonMissingProvider: "A compatible provider must be configured.",
@@ -810,7 +814,11 @@ const zh: Record<keyof typeof en, string> = {
     "必须先完成文献与研究空白分析，才能运行此阶段。",
   workflowActionReasonHumanReviewRequired:
     "必须完成人工复核，才能继续工作流。",
+  workflowActionReasonHumanReviewRejected:
+    "此阶段的复核已被拒绝，必须重新打开或运行后才能继续。",
   workflowActionReasonInactiveProvider: "当前配置的模型服务商未启用。",
+  workflowActionReasonIdeaSelectionRequired:
+    "必须至少选择一个已生成的 idea，才能继续。",
   workflowActionReasonMissingExperimentInputs: "缺少必需的实验输入。",
   workflowActionReasonMissingProvider: "必须先配置兼容的模型服务商。",
   workflowActionReasonPaperPrerequisitesIncomplete:

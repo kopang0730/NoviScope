@@ -141,8 +141,11 @@ export function StageWorkbenchTabs({
 
   useEffect(() => {
     setActiveTabId(isTabAvailable(initialTabId, stage) ? initialTabId : "overview");
+  }, [initialTabId, stage.id]);
+
+  useEffect(() => {
     setSelectedProviderId("");
-  }, [initialTabId, stage]);
+  }, [stage.id]);
 
   function handleStageChange(nextStage: StageCard) {
     if (!isCurrentStage() || nextStage.id !== stage.id) {
@@ -231,7 +234,7 @@ export function StageWorkbenchTabs({
         ) : (
           <section className="rounded-lg border border-amber-200 bg-amber-50 p-4">
             <p className="text-sm text-amber-900">{t("stageWorkbenchReviewCompact")}</p>
-            <Link className={buttonClassName({ className: "mt-3", size: "sm", variant: "secondary" })} to={`/stages/${currentStage.id}?quest=${currentStage.quest_id}`}>
+            <Link className={buttonClassName({ className: "mt-3", size: "sm", variant: "secondary" })} to={`/stages/${currentStage.id}?quest=${currentStage.quest_id}#review`}>
               {t("stageWorkbenchOpenDetail")}
             </Link>
           </section>

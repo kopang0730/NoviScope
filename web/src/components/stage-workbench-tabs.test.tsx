@@ -256,4 +256,16 @@ describe("StageWorkbenchTabs", () => {
     );
   });
 
+  it("deep-links the compact Review handoff to the full Review tab", async () => {
+    const user = userEvent.setup();
+    renderTabs(stage());
+
+    await user.click(screen.getByRole("tab", { name: "Review" }));
+
+    expect(screen.getByRole("link", { name: "Open Stage Detail" })).toHaveAttribute(
+      "href",
+      "/stages/stage-1?quest=quest-1#review",
+    );
+  });
+
 });

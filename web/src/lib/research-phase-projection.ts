@@ -1,4 +1,4 @@
-import type { StageCard } from "../api/types";
+import type { StageCard, WorkflowNextAction } from "../api/types";
 import type { TranslationKey } from "../i18n/i18n-context";
 import type { ProviderReadinessData } from "./provider-readiness-data";
 import {
@@ -26,6 +26,14 @@ export type MacroPhasePresentation = {
   readonly signal: string;
   readonly state: MacroPhaseState;
   readonly titleKey: TranslationKey;
+};
+
+type MacroPhaseProjectionInput = {
+  readonly nextAction: WorkflowNextAction | null;
+  readonly phase: MacroPhaseView;
+  readonly providerReadinessData: ProviderReadinessData;
+  readonly stages: readonly StageCard[];
+  readonly t: Translate;
 };
 
 function readString(payload: Readonly<Record<string, unknown>>, key: string) {
@@ -67,12 +75,13 @@ export function macroPhaseStateKey(state: MacroPhaseState): TranslationKey {
   }
 }
 
-export function buildMacroPhasePresentation(
-  phase: MacroPhaseView,
-  providerReadinessData: ProviderReadinessData,
-  stages: readonly StageCard[],
-  t: Translate,
-): MacroPhasePresentation {
+export function buildMacroPhasePresentation({
+  nextAction,
+  phase,
+  providerReadinessData,
+  stages,
+  t,
+}: MacroPhaseProjectionInput): MacroPhasePresentation {
   const stage = phase.primaryStage;
   const flow = flowForAgent(phase.definition.primaryAgentId);
   const titleKey = macroPhaseTitleKey(phase.definition.id);
@@ -94,6 +103,18 @@ export function buildMacroPhasePresentation(
     return {
       flow,
       signal: stage.review_notes || stage.summary || t("canvasWaitingForOutput"),
+      state: "blocked",
+      titleKey,
+    };
+  }
+
+  if (
+    nextAction?.action_type === "resolve_blocker"
+    && nextAction.stage_id === stage.id
+  ) {
+    return {
+      flow,
+      signal: nextAction.detail || stage.summary || t("canvasWaitingForOutput"),
       state: "blocked",
       titleKey,
     };

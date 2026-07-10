@@ -205,6 +205,23 @@ def complete_unreviewed_paper_stage(client: TestClient, stage_id: str) -> None:
     )
 
 
+def complete_unselected_idea_stage(client: TestClient, stage_id: str) -> None:
+    mark_stage_running(client, stage_id)
+    update_stage(
+        client,
+        stage_id,
+        {
+            "output_payload": {
+                "ideas": [{"idea_id": "idea-1", "idea_title": "Stroke-aware erasure"}],
+                "selected_idea_ids": [],
+                "selection_status": "pending_human_selection",
+            },
+            "status": "complete",
+            "summary": "Generated one idea for human selection.",
+        },
+    )
+
+
 def test_workflow_next_actions_runs_experiment_after_selected_idea_ids(
     tmp_path,
     dev_admin_header_enabled: None,
@@ -274,6 +291,39 @@ def test_workflow_next_actions_requires_reapproval_after_idea_review_reset(
     assert action["stage_id"] == idea_stage_id
 
 
+def test_workflow_next_actions_routes_unselected_ideas_to_artifacts(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'next-actions-idea-select.db'}")
+    with TestClient(app) as client:
+        # Given: generated ideas are complete but no idea has been selected.
+        register_and_login(client, "NEXT-ACTIONS-IDEA-SELECT", "idea-select@example.com")
+        create_personal_provider(client)
+        quest_id = create_quest(client)
+        approve_demand_stage(
+            client,
+            stage_id_for_agent(client, quest_id, DEMAND_VALIDATOR_AGENT_ID),
+        )
+        complete_literature_stage(
+            client,
+            stage_id_for_agent(client, quest_id, LITERATURE_SCOUT_AGENT_ID),
+        )
+        idea_stage_id = stage_id_for_agent(client, quest_id, IDEA_GENERATOR_AGENT_ID)
+        complete_unselected_idea_stage(client, idea_stage_id)
+
+        # When: the workbench computes the next action.
+        response = client.get(f"/quests/{quest_id}/workflow-next-actions")
+
+    # Then: the action is a selection blocker that the UI routes to Artifacts.
+    assert response.status_code == 200
+    action = response.json()["actions"][0]
+    assert action["action_type"] == "resolve_blocker"
+    assert action["agent_id"] == IDEA_GENERATOR_AGENT_ID
+    assert action["blocking_reason"] == "idea_selection_required"
+    assert action["stage_id"] == idea_stage_id
+
+
 def test_workflow_next_actions_surfaces_final_paper_review(
     tmp_path,
     dev_admin_header_enabled: None,
@@ -306,3 +356,99 @@ def test_workflow_next_actions_surfaces_final_paper_review(
     assert action["action_type"] == "review_stage"
     assert action["agent_id"] == PAPER_MEETING_WRITER_AGENT_ID
     assert action["stage_id"] == paper_stage_id
+
+
+def test_workflow_next_actions_surfaces_recovery_for_rejected_final_paper(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'next-actions-paper-rejected.db'}")
+    with TestClient(app) as client:
+        # Given: the terminal paper stage is complete but its human review was rejected.
+        register_and_login(client, "NEXT-ACTIONS-PAPER-REJECT", "paper-reject@example.com")
+        create_personal_provider(client)
+        quest_id = create_quest(client)
+        approve_demand_stage(
+            client,
+            stage_id_for_agent(client, quest_id, DEMAND_VALIDATOR_AGENT_ID),
+        )
+        complete_literature_stage(
+            client,
+            stage_id_for_agent(client, quest_id, LITERATURE_SCOUT_AGENT_ID),
+        )
+        approve_idea_with_selected_payload(
+            client,
+            stage_id_for_agent(client, quest_id, IDEA_GENERATOR_AGENT_ID),
+        )
+        approve_experiment_plan(
+            client,
+            stage_id_for_agent(client, quest_id, EXPERIMENT_PLANNER_AGENT_ID),
+        )
+        paper_stage_id = stage_id_for_agent(client, quest_id, PAPER_MEETING_WRITER_AGENT_ID)
+        complete_unreviewed_paper_stage(client, paper_stage_id)
+        update_stage(
+            client,
+            paper_stage_id,
+            {"human_approved": False, "review_notes": "Claims need stronger evidence."},
+        )
+
+        # When: the workbench computes the terminal next action.
+        response = client.get(f"/quests/{quest_id}/workflow-next-actions")
+
+    # Then: the rejected terminal gate has an explicit recovery action.
+    assert response.status_code == 200
+    action = response.json()["actions"][0]
+    assert action["action_type"] == "resolve_blocker"
+    assert action["agent_id"] == PAPER_MEETING_WRITER_AGENT_ID
+    assert action["blocking_reason"] == "human_review_rejected"
+    assert action["stage_id"] == paper_stage_id
+
+
+def test_workflow_next_actions_points_rejected_experiment_to_experiment_review(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'next-actions-experiment-rejected.db'}")
+    with TestClient(app) as client:
+        # Given: Experiment Planner completed but its human review was rejected.
+        register_and_login(
+            client,
+            "NEXT-ACTIONS-EXPERIMENT-REJECT",
+            "experiment-reject@example.com",
+        )
+        create_personal_provider(client)
+        quest_id = create_quest(client)
+        approve_demand_stage(
+            client,
+            stage_id_for_agent(client, quest_id, DEMAND_VALIDATOR_AGENT_ID),
+        )
+        complete_literature_stage(
+            client,
+            stage_id_for_agent(client, quest_id, LITERATURE_SCOUT_AGENT_ID),
+        )
+        approve_idea_with_selected_payload(
+            client,
+            stage_id_for_agent(client, quest_id, IDEA_GENERATOR_AGENT_ID),
+        )
+        experiment_stage_id = stage_id_for_agent(
+            client,
+            quest_id,
+            EXPERIMENT_PLANNER_AGENT_ID,
+        )
+        approve_experiment_plan(client, experiment_stage_id)
+        update_stage(
+            client,
+            experiment_stage_id,
+            {"human_approved": False, "review_notes": "Add a stronger baseline."},
+        )
+
+        # When: the workbench computes the next action.
+        response = client.get(f"/quests/{quest_id}/workflow-next-actions")
+
+    # Then: recovery stays on Experiment Planner rather than the blocked paper stage.
+    assert response.status_code == 200
+    action = response.json()["actions"][0]
+    assert action["action_type"] == "resolve_blocker"
+    assert action["agent_id"] == EXPERIMENT_PLANNER_AGENT_ID
+    assert action["blocking_reason"] == "human_review_rejected"
+    assert action["stage_id"] == experiment_stage_id

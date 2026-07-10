@@ -43,6 +43,9 @@ function initialTabIdForHash(hash: string): StageWorkbenchTabId {
   if (hash === "#review") {
     return "review";
   }
+  if (hash === "#artifacts") {
+    return "artifacts";
+  }
   return "overview";
 }
 

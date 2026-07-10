@@ -7,11 +7,12 @@ import {
 } from "../lib/research-phase-projection";
 import type { ProviderReadinessData } from "../lib/provider-readiness-data";
 import type { MacroPhaseId, MacroPhaseView } from "../lib/research-workbench";
-import type { StageCard } from "../api/types";
+import type { StageCard, WorkflowNextAction } from "../api/types";
 import { Badge, type BadgeTone } from "./badge";
 
 export type ResearchPhasePathProps = {
   readonly nextActionPhaseId: MacroPhaseId | null;
+  readonly nextAction: WorkflowNextAction | null;
   readonly onSelectPhase: (phaseId: MacroPhaseId) => void;
   readonly phases: readonly MacroPhaseView[];
   readonly providerReadinessData: ProviderReadinessData;
@@ -54,6 +55,7 @@ function nextPhaseIndex(key: string, currentIndex: number, phaseCount: number) {
 }
 
 export function ResearchPhasePath({
+  nextAction,
   nextActionPhaseId,
   onSelectPhase,
   phases,
@@ -83,12 +85,13 @@ export function ResearchPhasePath({
     <nav aria-label={t("researchCanvasTitle")} id="research-phase-path">
       <ol className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         {phases.map((phase, index) => {
-          const presentation = buildMacroPhasePresentation(
+          const presentation = buildMacroPhasePresentation({
+            nextAction,
             phase,
+            t,
             providerReadinessData,
             stages,
-            t,
-          );
+          });
           const phaseTitle = t(presentation.titleKey);
           const isSelected = phase.definition.id === selectedPhaseId;
           const isCurrentAction = phase.definition.id === nextActionPhaseId;

@@ -249,4 +249,24 @@ describe("StageDetailPage shared workbench", () => {
     );
     expect(screen.getByRole("tabpanel", { name: "Review" })).toBeInTheDocument();
   });
+
+  it("opens the Artifacts tab when the stage URL targets the artifacts hash", async () => {
+    render(
+      <MemoryRouter initialEntries={["/stages/stage-1?quest=quest-1#artifacts"]}>
+        <AuthProvider>
+          <I18nProvider>
+            <Routes>
+              <Route element={<StageDetailPage />} path="/stages/:stageId" />
+            </Routes>
+          </I18nProvider>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("tab", { name: "Artifacts" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("tabpanel", { name: "Artifacts" })).toBeInTheDocument();
+  });
 });

@@ -3,7 +3,10 @@ import type { Provider, WorkflowAgentCapability, WorkflowNextAction } from "../a
 import { useI18n } from "../i18n/i18n-context";
 import { getActivePersonalProviders } from "../lib/personal-provider-overrides";
 import { supportsWorkflowProviderOverride } from "../lib/workflow-action-provider";
-import { buildWorkflowActionView } from "../lib/workflow-action-view";
+import {
+  buildWorkflowActionView,
+  workflowActionStagePath,
+} from "../lib/workflow-action-view";
 import { Badge } from "./badge";
 import { Button } from "./button";
 import { Card } from "./card";
@@ -68,13 +71,13 @@ export function StageNextActionCard({
         );
       case "resolve_blocker":
         return (
-          <Button onClick={() => onNavigate(stagePath)}>
+          <Button onClick={() => onNavigate(workflowActionStagePath(action, questId))}>
             {t("workflowActionResolveBlocker")}
           </Button>
         );
       case "review_stage":
         return (
-          <Button onClick={() => onNavigate(`${stagePath}#review`)}>
+          <Button onClick={() => onNavigate(workflowActionStagePath(action, questId))}>
             {t("workflowActionReviewStage")}
           </Button>
         );

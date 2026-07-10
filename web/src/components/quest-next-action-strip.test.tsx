@@ -165,6 +165,18 @@ describe("QuestNextActionStrip", () => {
     );
   });
 
+  it("links workflow blockers to the Artifacts tab that can resolve them", () => {
+    renderStrip([{
+      ...action("resolve_blocker"),
+      blocking_reason: "missing_experiment_inputs",
+    }]);
+
+    expect(screen.getByRole("link", { name: "Resolve blocker" })).toHaveAttribute(
+      "href",
+      "/stages/stage-1?quest=quest-1#artifacts",
+    );
+  });
+
   it("does not expose an enabled primary command while waiting", () => {
     renderStrip([action("wait_for_stage")]);
 

@@ -12,8 +12,9 @@ from noviscope.api.workflow_graph import (
     WorkflowGraphResponse,
     WorkflowNodeResponse,
     build_workflow_graph,
+    has_selected_idea,
 )
-from noviscope.core.stage_policy import DEMAND_VALIDATOR_AGENT_ID
+from noviscope.core.stage_policy import DEMAND_VALIDATOR_AGENT_ID, IDEA_GENERATOR_AGENT_ID
 from noviscope.models.quest import StageCard, StageStatus
 from noviscope.quests.service import QuestService
 
@@ -29,6 +30,8 @@ WorkflowActionType: TypeAlias = Literal[
 BlockingActionType: TypeAlias = Literal["configure_provider", "resolve_blocker"]
 COMPLETED_STAGE_BLOCKING_REASON: Final = "stage_already_complete"
 DEMAND_EVIDENCE_BLOCKING_REASON: Final = "demand_evidence_review_required"
+HUMAN_REVIEW_REJECTED_BLOCKING_REASON: Final = "human_review_rejected"
+IDEA_SELECTION_BLOCKING_REASON: Final = "idea_selection_required"
 
 
 class WorkflowNextActionResponse(BaseModel):
@@ -74,12 +77,65 @@ def review_detail(stage: StageCard, node: WorkflowNodeResponse) -> str:
     return stage.review_notes or node.summary or "Review this stage output before continuing."
 
 
-def review_action_required(review_state: GateStatus) -> bool:
+def review_state_needs_action(review_state: GateStatus) -> bool:
     match review_state:
-        case "pending_review":
+        case "pending_review" | "rejected":
             return True
-        case "approved" | "not_required" | "rejected" | "waiting_for_completion":
+        case "approved" | "not_required" | "waiting_for_completion":
             return False
+        case unreachable:
+            assert_never(unreachable)
+
+
+def review_next_action(
+    node: WorkflowNodeResponse,
+    stage: StageCard,
+    priority: int,
+) -> WorkflowNextActionResponse | None:
+    match node.review_state:
+        case "rejected":
+            return WorkflowNextActionResponse(
+                action_type="resolve_blocker",
+                agent_id=stage.agent_id,
+                blocking_reason=HUMAN_REVIEW_REJECTED_BLOCKING_REASON,
+                can_run=False,
+                detail=review_detail(stage, node),
+                label=f"Resolve blocker for {stage.title}",
+                priority=priority,
+                stage_id=stage.id,
+                stage_status=stage.status,
+                stage_title=stage.title,
+            )
+        case "pending_review":
+            if stage.agent_id == IDEA_GENERATOR_AGENT_ID and not has_selected_idea(
+                stage.output_payload
+            ):
+                return WorkflowNextActionResponse(
+                    action_type="resolve_blocker",
+                    agent_id=stage.agent_id,
+                    blocking_reason=IDEA_SELECTION_BLOCKING_REASON,
+                    can_run=False,
+                    detail="Select at least one generated idea before approving this stage.",
+                    label=f"Resolve blocker for {stage.title}",
+                    priority=priority,
+                    stage_id=stage.id,
+                    stage_status=stage.status,
+                    stage_title=stage.title,
+                )
+            return WorkflowNextActionResponse(
+                action_type="review_stage",
+                agent_id=stage.agent_id,
+                blocking_reason="human_review_required",
+                can_run=False,
+                detail=review_detail(stage, node),
+                label=f"Review {stage.title}",
+                priority=priority,
+                stage_id=stage.id,
+                stage_status=stage.status,
+                stage_title=stage.title,
+            )
+        case "approved" | "not_required" | "waiting_for_completion":
+            return None
         case unreachable:
             assert_never(unreachable)
 
@@ -89,19 +145,9 @@ def node_next_action(
     stage: StageCard,
     priority: int,
 ) -> WorkflowNextActionResponse:
-    if review_action_required(node.review_state):
-        return WorkflowNextActionResponse(
-            action_type="review_stage",
-            agent_id=stage.agent_id,
-            blocking_reason="human_review_required",
-            can_run=False,
-            detail=review_detail(stage, node),
-            label=f"Review {stage.title}",
-            priority=priority,
-            stage_id=stage.id,
-            stage_status=stage.status,
-            stage_title=stage.title,
-        )
+    review_action = review_next_action(node, stage, priority)
+    if review_action is not None:
+        return review_action
     if node.can_run:
         return WorkflowNextActionResponse(
             action_type="run_stage",
@@ -149,7 +195,7 @@ def node_next_action(
 
 def node_needs_action(node: WorkflowNodeResponse) -> bool:
     return (
-        review_action_required(node.review_state)
+        review_state_needs_action(node.review_state)
         or node.can_run
         or node_has_actionable_blocker(node)
     )

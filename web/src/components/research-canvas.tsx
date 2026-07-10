@@ -58,6 +58,7 @@ export function ResearchCanvas({
   return (
     <div className="space-y-4">
       <ResearchPhasePath
+        nextAction={nextAction}
         nextActionPhaseId={nextActionPhaseId}
         onSelectPhase={setSelectedPhaseId}
         phases={phases}

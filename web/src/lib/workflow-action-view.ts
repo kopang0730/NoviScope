@@ -11,6 +11,24 @@ export type WorkflowActionView = {
   readonly title: string;
 };
 
+export function workflowActionStagePath(action: WorkflowNextAction, questId: string) {
+  const stagePath = `/stages/${action.stage_id}?quest=${questId}`;
+  switch (action.action_type) {
+    case "review_stage":
+      return `${stagePath}#review`;
+    case "resolve_blocker":
+      return action.blocking_reason === "human_review_rejected"
+        ? `${stagePath}#review`
+        : `${stagePath}#artifacts`;
+    case "configure_provider":
+    case "run_stage":
+    case "wait_for_stage":
+      return stagePath;
+    default:
+      return unreachableActionType(action.action_type);
+  }
+}
+
 const blockingReasonKeys: Readonly<Record<string, TranslationKey>> = {
   demand_evidence_review_required: "workflowActionReasonDemandEvidenceReviewRequired",
   demand_validation_incomplete: "workflowActionReasonDemandValidationIncomplete",
@@ -19,7 +37,9 @@ const blockingReasonKeys: Readonly<Record<string, TranslationKey>> = {
   experiment_prerequisites_incomplete: "workflowActionReasonExperimentPrerequisitesIncomplete",
   gap_prerequisites_incomplete: "workflowActionReasonGapPrerequisitesIncomplete",
   human_review_required: "workflowActionReasonHumanReviewRequired",
+  human_review_rejected: "workflowActionReasonHumanReviewRejected",
   inactive_provider: "workflowActionReasonInactiveProvider",
+  idea_selection_required: "workflowActionReasonIdeaSelectionRequired",
   missing_experiment_inputs: "workflowActionReasonMissingExperimentInputs",
   missing_provider: "workflowActionReasonMissingProvider",
   paper_prerequisites_incomplete: "workflowActionReasonPaperPrerequisitesIncomplete",

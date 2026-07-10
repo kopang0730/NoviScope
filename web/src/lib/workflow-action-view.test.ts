@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { WorkflowActionType, WorkflowNextAction } from "../api/types";
-import { buildWorkflowActionView } from "./workflow-action-view";
+import {
+  buildWorkflowActionView,
+  workflowActionStagePath,
+} from "./workflow-action-view";
 
 function action(
   actionType: WorkflowActionType,
@@ -84,5 +87,16 @@ describe("buildWorkflowActionView", () => {
     );
 
     expect(view.reason).toBe("API detail fallback");
+  });
+
+  it("routes rejected reviews back to Review and editable blockers to Artifacts", () => {
+    expect(workflowActionStagePath(
+      action("resolve_blocker", { blocking_reason: "human_review_rejected" }),
+      "quest-1",
+    )).toBe("/stages/stage-1?quest=quest-1#review");
+    expect(workflowActionStagePath(
+      action("resolve_blocker", { blocking_reason: "idea_selection_required" }),
+      "quest-1",
+    )).toBe("/stages/stage-1?quest=quest-1#artifacts");
   });
 });
