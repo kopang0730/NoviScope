@@ -188,18 +188,22 @@ Provider configuration becomes a capability-aware matrix rather than nine large 
 | Lab shared | Available to all lab users | Administrators |
 | Personal override | Visible only to the owner | The current user |
 
-The page uses two tabs, `Shared` and `Personal`. Shared configuration explains whether
-the user is consuming an administrator-managed provider or selecting a personal
-override.
+The page uses two tabs, `Shared` and `Personal`, to organize provider credentials.
+Shared providers may be assigned as lab-wide agent defaults by administrators.
+Personal providers are selected as an explicit override when the owner runs a stage;
+the MVP does not persist a separate personal default assignment for every agent.
 
 ### 6.2 Agent assignment matrix
 
-Each row displays agent role, capability status, assigned model, fallback model,
-connection state, and a test action. Planned agents remain visible for roadmap clarity
-but disable assignment controls and state why configuration is unavailable.
+Each row displays agent role, capability status, shared default model, connection
+state, and a test action. Planned agents remain visible for roadmap clarity but disable
+assignment controls and state why configuration is unavailable.
 
 There is one page-level save action for changed assignments. Per-provider testing may
 remain row-level, with an accessible label that names the provider and agent.
+Members can view the effective shared default. When a runnable action is opened, they
+may choose one of their own personal providers for that run without changing the lab
+default.
 
 ## 7. Stage Detail Route
 
@@ -224,7 +228,7 @@ workflow truth.
 | Quest and stage state | Quest and StageCard APIs |
 | Next action | workflow readiness, stage run gate, provider readiness, review state |
 | Agent capability status | `/workflow/capabilities` |
-| Provider assignment | shared and personal provider/agent assignment APIs |
+| Provider assignment | shared agent defaults plus the stage-run `provider_id` override |
 | Evidence and trust | stage output/evidence payload, evidence audit API, artifact endpoints |
 | Review decision | human approval and review notes on the stage |
 
@@ -290,8 +294,8 @@ The implementation is acceptable when:
 4. The mobile Canvas uses a vertical path and collapsed inspector rather than a long
    stacked dashboard or horizontal map.
 5. New Quest supports a direction-only start while preserving optional research context.
-6. Provider settings distinguish shared configuration, personal override, and planned
-   capabilities.
+6. Provider settings distinguish shared defaults, personal run-time overrides, and
+   planned capabilities without implying persistent personal agent assignments.
 7. Existing evidence, review, and formal-claim blockers remain visible and cannot be
    visually downgraded to optional decoration.
 8. Chinese and English strings, keyboard behavior, mobile touch targets, and visual
