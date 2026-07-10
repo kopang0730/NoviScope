@@ -213,13 +213,17 @@ def find_current_evidence_auditor(
     stages: Sequence[StageCard],
 ) -> StageCard | None:
     auditor_stages = sorted(
-        (stage for stage in stages if stage.agent_id == EVIDENCE_AUDITOR_AGENT_ID),
+        (
+            stage
+            for stage in stages
+            if stage.agent_id == EVIDENCE_AUDITOR_AGENT_ID
+            and stage.status == StageStatus.COMPLETE
+        ),
         key=lambda stage: (stage.created_at, stage.id),
         reverse=True,
     )
-    for stage in auditor_stages:
-        if evidence_auditor_is_approved(stage, stages):
-            return stage
+    if len(auditor_stages) > 1 and auditor_stages[0].created_at == auditor_stages[1].created_at:
+        return None
     return auditor_stages[0] if auditor_stages else None
 
 

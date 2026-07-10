@@ -212,3 +212,37 @@ def test_evidence_audit_accepts_a_fresh_auditor_after_an_older_one_becomes_stale
     assert body["ready_for_formal_claims"] is True
     assert body["blocking_issue_count"] == 0
     assert "evidence_audit_approved" in body["passed_checks"]
+
+
+def test_evidence_audit_uses_latest_completed_auditor_result(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    database_url = f"sqlite:///{tmp_path / 'evidence-auditor-latest.db'}"
+    app = create_app(database_url=database_url)
+    with TestClient(app) as client:
+        register_and_login(client, "AUDIT-LATEST", "audit-latest@example.com")
+        quest_id, stage_ids = create_quest_with_stage_map(client)
+        complete_research_gates(
+            client,
+            stage_ids,
+            database_url=database_url,
+            paper_approved=True,
+            verified_result=True,
+        )
+        add_trusted_code_result_stage(database_url, quest_id)
+        add_approved_evidence_auditor_stage(database_url, quest_id)
+        add_approved_evidence_auditor_stage(
+            database_url,
+            quest_id,
+            alignment_value=False,
+        )
+
+        response = client.get(f"/quests/{quest_id}/evidence-audit")
+
+    body = response.json()
+    assert body["audit_status"] == "blocked"
+    assert body["ready_for_formal_claims"] is False
+    assert {issue["code"] for issue in body["blocking_issues"]} == {
+        "evidence_audit_not_approved"
+    }

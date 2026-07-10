@@ -4,7 +4,10 @@ import pytest
 from pydantic import JsonValue
 
 from noviscope.api.evidence_audit_contract import EVIDENCE_AUDIT_POLICY_VERSION
-from noviscope.api.evidence_audit_readers import evidence_auditor_is_approved
+from noviscope.api.evidence_audit_readers import (
+    evidence_auditor_is_approved,
+    find_current_evidence_auditor,
+)
 from noviscope.api.evidence_audit_snapshot import (
     EVIDENCE_AUDIT_FINGERPRINT_KEY,
     evidence_audit_stage_fingerprint,
@@ -101,3 +104,25 @@ def test_evidence_auditor_rejects_non_local_or_traversing_artifact_uri(
     )
 
     assert evidence_auditor_is_approved(auditor, [upstream, auditor]) is False
+
+
+def test_current_auditor_fails_closed_when_completed_timestamps_tie() -> None:
+    created_at = "2026-07-10T05:00:00+00:00"
+    older_auditor = StageCard(
+        id="stage_zzzz",
+        agent_id=EVIDENCE_AUDITOR_AGENT_ID,
+        created_at=created_at,
+        quest_id="quest-auditor-tie",
+        status=StageStatus.COMPLETE,
+        title="Older approved auditor",
+    )
+    newer_auditor = StageCard(
+        id="stage_aaaa",
+        agent_id=EVIDENCE_AUDITOR_AGENT_ID,
+        created_at=created_at,
+        quest_id="quest-auditor-tie",
+        status=StageStatus.COMPLETE,
+        title="Newer rejected auditor",
+    )
+
+    assert find_current_evidence_auditor([older_auditor, newer_auditor]) is None
