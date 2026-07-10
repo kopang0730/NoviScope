@@ -34,7 +34,7 @@ def add_trusted_code_result_stage(
                 StageCard(
                     agent_id=CODE_RUNNER_AGENT_ID,
                     human_approved=True,
-                    output_payload={"experiment_results": [effective_result]},
+                    output_payload={"metric_records": [effective_result]},
                     quest_id=quest_id,
                     status=StageStatus.COMPLETE,
                     title="Code runner",
@@ -50,6 +50,7 @@ def add_approved_evidence_auditor_stage(
     quest_id: str,
     *,
     alignment_value: JsonValue = True,
+    output_payload: dict[str, JsonValue] | None = None,
     valid_contract: bool = True,
 ) -> None:
     evidence_payload: dict[str, JsonValue] = {}
@@ -75,7 +76,7 @@ def add_approved_evidence_auditor_stage(
                     agent_id=EVIDENCE_AUDITOR_AGENT_ID,
                     evidence_payload=evidence_payload,
                     human_approved=True,
-                    output_payload={},
+                    output_payload=output_payload or {},
                     quest_id=quest_id,
                     status=StageStatus.COMPLETE,
                     title="Evidence auditor",

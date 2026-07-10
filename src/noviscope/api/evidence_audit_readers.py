@@ -18,13 +18,14 @@ from noviscope.api.evidence_audit_snapshot import (
 )
 from noviscope.api.evidence_ledger import collect_source_refs
 from noviscope.core.json_types import JsonObject
-from noviscope.core.stage_policy import CODE_RUNNER_AGENT_ID, EVIDENCE_AUDITOR_AGENT_ID
+from noviscope.core.stage_policy import (
+    CODE_RUNNER_AGENT_ID,
+    CODE_RUNNER_METRIC_RECORDS_KEY,
+    EVIDENCE_AUDITOR_AGENT_ID,
+)
 from noviscope.models.quest import StageCard, StageStatus
 
 ACCEPTED_HUMAN_DEMAND_VERDICTS: Final = frozenset({"plausible", "verified"})
-TRUSTED_RESULT_AGENT_IDS: Final = frozenset(
-    {CODE_RUNNER_AGENT_ID, EVIDENCE_AUDITOR_AGENT_ID}
-)
 VERIFIED_RESULT_FACT_PREFIX: Final = "Verified experiment result:"
 
 
@@ -83,7 +84,7 @@ def has_recorded_human_demand_evidence(stage: StageCard) -> bool:
 
 
 def verified_experiment_result_records(stage: StageCard) -> tuple[JsonObject, ...]:
-    results = stage.output_payload.get("experiment_results")
+    results = stage.output_payload.get(CODE_RUNNER_METRIC_RECORDS_KEY)
     match results:
         case list() as items:
             return tuple(
@@ -112,7 +113,7 @@ def trusted_result_stages(stages: Sequence[StageCard]) -> tuple[StageCard, ...]:
         stage
         for stage in stages
         if (
-            stage.agent_id in TRUSTED_RESULT_AGENT_IDS
+            stage.agent_id == CODE_RUNNER_AGENT_ID
             and stage.status == StageStatus.COMPLETE
             and stage.human_approved is True
         )
@@ -124,7 +125,7 @@ def trusted_result_stage_with_invalid_entries(
 ) -> StageCard | None:
     for stage in trusted_result_stages(stages):
         if result_collection_has_invalid_entries(
-            stage.output_payload.get("experiment_results")
+            stage.output_payload.get(CODE_RUNNER_METRIC_RECORDS_KEY)
         ):
             return stage
     return None

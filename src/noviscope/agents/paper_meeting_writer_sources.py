@@ -4,14 +4,13 @@ from noviscope.agents.paper_meeting_writer_types import PaperMeetingWriterRunErr
 from noviscope.core.json_types import JsonObject
 from noviscope.core.stage_policy import (
     CODE_RUNNER_AGENT_ID,
+    CODE_RUNNER_METRIC_RECORDS_KEY,
     DEMAND_VALIDATOR_AGENT_ID,
     EVIDENCE_AUDITOR_AGENT_ID,
     EXPERIMENT_PLANNER_AGENT_ID,
     IDEA_GENERATOR_AGENT_ID,
 )
 from noviscope.models.quest import StageCard, StageStatus
-
-TRUSTED_RESULT_STAGE_AGENT_IDS = frozenset({CODE_RUNNER_AGENT_ID, EVIDENCE_AUDITOR_AGENT_ID})
 
 
 def find_stage(stages: tuple[StageCard, ...], agent_id: str) -> StageCard | None:
@@ -46,10 +45,12 @@ def trusted_experiment_result_records(stages: tuple[StageCard, ...]) -> list[Jso
     records: list[JsonObject] = []
     for stage in stages:
         if (
-            stage.agent_id not in TRUSTED_RESULT_STAGE_AGENT_IDS
+            stage.agent_id != CODE_RUNNER_AGENT_ID
             or stage.status != StageStatus.COMPLETE
             or stage.human_approved is not True
         ):
             continue
-        records.extend(experiment_result_records(stage.output_payload.get("experiment_results")))
+        records.extend(
+            experiment_result_records(stage.output_payload.get(CODE_RUNNER_METRIC_RECORDS_KEY))
+        )
     return records

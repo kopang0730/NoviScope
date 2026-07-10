@@ -116,13 +116,15 @@ def read_paper_refs(value: JsonValue | None) -> tuple[str, ...]:
             refs.extend(
                 reference
                 for key in PAPER_REF_KEYS
-                if (reference := read_string(item, key))
+                if isinstance((reference := item.get(key)), str)
                 and paper_reference_is_valid(key, reference)
             )
     return tuple(refs)
 
 
 def paper_reference_is_valid(key: str, value: str) -> bool:
+    if any(character.isspace() for character in value):
+        return False
     if key == "doi":
         return doi_is_valid(value)
     if key == "openalex_id":
@@ -166,7 +168,12 @@ def arxiv_id_is_valid(value: str) -> bool:
 
 
 def url_is_valid(value: str) -> bool:
-    parsed = urlsplit(value.strip())
+    if any(character.isspace() for character in value):
+        return False
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return False
     return parsed.scheme in {"http", "https"} and parsed.hostname is not None
 
 

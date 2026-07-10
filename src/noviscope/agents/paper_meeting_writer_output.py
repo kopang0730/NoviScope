@@ -106,6 +106,7 @@ def constrain_output(
             "human_review_required": human_review_required,
             "ieee_paper_skeleton_markdown": artifacts.ieee_paper_skeleton_markdown,
             "meeting_outline_markdown": artifacts.meeting_outline_markdown,
+            "model_generated_hypotheses": [],
             "summary": summary,
             "verified_facts": verified_facts,
             "warnings": warnings,

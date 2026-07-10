@@ -23,7 +23,7 @@ def add_complete_runner_stage(
         agent_id=agent_id,
         evidence_payload={"policy_version": "server-v1"},
         human_approved=True,
-        output_payload={"experiment_results": []},
+        output_payload={"server_output": []},
         quest_id=quest_id,
         status=StageStatus.COMPLETE,
         summary="Server-generated runner output.",
@@ -45,6 +45,7 @@ def add_complete_runner_stage(
     "patch",
     [
         {"evidence_payload": {"policy_version": "forged"}},
+        {"input_payload": {"source": "forged"}},
         {"output_payload": {"experiment_results": [{"metric_value": 99.9}]}},
         {"status": "running"},
         {"summary": "User-authored trusted result."},

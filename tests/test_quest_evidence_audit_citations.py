@@ -11,10 +11,19 @@ from noviscope.main import create_app
 @pytest.mark.parametrize(
     ("reference_key", "reference_value"),
     [
+        ("arxiv_id", " arXiv:2401.12345"),
         ("doi", "Title without identifier"),
+        ("doi", " https://doi.org/10.1234/valid.2026"),
         ("openalex_id", "not-an-openalex-id"),
+        ("openalex_id", "https://openalex.org/W123 "),
         ("paper_ref", "not a URL"),
+        ("paper_ref", " 10.1234/valid.2026"),
+        ("paper_ref", " https://example.com/paper"),
+        ("paper_ref", "https://bad host/paper"),
         ("url", "javascript:alert(1)"),
+        ("url", "https://[broken"),
+        ("url", "https://bad host/paper"),
+        ("url", "https://example.com/paper "),
     ],
 )
 def test_audit_rejects_malformed_literature_identifiers(
