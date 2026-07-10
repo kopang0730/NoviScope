@@ -120,15 +120,49 @@ All spacing derives from 4px.
 - Accessibility: quest rows are buttons with readable selected state; stages keep open links and run buttons separate.
 - Motion: only transition color/background on interactive controls.
 
-### Research Canvas
+### Compact Research Workbench
 
-- Structure: compact summary counters, horizontally scrollable stage map, and a selected-stage inspector.
-- States: selected stage, next action, pending review, runnable, blocked, complete.
-- Evidence: every stage node may show up to four traceable facts; the inspector expands those facts with run state and review notes.
-- Flow semantics: every stage node shows a compact input signal and output artifact pair so users can read the research workflow without knowing internal agent names.
-- Traceability: the inspector shows saved output and evidence field counts before detailed evidence, making empty or blocked stages obvious.
-- Accessibility: stage selection is a real button, while run/open actions remain separate controls.
-- Layout: map stacks above the inspector on narrow screens and uses a fixed-width scroll region for the five-stage workflow.
+- One authoritative next-action strip appears before workflow navigation.
+- Desktop uses Quest rail, research surface, and contextual inspector.
+- Mobile uses a Quest selector, sticky next action, vertical phase path, and collapsed inspector.
+- Five macro phases contain nine agent roles; planned roles remain visible but disabled.
+- The Canvas is workflow navigation, not a draggable workflow editor.
+
+### Next Action Strip
+
+- Structure: action type, responsible party, gate reason, trust summary, one primary action, and one secondary evidence or detail action.
+- States: run agent, review evidence, resolve blocker, inspect output, and no pending action.
+- Ownership: this is the only component that calculates and presents the primary next action; other surfaces may link to it but never repeat an action summary.
+- Accessibility: primary and secondary controls have visible labels and 44px minimum touch targets on mobile.
+
+### Macro Phase Path
+
+- Structure: exactly five ordered phase nodes, each with a phase name, input-to-output statement, aggregate state, salient signal, and agent-role chips.
+- States: pending, runnable, running, review required, blocked, complete, and planned extension.
+- Planned roles: remain visible with a disabled `Planned` label and never appear runnable, complete, or provider-configurable.
+- Interaction: selecting a phase updates the contextual inspector without navigating away; stage Run and Open actions remain separate controls.
+- Layout: desktop uses a compact horizontal path; mobile uses a vertical path without horizontal scrolling.
+
+### Stage Workbench Tabs
+
+- Structure: contextual Overview, Evidence, Run, Review, and Artifacts tabs, shown only when meaningful for the selected phase.
+- Advanced payloads and diagnostic JSON remain available in a collapsed Advanced section.
+- States: tabs reflect available evidence, execution, review, and artifact data without duplicating the next-action summary.
+- Accessibility: tab controls have readable selected state and 44px minimum touch targets on mobile.
+
+### Provider Matrix
+
+- Structure: agent role, capability status, shared default model, connection state, and test action, organized in Shared and Personal views.
+- States: implemented, requires review, planned, unavailable, connected, and unconfigured.
+- Planned agent rows remain visible for roadmap clarity but disable assignment controls and explain why configuration is unavailable.
+- Interaction: assignment changes use one page-level save action; provider tests remain explicit, accessible row-level actions.
+
+### Workbench Constraints
+
+- Do not duplicate action summaries outside the Next Action Strip.
+- Do not nest top-level cards inside other top-level cards.
+- Chinese and English copy ships together with equivalent meaning and behavior.
+- Mobile primary controls use 44px minimum touch targets.
 
 ### Source Stage List
 
