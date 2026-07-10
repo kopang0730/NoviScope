@@ -1,146 +1,141 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { getErrorMessage } from "../api/client";
-import { runStage } from "../api/quests";
-import type { StageCard } from "../api/types";
+import { useEffect, useId, useState } from "react";
+import type { Provider, WorkflowNextAction } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
-import { formatDateTime, labelFromEnum } from "../lib/format";
-import type { ProviderReadinessData } from "../lib/provider-readiness-data";
-import {
-  getLocalizedStageRunGateReason,
-  getStageRunGate,
-} from "../lib/stage-run-gate";
-import { stageTone } from "../lib/status-tones";
+import { buildWorkflowActionView } from "../lib/workflow-action-view";
 import { Badge } from "./badge";
-import { Button, buttonClassName } from "./button";
-import { Card, CardHeading } from "./card";
+import { Button } from "./button";
+import { Card } from "./card";
+import { Select } from "./input";
 
-function findNextWorkflowStage(stage: StageCard, stages: readonly StageCard[]) {
-  const stageIndex = stages.findIndex((candidate) => candidate.id === stage.id);
-  if (stageIndex < 0) {
-    return null;
-  }
+export type StageNextActionCardProps = {
+  readonly action: WorkflowNextAction | null;
+  readonly onNavigate: (path: string) => void;
+  readonly onRun: (stageId: string, providerId?: string) => void;
+  readonly providers: readonly Provider[];
+  readonly questId: string;
+  readonly runningStageId: string | null;
+};
 
-  return stages[stageIndex + 1] ?? null;
+function unsupportedActionType(actionType: never): never {
+  throw new TypeError(`Unsupported workflow action type: ${actionType}`);
 }
 
 export function StageNextActionCard({
-  onStageChange,
-  providerReadinessData,
-  stage,
-  stages,
-}: {
-  readonly onStageChange?: (stage: StageCard) => void;
-  readonly providerReadinessData: ProviderReadinessData;
-  readonly stage: StageCard;
-  readonly stages: readonly StageCard[];
-}) {
-  const { t } = useI18n();
-  const navigate = useNavigate();
-  const [runError, setRunError] = useState<string | null>(null);
-  const [running, setRunning] = useState(false);
+  action,
+  onNavigate,
+  onRun,
+  providers,
+  questId,
+  runningStageId,
+}: StageNextActionCardProps) {
+  const { language, t } = useI18n();
+  const headingId = useId();
+  const [selectedProviderId, setSelectedProviderId] = useState("");
 
-  if (stage.status !== "complete") {
-    return null;
-  }
+  useEffect(() => {
+    setSelectedProviderId("");
+  }, [action?.stage_id]);
 
-  const nextStage = findNextWorkflowStage(stage, stages);
-  const canvasHref = `/canvas?quest=${stage.quest_id}`;
-
-  if (!nextStage) {
+  if (!action) {
     return (
-      <Card className="border-emerald-200 bg-emerald-50/50">
-        <CardHeading
-          action={
-            <Link className={buttonClassName({ size: "sm", variant: "secondary" })} to={canvasHref}>
-              {t("stageNextActionOpenCanvas")}
-            </Link>
-          }
-          description={t("stageNextActionCompleteDescription")}
-          title={t("stageNextActionCompleteTitle")}
-        />
+      <Card aria-labelledby={headingId} className="bg-slate-50">
+        <h2 className="text-sm font-semibold text-slate-900" id={headingId}>
+          {t("canvasNextAction")}
+        </h2>
+        <p className="mt-2 text-sm text-slate-600">{t("workflowActionNoPending")}</p>
       </Card>
     );
   }
 
-  const nextGate = getStageRunGate({
-    providerReadinessData,
-    stage: nextStage,
-    stages,
-  });
-  const nextStageHref = `/stages/${nextStage.id}?quest=${nextStage.quest_id}`;
+  const view = buildWorkflowActionView(action, language);
+  const stagePath = `/stages/${action.stage_id}?quest=${questId}`;
+  const activeProviders = providers.filter(
+    (provider) =>
+      provider.is_active &&
+      (provider.kind === "openai_compatible" || provider.kind === "custom"),
+  );
+  const supportsProviderOverride = action.action_type === "run_stage" && activeProviders.length > 0;
 
-  async function handleRunNextStage(stageToRun: StageCard) {
-    setRunError(null);
-    setRunning(true);
-
-    try {
-      const updatedStage = await runStage(stageToRun.id);
-      onStageChange?.(updatedStage);
-      navigate(`/stages/${updatedStage.id}?quest=${updatedStage.quest_id}`);
-    } catch (error) {
-      if (error instanceof Error) {
-        setRunError(getErrorMessage(error));
-        return;
-      }
-      throw error;
-    } finally {
-      setRunning(false);
+  const primaryCommand = (() => {
+    switch (action.action_type) {
+      case "configure_provider":
+        return (
+          <Button onClick={() => onNavigate("/providers")}>
+            {t("workflowActionConfigureProvider")}
+          </Button>
+        );
+      case "resolve_blocker":
+        return (
+          <Button onClick={() => onNavigate(stagePath)}>
+            {t("workflowActionResolveBlocker")}
+          </Button>
+        );
+      case "review_stage":
+        return (
+          <Button onClick={() => onNavigate(stagePath)}>
+            {t("workflowActionReviewStage")}
+          </Button>
+        );
+      case "run_stage":
+        return (
+          <Button
+            disabled={view.disabled}
+            loading={runningStageId === action.stage_id}
+            onClick={() => onRun(action.stage_id, selectedProviderId || undefined)}
+          >
+            {t("workflowActionRunStage")}
+          </Button>
+        );
+      case "wait_for_stage":
+        return <Button disabled>{t("workflowActionWaitForStage")}</Button>;
+      default:
+        return unsupportedActionType(action.action_type);
     }
-  }
+  })();
 
   return (
-    <Card className="border-teal-200 bg-teal-50/50">
-      <CardHeading
-        action={
-          <div className="flex flex-wrap gap-2">
-            {nextGate.canRun ? (
-              <Button loading={running} onClick={() => void handleRunNextStage(nextStage)} size="sm" type="button">
-                {t("stageNextActionRunNextStage")}
-              </Button>
-            ) : null}
-            <Link className={buttonClassName({ size: "sm", variant: "primary" })} to={nextStageHref}>
-              {t("stageNextActionOpenNextStage")}
-            </Link>
-            <Link className={buttonClassName({ size: "sm", variant: "secondary" })} to={canvasHref}>
-              {t("stageNextActionOpenCanvas")}
-            </Link>
+    <Card aria-labelledby={headingId} className="border-teal-200 bg-teal-50/50">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-sm font-semibold text-slate-900" id={headingId}>
+              {t("canvasNextAction")}
+            </h2>
+            <Badge tone="teal">{t("workflowActionTrustSummary")}</Badge>
           </div>
-        }
-        description={t("stageNextActionDescription")}
-        title={t("stageNextActionTitle")}
-      />
-
-      <div className="mt-4 rounded-lg border border-teal-200 bg-white p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">
-              {t("stageNextActionNextStage")}
-            </p>
-            <h3 className="mt-1 text-base font-semibold text-slate-950">{nextStage.title}</h3>
-            <p className="mt-2 text-sm text-slate-600">{getLocalizedStageRunGateReason(nextGate, t)}</p>
-          </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <Badge tone={stageTone(nextStage.status)}>{labelFromEnum(nextStage.status)}</Badge>
-            <Badge tone={nextGate.canRun ? "teal" : "amber"}>
-              {nextGate.canRun ? t("stageNextActionRunnable") : t("stageNextActionBlocked")}
-            </Badge>
-          </div>
+          <p className="mt-2 break-words text-base font-semibold text-slate-950">{view.title}</p>
+          <p className="mt-1 break-words text-sm leading-6 text-slate-600">{view.reason}</p>
+          <p className="mt-2 break-words text-xs font-medium text-slate-500">{view.responsible}</p>
         </div>
 
-        {runError ? (
-          <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-            {runError}
-          </p>
-        ) : null}
+        <div className="flex w-full shrink-0 flex-col gap-3 xl:w-auto xl:min-w-[280px]">
+          {supportsProviderOverride ? (
+            <Select
+              className="min-h-11"
+              label={t("workflowActionProviderOverride")}
+              onChange={(event) => setSelectedProviderId(event.target.value)}
+              value={selectedProviderId}
+            >
+              <option value="">{t("workflowActionProviderDefault")}</option>
+              {activeProviders.map((provider) => (
+                <option key={provider.id} value={provider.id}>
+                  {provider.name} · {provider.scope === "personal"
+                    ? t("workflowActionProviderPersonal")
+                    : t("workflowActionProviderShared")}
+                </option>
+              ))}
+            </Select>
+          ) : null}
 
-        <div className="mt-4 grid gap-2 text-xs text-slate-500 sm:grid-cols-2">
-          <p>
-            {t("stageDetailAgentId")}: {nextStage.agent_id}
-          </p>
-          <p>
-            {t("updated")}: {formatDateTime(nextStage.updated_at)}
-          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+            {primaryCommand}
+            <Button
+              onClick={() => onNavigate(`${stagePath}#evidence`)}
+              variant="secondary"
+            >
+              {t("workflowActionViewDetail")}
+            </Button>
+          </div>
         </div>
       </div>
     </Card>

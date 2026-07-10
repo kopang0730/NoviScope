@@ -29,6 +29,7 @@ export type StageWorkbenchTabId = "overview" | "evidence" | "run" | "review" | "
 export type StageWorkbenchTabsProps = {
   readonly mode: "compact" | "full";
   readonly onRunStage: (stageId: string, providerId?: string) => void;
+  readonly onStageChange?: (stage: StageCard) => void;
   readonly stage: StageCard;
   readonly stages: readonly StageCard[];
   readonly providerReadinessData: ProviderReadinessData;
@@ -90,6 +91,7 @@ function AdvancedPayloads({ stage }: { readonly stage: StageCard }) {
 export function StageWorkbenchTabs({
   mode,
   onRunStage,
+  onStageChange,
   providerReadinessData,
   stage,
   stages,
@@ -112,10 +114,18 @@ export function StageWorkbenchTabs({
   );
 
   useEffect(() => {
-    setActiveTabId("overview");
     setCurrentStage(stage);
-    setSelectedProviderId("");
   }, [stage]);
+
+  useEffect(() => {
+    setActiveTabId("overview");
+    setSelectedProviderId("");
+  }, [stage.id]);
+
+  function handleStageChange(nextStage: StageCard) {
+    setCurrentStage(nextStage);
+    onStageChange?.(nextStage);
+  }
 
   function renderPanel() {
     switch (activeTabId) {
@@ -186,7 +196,7 @@ export function StageWorkbenchTabs({
         );
       case "review":
         return mode === "full" ? (
-          <StageReviewGateCard onStageChange={setCurrentStage} stage={currentStage} />
+          <StageReviewGateCard onStageChange={handleStageChange} stage={currentStage} />
         ) : (
           <section className="rounded-lg border border-amber-200 bg-amber-50 p-4">
             <p className="text-sm text-amber-900">{t("stageWorkbenchReviewCompact")}</p>
@@ -198,7 +208,7 @@ export function StageWorkbenchTabs({
       case "artifacts":
         return mode === "full" ? (
           <StageOutputPanel
-            onStageChange={setCurrentStage}
+            onStageChange={handleStageChange}
             stage={currentStage}
             stageRunGate={stageRunGate}
             workflowStages={stages}

@@ -1,25 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
-import { getQuest, getQuestStages, runStage } from "../api/quests";
+import { useMemo, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getErrorMessage } from "../api/client";
-import type { Quest, StageCard, StageStatus } from "../api/types";
+import { runStage } from "../api/quests";
+import type { StageCard, StageStatus } from "../api/types";
 import { useAuth } from "../auth/auth-context";
 import { Badge } from "../components/badge";
 import { Button, buttonClassName } from "../components/button";
 import { Card, CardHeading } from "../components/card";
-import { StageProviderReadinessCard } from "../components/stage-provider-readiness";
 import { StageEditor } from "../components/stage-editor";
 import { StageNextActionCard } from "../components/stage-next-action-card";
-import { StageOutputPanel } from "../components/stage-output-summary";
-import { StageReviewGateCard } from "../components/stage-review-gate-card";
+import { StageWorkbenchTabs } from "../components/stage-workbench-tabs";
 import { useI18n } from "../i18n/i18n-context";
 import { downloadTextFile } from "../lib/download-file";
 import { formatDateTime, labelFromEnum } from "../lib/format";
 import { useProviderReadinessData } from "../lib/provider-readiness-data";
-import {
-  getLocalizedStageRunGateReason,
-  getStageRunGate,
-} from "../lib/stage-run-gate";
+import { useStageDetailData } from "../lib/stage-detail-data";
 import {
   buildStageReviewPacketFilename,
   buildStageReviewPacketMarkdown,
@@ -41,94 +36,58 @@ function stageTone(status: StageStatus) {
 export function StageDetailPage() {
   const { stageId } = useParams();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { authReady, currentUser } = useAuth();
   const { t } = useI18n();
   const questId = searchParams.get("quest");
 
-  const [quest, setQuest] = useState<Quest | null>(null);
-  const [stage, setStage] = useState<StageCard | null>(null);
-  const [workflowStages, setWorkflowStages] = useState<readonly StageCard[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [runningStage, setRunningStage] = useState(false);
+  const [runningStageId, setRunningStageId] = useState<string | null>(null);
   const providerReadinessData = useProviderReadinessData();
-
-  useEffect(() => {
-    if (!stageId || !questId || !currentUser) {
-      setQuest(null);
-      setStage(null);
-      setWorkflowStages([]);
-      setLoading(false);
-      return;
-    }
-
-    let active = true;
-    setLoading(true);
-    setLoadError(null);
-
-    void Promise.all([getQuest(questId), getQuestStages(questId)])
-      .then(([nextQuest, stages]) => {
-        if (!active) {
-          return;
-        }
-
-        const nextStage = stages.find((candidate) => candidate.id === stageId);
-        if (!nextStage) {
-          throw new Error("Stage not found in the selected quest.");
-        }
-
-        setQuest(nextQuest);
-        setStage(nextStage);
-        setWorkflowStages(stages);
-      })
-      .catch((error) => {
-        if (!active) {
-          return;
-        }
-        if (error instanceof Error) {
-          setLoadError(getErrorMessage(error));
-          return;
-        }
-        throw error;
-      })
-      .finally(() => {
-        if (active) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [currentUser, questId, stageId]);
+  const {
+    applyStageChange,
+    loadError,
+    loading,
+    nextAction,
+    providers,
+    quest,
+    refresh,
+    stage,
+    stages,
+  } = useStageDetailData({ currentUser, questId, stageId });
 
   const workflowBackLink = useMemo(() => (questId ? `/?quest=${questId}` : "/"), [questId]);
-  const stageRunGate = stage
-    ? getStageRunGate({ providerReadinessData, stage, stages: workflowStages })
-    : null;
 
-  function handleStageChange(nextStage: StageCard) {
-    setStage(nextStage);
-    setWorkflowStages((currentStages) =>
-      currentStages.map((candidate) => (candidate.id === nextStage.id ? nextStage : candidate)),
-    );
+  function handleWorkflowMutation(nextStage: StageCard) {
+    applyStageChange(nextStage);
+    setRunError(null);
+    void refresh().catch((error: unknown) => {
+      setRunError(getErrorMessage(error));
+    });
   }
 
-  async function handleRunStage() {
-    if (!stageId) {
+  async function handleRunStage(targetStageId: string, providerId?: string) {
+    if (!questId) {
       return;
     }
 
-    setRunningStage(true);
+    setRunningStageId(targetStageId);
     setRunError(null);
     setSuccessMessage(null);
 
     try {
-      const updatedStage = await runStage(stageId);
-      handleStageChange(updatedStage);
-      setSuccessMessage(updatedStage.status === "blocked" ? t("stageRunBlocked") : t("stageRunComplete"));
+      const updatedStage = await runStage(
+        targetStageId,
+        providerId ? { provider_id: providerId } : {},
+      );
+      await refresh();
+      setSuccessMessage(
+        updatedStage.status === "blocked" ? t("stageRunBlocked") : t("stageRunComplete"),
+      );
+      if (targetStageId !== stageId) {
+        navigate(`/stages/${targetStageId}?quest=${questId}`);
+      }
     } catch (error) {
       if (error instanceof Error) {
         setRunError(getErrorMessage(error));
@@ -136,7 +95,7 @@ export function StageDetailPage() {
         throw error;
       }
     } finally {
-      setRunningStage(false);
+      setRunningStageId(null);
     }
   }
 
@@ -172,18 +131,15 @@ export function StageDetailPage() {
     <div className="space-y-4">
       <Card>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-sm text-slate-500">{t("stageEditorEyebrow")}</p>
-            <h1 className="mt-1 text-xl font-semibold text-slate-900">{stage?.title ?? t("stageDetailFallbackTitle")}</h1>
+          <div className="min-w-0">
+            <p className="text-sm text-slate-500">{t("stageDetailTitle")}</p>
+            <h1 className="mt-1 text-xl font-semibold text-slate-900">
+              {stage?.title ?? t("stageDetailFallbackTitle")}
+            </h1>
             {quest ? <p className="mt-2 text-sm text-slate-600">{quest.title}</p> : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {stage ? <Badge tone={stageTone(stage.status)}>{labelFromEnum(stage.status)}</Badge> : null}
-            {stage && stageRunGate?.canRun ? (
-              <Button loading={runningStage} onClick={() => void handleRunStage()} size="sm">
-                {t("runStage")}
-              </Button>
-            ) : null}
             {stage ? (
               <Button onClick={() => handleDownloadReviewPacket(stage)} size="sm" type="button" variant="secondary">
                 {t("downloadReviewPacket")}
@@ -196,47 +152,53 @@ export function StageDetailPage() {
         </div>
         {loadError ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{loadError}</p> : null}
         {loading ? <p className="mt-4 text-sm text-slate-500">{t("stageDetailLoading")}</p> : null}
-        {stageRunGate && !stageRunGate.canRun ? (
-          <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            {getLocalizedStageRunGateReason(stageRunGate, t)}
-          </p>
-        ) : null}
         {stage ? (
           <div className="mt-4 grid gap-2 text-xs text-slate-500 sm:grid-cols-2">
-            <p>
-              {t("stageDetailAgentId")}: {stage.agent_id}
-            </p>
-            <p>
-              {t("updated")}: {formatDateTime(stage.updated_at)}
-            </p>
+            <p>{t("stageDetailAgentId")}: {stage.agent_id}</p>
+            <p>{t("updated")}: {formatDateTime(stage.updated_at)}</p>
           </div>
         ) : null}
       </Card>
 
       {stage ? (
         <>
-          <StageReviewGateCard onStageChange={handleStageChange} stage={stage} />
-
-          <StageProviderReadinessCard readinessData={providerReadinessData} stage={stage} />
-
-          <StageOutputPanel
-            onStageChange={handleStageChange}
-            stage={stage}
-            stageRunGate={stageRunGate ?? undefined}
-            workflowStages={workflowStages}
+          <StageNextActionCard
+            action={nextAction}
+            onNavigate={(path) => void navigate(path)}
+            onRun={(targetStageId, providerId) => void handleRunStage(targetStageId, providerId)}
+            providers={providers}
+            questId={questId}
+            runningStageId={runningStageId}
           />
 
-          <StageNextActionCard
-            onStageChange={handleStageChange}
+          <StageWorkbenchTabs
+            mode="full"
+            onRunStage={(targetStageId, providerId) => void handleRunStage(targetStageId, providerId)}
+            onStageChange={handleWorkflowMutation}
             providerReadinessData={providerReadinessData}
             stage={stage}
-            stages={workflowStages}
+            stages={stages}
           />
 
-          {runError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{runError}</p> : null}
-          {successMessage ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{successMessage}</p> : null}
+          {runError ? (
+            <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700" role="alert">
+              {runError}
+            </p>
+          ) : null}
+          {successMessage ? (
+            <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">
+              {successMessage}
+            </p>
+          ) : null}
 
-          <StageEditor onStageChange={handleStageChange} stage={stage} />
+          <details>
+            <summary className="cursor-pointer rounded-lg border border-slate-200 bg-white px-5 py-4 text-sm font-semibold text-slate-900 shadow-panel sm:px-6">
+              {t("stageDetailAdvancedEditor")}
+            </summary>
+            <div className="mt-4">
+              <StageEditor onStageChange={handleWorkflowMutation} stage={stage} />
+            </div>
+          </details>
         </>
       ) : null}
     </div>
