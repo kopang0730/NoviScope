@@ -106,6 +106,14 @@ test.describe.serial("compact Canvas workbench", () => {
     await expect(page.getByRole("link", { name: "Human review" })).toBeVisible();
     await captureState(page, testInfo, "canvas-human-review-blocker");
 
+    await page.getByRole("link", { name: "Human review" }).click();
+    await expect(page.getByRole("tab", { name: "Review" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await page.goBack();
+    await expect(page.getByRole("heading", { exact: true, name: direction })).toBeVisible();
+
     await page.getByRole("tab", { name: "Evidence" }).click();
     await expect(page.getByText(/Stored evidence/)).toBeVisible();
     await page.getByRole("tab", { name: "Review" }).click();

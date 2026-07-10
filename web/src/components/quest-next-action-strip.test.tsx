@@ -152,7 +152,7 @@ describe("QuestNextActionStrip", () => {
 
     expect(screen.getByRole("link", { name: "Human review" })).toHaveAttribute(
       "href",
-      "/stages/stage-1?quest=quest-1",
+      "/stages/stage-1?quest=quest-1#review",
     );
   });
 

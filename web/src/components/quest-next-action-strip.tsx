@@ -57,6 +57,7 @@ export function QuestNextActionStrip({
 
   const view = buildWorkflowActionView(action, language);
   const stagePath = `/stages/${action.stage_id}?quest=${questId}`;
+  const primaryStagePath = action.action_type === "review_stage" ? `${stagePath}#review` : stagePath;
   const supportsProviderOverride = supportsWorkflowProviderOverride(action, capabilities);
   const overrideProviders = getActivePersonalProviders(providers, currentUserId);
 
@@ -75,7 +76,7 @@ export function QuestNextActionStrip({
         return (
           <Link
             className={buttonClassName({ className: "min-h-11", variant: "primary" })}
-            to={stagePath}
+            to={primaryStagePath}
           >
             {action.action_type === "review_stage"
               ? t("workflowActionReviewStage")

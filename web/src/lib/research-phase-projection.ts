@@ -3,6 +3,7 @@ import type { TranslationKey } from "../i18n/i18n-context";
 import type { ProviderReadinessData } from "./provider-readiness-data";
 import {
   flowForAgent,
+  isHumanGateStage,
   needsHumanReview,
   type CanvasStageFlow,
 } from "./research-canvas-data";
@@ -85,6 +86,15 @@ export function buildMacroPhasePresentation(
       flow,
       signal: stage.summary || t("workflowReadinessStatusRunning"),
       state: "running",
+      titleKey,
+    };
+  }
+
+  if (isHumanGateStage(stage) && stage.human_approved === false) {
+    return {
+      flow,
+      signal: stage.review_notes || stage.summary || t("canvasWaitingForOutput"),
+      state: "blocked",
       titleKey,
     };
   }

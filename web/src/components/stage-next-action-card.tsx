@@ -74,7 +74,7 @@ export function StageNextActionCard({
         );
       case "review_stage":
         return (
-          <Button onClick={() => onNavigate(stagePath)}>
+          <Button onClick={() => onNavigate(`${stagePath}#review`)}>
             {t("workflowActionReviewStage")}
           </Button>
         );

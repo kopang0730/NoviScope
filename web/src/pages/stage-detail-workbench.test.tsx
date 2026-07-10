@@ -229,4 +229,24 @@ describe("StageDetailPage shared workbench", () => {
     );
     expect(screen.getByRole("tabpanel", { name: "Evidence" })).toBeInTheDocument();
   });
+
+  it("opens the Review tab when the stage URL targets the review hash", async () => {
+    render(
+      <MemoryRouter initialEntries={["/stages/stage-1?quest=quest-1#review"]}>
+        <AuthProvider>
+          <I18nProvider>
+            <Routes>
+              <Route element={<StageDetailPage />} path="/stages/:stageId" />
+            </Routes>
+          </I18nProvider>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("tab", { name: "Review" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("tabpanel", { name: "Review" })).toBeInTheDocument();
+  });
 });

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   StageCard,
   WorkflowAgentCapability,
@@ -48,6 +48,12 @@ export function ResearchCanvas({
   );
   const selectedStage =
     selectedPrimaryAgent?.status === "implemented" ? selectedPhase?.primaryStage ?? null : null;
+
+  useEffect(() => {
+    if (nextActionPhaseId) {
+      setSelectedPhaseId(nextActionPhaseId);
+    }
+  }, [nextActionPhaseId]);
 
   return (
     <div className="space-y-4">

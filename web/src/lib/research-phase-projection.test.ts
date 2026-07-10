@@ -72,4 +72,27 @@ describe("research phase provider projection", () => {
 
     expect(presentation.state).toBe("runnable");
   });
+
+  it("projects a rejected human gate as blocked instead of complete", () => {
+    const rejectedStage = {
+      ...stage,
+      human_approved: false,
+      status: "complete" as const,
+      summary: "Demand evidence was rejected.",
+    };
+    const phase = buildMacroPhaseViews([rejectedStage], [capability])[0];
+    expect(phase).toBeDefined();
+    if (!phase) {
+      return;
+    }
+
+    const presentation = buildMacroPhasePresentation(
+      phase,
+      readiness,
+      [rejectedStage],
+      (key: TranslationKey) => key,
+    );
+
+    expect(presentation.state).toBe("blocked");
+  });
 });

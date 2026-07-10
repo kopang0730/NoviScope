@@ -147,4 +147,27 @@ describe("StageNextActionCard provider override", () => {
 
     expect(onRun).toHaveBeenCalledWith("stage-1", "personal-anthropic");
   });
+
+  it("navigates review actions directly to the Review tab", async () => {
+    const user = userEvent.setup();
+    const onNavigate = vi.fn();
+    render(
+      <I18nProvider>
+        <StageNextActionCard
+          action={{ ...action, action_type: "review_stage", can_run: false }}
+          capabilities={[capability("model_provider")]}
+          currentUserId="user-1"
+          onNavigate={onNavigate}
+          onRun={vi.fn()}
+          providers={providers}
+          questId="quest-1"
+          runningStageId={null}
+        />
+      </I18nProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Human review" }));
+
+    expect(onNavigate).toHaveBeenCalledWith("/stages/stage-1?quest=quest-1#review");
+  });
 });

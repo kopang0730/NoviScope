@@ -9,7 +9,10 @@ import { Button, buttonClassName } from "../components/button";
 import { Card, CardHeading } from "../components/card";
 import { StageEditor } from "../components/stage-editor";
 import { StageNextActionCard } from "../components/stage-next-action-card";
-import { StageWorkbenchTabs } from "../components/stage-workbench-tabs";
+import {
+  StageWorkbenchTabs,
+  type StageWorkbenchTabId,
+} from "../components/stage-workbench-tabs";
 import { useI18n } from "../i18n/i18n-context";
 import { downloadTextFile } from "../lib/download-file";
 import { formatDateTime, labelFromEnum } from "../lib/format";
@@ -31,6 +34,16 @@ function stageTone(status: StageStatus) {
     return "red";
   }
   return "gray";
+}
+
+function initialTabIdForHash(hash: string): StageWorkbenchTabId {
+  if (hash === "#evidence") {
+    return "evidence";
+  }
+  if (hash === "#review") {
+    return "review";
+  }
+  return "overview";
 }
 
 export function StageDetailPage() {
@@ -195,7 +208,7 @@ export function StageDetailPage() {
 
           <StageWorkbenchTabs
             currentUserId={currentUser?.id ?? null}
-            initialTabId={location.hash === "#evidence" ? "evidence" : "overview"}
+            initialTabId={initialTabIdForHash(location.hash)}
             mode="full"
             onRunStage={(targetStageId, providerId) => void handleRunStage(targetStageId, providerId)}
             onStageChange={handleWorkflowMutation}
