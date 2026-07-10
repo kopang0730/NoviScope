@@ -103,6 +103,7 @@ export function QuestNextActionStrip({
     <section
       aria-labelledby={headingId}
       className="sticky top-3 z-10 rounded-lg border border-teal-200 bg-white px-4 py-4 shadow-panel sm:px-5 lg:static"
+      id="quest-next-action"
     >
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0">
@@ -119,24 +120,26 @@ export function QuestNextActionStrip({
 
         <div className="flex w-full shrink-0 flex-col gap-3 xl:w-auto xl:min-w-[280px]">
           {supportsProviderOverride ? (
-            <Select
-              className="min-h-11"
-              label={t("workflowActionProviderOverride")}
-              onChange={(event) => setSelectedProviderId(event.target.value)}
-              value={selectedProviderId}
-            >
-              <option value="">{t("workflowActionProviderDefault")}</option>
-              {activeProviders.map((provider) => (
-                <option key={provider.id} value={provider.id}>
-                  {provider.name} · {provider.scope === "personal"
-                    ? t("workflowActionProviderPersonal")
-                    : t("workflowActionProviderShared")}
-                </option>
-              ))}
-            </Select>
+            <div className="order-2 xl:order-1">
+              <Select
+                className="min-h-11"
+                label={t("workflowActionProviderOverride")}
+                onChange={(event) => setSelectedProviderId(event.target.value)}
+                value={selectedProviderId}
+              >
+                <option value="">{t("workflowActionProviderDefault")}</option>
+                {activeProviders.map((provider) => (
+                  <option key={provider.id} value={provider.id}>
+                    {provider.name} · {provider.scope === "personal"
+                      ? t("workflowActionProviderPersonal")
+                      : t("workflowActionProviderShared")}
+                  </option>
+                ))}
+              </Select>
+            </div>
           ) : null}
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <div className="order-1 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end xl:order-2">
             {primaryCommand}
             <Link
               className={buttonClassName({ className: "min-h-11", variant: "secondary" })}

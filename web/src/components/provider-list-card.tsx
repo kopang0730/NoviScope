@@ -63,7 +63,7 @@ function ProviderActions({
           {t("providerEdit")}
         </Button>
       ) : (
-        <span className="text-sm text-slate-400">{t("providerViewOnly")}</span>
+        <span className="text-sm text-slate-600">{t("providerViewOnly")}</span>
       )}
     </div>
   );
@@ -81,20 +81,20 @@ export function ProviderListCard({
   testingProviderId,
 }: ProviderListCardProps) {
   const { t } = useI18n();
+  const title =
+    scope === "shared"
+      ? t("providerSharedCredentialsTitle")
+      : t("providerPersonalCredentialsTitle");
 
   return (
-    <Card>
+    <Card aria-label={title} className="min-w-0">
       <CardHeading
         description={
           scope === "shared"
             ? t("providerSharedDefaultsDescription")
             : t("providerPersonalOverrideDescription")
         }
-        title={
-          scope === "shared"
-            ? t("providerSharedCredentialsTitle")
-            : t("providerPersonalCredentialsTitle")
-        }
+        title={title}
       />
       {!currentUser ? (
         <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">

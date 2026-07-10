@@ -187,13 +187,13 @@ export function ProviderSettingsPage() {
   }
 
   return (
-    <div className="grid gap-4">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
       <ProviderScopeTabs
         activeScope={activeScope}
         onChange={changeScope}
         providers={providers}
       />
-      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.65fr)]">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 2xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.65fr)]">
         <ProviderListCard
           currentUser={currentUser}
           loading={loading}

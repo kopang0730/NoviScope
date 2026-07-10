@@ -17,7 +17,7 @@ import { StageDetailPage } from "./pages/stage-detail";
 
 function navLinkClassName(isActive: boolean) {
   return [
-    "rounded-lg px-3 py-2 text-sm font-medium transition",
+    "inline-flex min-h-11 items-center justify-center rounded-lg px-2 py-2 text-center text-xs font-medium transition sm:px-3 sm:text-sm lg:justify-start lg:text-left",
     isActive
       ? "bg-teal-600 text-white shadow-sm"
       : "text-slate-700 hover:bg-slate-100 hover:text-slate-900",
@@ -42,13 +42,13 @@ function WorkspaceLayout() {
               <VersionStatus userRole={currentUser?.role} />
             </div>
           </div>
-          <div className="flex min-w-0 flex-wrap items-center gap-3 self-stretch sm:self-auto sm:justify-end">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 self-stretch sm:self-auto sm:justify-end sm:gap-3">
             <LanguageToggle />
             <div className="min-w-0 text-left sm:text-right">
               <p className="text-sm font-medium text-slate-800">
                 {currentUser?.display_name ?? t("guest")}
               </p>
-              <p className="break-all text-xs text-slate-500 sm:max-w-none">
+              <p className="hidden break-all text-xs text-slate-500 sm:block sm:max-w-none">
                 {currentUser?.email ?? (authReady ? t("signInPrompt") : t("checkingSession"))}
               </p>
             </div>
@@ -70,9 +70,9 @@ function WorkspaceLayout() {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-[1440px] gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="h-fit rounded-lg border border-slate-200 bg-white p-3 shadow-panel">
-          <nav className="flex flex-col gap-1 md:gap-2">
+      <div className="mx-auto grid max-w-[1440px] grid-cols-[minmax(0,1fr)] gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <aside className="h-fit rounded-lg border border-slate-200 bg-white p-2 shadow-panel lg:p-3">
+          <nav className="grid grid-cols-4 gap-1 lg:flex lg:flex-col lg:gap-2">
             <NavLink className={({ isActive }) => navLinkClassName(isActive)} end to="/canvas">
               {t("navCanvas")}
             </NavLink>
@@ -91,7 +91,7 @@ function WorkspaceLayout() {
               </NavLink>
             ) : null}
           </nav>
-          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-600">
+          <div className="mt-4 hidden rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-600 lg:block">
             <p className="font-medium text-slate-800">{t("labAlphaTitle")}</p>
             <p className="mt-1">{t("labAlphaDescription")}</p>
           </div>

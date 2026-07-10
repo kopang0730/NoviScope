@@ -80,7 +80,7 @@ export function ResearchPhasePath({
   }
 
   return (
-    <nav aria-label={t("researchCanvasTitle")}>
+    <nav aria-label={t("researchCanvasTitle")} id="research-phase-path">
       <ol className="grid gap-3 md:grid-cols-5">
         {phases.map((phase, index) => {
           const presentation = buildMacroPhasePresentation(
@@ -134,6 +134,11 @@ export function ResearchPhasePath({
                 <span className="mt-auto flex flex-wrap gap-1.5 pt-3">
                   {phase.agents.map((agent) => (
                     <span
+                      aria-label={`${agent.displayName}: ${
+                        agent.status === "planned"
+                          ? t("canvasRolePlanned")
+                          : t("canvasRoleImplemented")
+                      }`}
                       aria-disabled={agent.status === "planned" ? "true" : undefined}
                       className={[
                         "inline-flex min-h-6 items-center gap-1 rounded border px-2 py-1 text-xs",
@@ -142,6 +147,7 @@ export function ResearchPhasePath({
                           : "border-teal-200 bg-teal-50 text-teal-800",
                       ].join(" ")}
                       key={agent.agentId}
+                      role="status"
                     >
                       {agent.displayName}
                       <span className="font-semibold">

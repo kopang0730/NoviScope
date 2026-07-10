@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from sqlmodel import Session
 
 from noviscope.api.artifacts import router as artifacts_router
+from noviscope.api.auth_session import router as auth_session_router
 from noviscope.api.demand_review import router as demand_review_router
 from noviscope.api.dependencies import get_session
 from noviscope.api.evidence_ledger import router as evidence_ledger_router
@@ -42,6 +43,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
     app = FastAPI(title=settings.app_name, lifespan=lifespan)
     app.include_router(router)
     app.include_router(artifacts_router)
+    app.include_router(auth_session_router)
     app.include_router(demand_review_router)
     app.include_router(evidence_ledger_router)
     app.include_router(experiment_setup_router)

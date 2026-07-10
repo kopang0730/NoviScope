@@ -134,7 +134,7 @@ export function CreateQuestPage() {
         </pre>
       </aside>
       <details className="rounded-lg border border-slate-200 bg-white p-5 shadow-panel xl:hidden">
-        <summary className="cursor-pointer text-sm font-semibold text-slate-900">{t("initialDirectionPreview")}</summary>
+        <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-slate-900">{t("initialDirectionPreview")}</summary>
         <pre className="mt-4 max-h-[420px] overflow-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-950 p-4 text-xs leading-6 text-slate-100">
           {preview}
         </pre>
