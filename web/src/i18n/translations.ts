@@ -112,6 +112,49 @@ const en = {
   createAccount: "Create Account",
   created: "Created",
   currentQuest: "Current quest",
+  workflowActionConfigureProvider: "Configure provider",
+  workflowActionNoPending: "No pending action",
+  workflowActionProviderDefault: "Use workflow default",
+  workflowActionProviderOverride: "Provider override",
+  workflowActionProviderPersonal: "Personal",
+  workflowActionProviderShared: "Shared",
+  workflowActionReasonDemandEvidenceReviewRequired:
+    "Demand evidence must be reviewed before downstream work can continue.",
+  workflowActionReasonDemandValidationIncomplete:
+    "Demand validation must complete before this stage can run.",
+  workflowActionReasonDemandValidationReviewRequired:
+    "Demand validation requires review before this stage can run.",
+  workflowActionReasonExperimentPlannerReviewRequired:
+    "The experiment plan requires review before paper preparation can continue.",
+  workflowActionReasonExperimentPrerequisitesIncomplete:
+    "Experiment prerequisites must complete before this stage can run.",
+  workflowActionReasonGapPrerequisitesIncomplete:
+    "Literature and gap prerequisites must complete before this stage can run.",
+  workflowActionReasonHumanReviewRequired:
+    "Human review is required before the workflow can continue.",
+  workflowActionReasonInactiveProvider: "The configured provider is inactive.",
+  workflowActionReasonMissingExperimentInputs:
+    "Required experiment inputs are missing.",
+  workflowActionReasonMissingProvider: "A compatible provider must be configured.",
+  workflowActionReasonPaperPrerequisitesIncomplete:
+    "Paper prerequisites must complete before this stage can run.",
+  workflowActionReasonReady: "The stage is ready to run.",
+  workflowActionReasonRunnerError: "The previous stage run failed and requires inspection.",
+  workflowActionReasonRunnerNotImplemented: "This stage runner is not implemented yet.",
+  workflowActionReasonStageAlreadyComplete: "This stage is already complete.",
+  workflowActionReasonStageAlreadyRunning:
+    "Wait for the current stage run to finish before taking another action.",
+  workflowActionReasonUnsupportedProvider:
+    "The configured provider is not compatible with this stage.",
+  workflowActionResolveBlocker: "Resolve blocker",
+  workflowActionResponsibleAgent: "Responsible agent",
+  workflowActionResponsibleResearcher: "Responsible: Researcher",
+  workflowActionResponsibleSupervisor: "Responsible: Researcher or supervisor",
+  workflowActionReviewStage: "Human review",
+  workflowActionRunStage: "Run agent",
+  workflowActionTrustSummary: "Authoritative workflow gate",
+  workflowActionViewDetail: "View evidence and details",
+  workflowActionWaitForStage: "Wait for stage",
   dataAvailabilityStatus: "Data status",
   datasetsNeeded: "Datasets needed",
   displayName: "Display Name",
@@ -352,6 +395,9 @@ const en = {
   questScenarioPlaceholder: "Education company reuses completed exam sheets and needs to remove student handwriting.",
   questSearch: "Search",
   questSearchPlaceholder: "Search quests...",
+  questRailCollapse: "Hide quests",
+  questRailExpand: "Show quests",
+  questSelector: "Quest",
   questSignInPrompt: "Sign in to load quest data from the API.",
   questStatus: "Status",
   questSubmitHint: "The structured answers will be saved into Initial Research Direction for the first agent stage.",
@@ -660,6 +706,46 @@ const zh: Record<keyof typeof en, string> = {
   createAccount: "创建账号",
   created: "创建时间",
   currentQuest: "当前 Quest",
+  workflowActionConfigureProvider: "配置模型服务商",
+  workflowActionNoPending: "暂无待处理动作",
+  workflowActionProviderDefault: "使用工作流默认配置",
+  workflowActionProviderOverride: "本次运行的模型服务商",
+  workflowActionProviderPersonal: "个人",
+  workflowActionProviderShared: "课题组共享",
+  workflowActionReasonDemandEvidenceReviewRequired:
+    "必须先复核需求证据，才能继续下游工作。",
+  workflowActionReasonDemandValidationIncomplete:
+    "必须先完成需求验证，才能运行此阶段。",
+  workflowActionReasonDemandValidationReviewRequired:
+    "需求验证必须通过复核，才能运行此阶段。",
+  workflowActionReasonExperimentPlannerReviewRequired:
+    "实验计划必须通过复核，才能继续准备论文。",
+  workflowActionReasonExperimentPrerequisitesIncomplete:
+    "必须先完成实验前置阶段，才能运行此阶段。",
+  workflowActionReasonGapPrerequisitesIncomplete:
+    "必须先完成文献与研究空白分析，才能运行此阶段。",
+  workflowActionReasonHumanReviewRequired:
+    "必须完成人工复核，才能继续工作流。",
+  workflowActionReasonInactiveProvider: "当前配置的模型服务商未启用。",
+  workflowActionReasonMissingExperimentInputs: "缺少必需的实验输入。",
+  workflowActionReasonMissingProvider: "必须先配置兼容的模型服务商。",
+  workflowActionReasonPaperPrerequisitesIncomplete:
+    "必须先完成论文写作的前置阶段，才能运行此阶段。",
+  workflowActionReasonReady: "此阶段已可运行。",
+  workflowActionReasonRunnerError: "上次阶段运行失败，需要检查后再继续。",
+  workflowActionReasonRunnerNotImplemented: "此阶段的自动运行能力尚未实现。",
+  workflowActionReasonStageAlreadyComplete: "此阶段已经完成。",
+  workflowActionReasonStageAlreadyRunning: "请等待当前阶段运行完成后再执行下一步。",
+  workflowActionReasonUnsupportedProvider: "当前模型服务商与此阶段不兼容。",
+  workflowActionResolveBlocker: "解除阻塞",
+  workflowActionResponsibleAgent: "负责智能体",
+  workflowActionResponsibleResearcher: "负责人：研究人员",
+  workflowActionResponsibleSupervisor: "负责人：研究人员或导师",
+  workflowActionReviewStage: "人工复核",
+  workflowActionRunStage: "运行智能体",
+  workflowActionTrustSummary: "后端权威工作流关卡",
+  workflowActionViewDetail: "查看证据与详情",
+  workflowActionWaitForStage: "等待阶段完成",
   dataAvailabilityStatus: "数据状态",
   datasetsNeeded: "所需数据集",
   displayName: "显示名称",
@@ -900,6 +986,9 @@ const zh: Record<keyof typeof en, string> = {
   questScenarioPlaceholder: "教培企业想复用已填写试卷，需要擦除学生手写内容。",
   questSearch: "搜索",
   questSearchPlaceholder: "搜索 Quest...",
+  questRailCollapse: "收起课题列表",
+  questRailExpand: "展开课题列表",
+  questSelector: "选择 Quest",
   questSignInPrompt: "登录后从 API 加载 Quest 数据。",
   questStatus: "状态",
   questSubmitHint: "这些结构化回答会汇总保存到 Initial Research Direction，供第一个 agent 阶段使用。",

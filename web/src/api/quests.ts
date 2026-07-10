@@ -31,7 +31,7 @@ export type UpdateStagePayload = {
 };
 
 export type RunStagePayload = {
-  provider_id?: string;
+  readonly provider_id?: string;
 };
 
 export async function getQuests() {
