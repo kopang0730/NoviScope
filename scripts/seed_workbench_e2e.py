@@ -1,6 +1,8 @@
 import argparse
 from collections.abc import Sequence
+from ipaddress import ip_address
 from typing import Final
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, SecretStr
 from sqlalchemy import inspect, select
@@ -30,6 +32,7 @@ QUEST_DIRECTION: Final = (
     "Analyze badminton movement and shuttle trajectories for coaching support. "
     "Treat the demand as unverified until a human reviews real user evidence."
 )
+LOOPBACK_PROVIDER_SCHEMES: Final = frozenset({"http", "https"})
 
 
 class E2ESeedError(RuntimeError):
@@ -59,11 +62,32 @@ def _contains_noviscope_data(engine: Engine) -> bool:
     return False
 
 
+def _is_loopback_provider_url(provider_base_url: str) -> bool:
+    try:
+        parsed_url = urlsplit(provider_base_url)
+        hostname = parsed_url.hostname
+        _validated_port = parsed_url.port
+    except ValueError:
+        return False
+
+    if parsed_url.scheme not in LOOPBACK_PROVIDER_SCHEMES or hostname is None:
+        return False
+    normalized_hostname = hostname.rstrip(".").lower()
+    if normalized_hostname == "localhost":
+        return True
+    try:
+        return ip_address(normalized_hostname).is_loopback
+    except ValueError:
+        return False
+
+
 def seed_workbench_e2e(
     database_url: str,
     provider_base_url: str,
     provider_secret_key: SecretStr,
 ) -> SeededIds:
+    if not _is_loopback_provider_url(provider_base_url):
+        raise E2ESeedError("E2E provider base URL must use HTTP(S) on a loopback host")
     if not is_sqlite_database_url(database_url):
         raise E2ESeedError("E2E seeding accepts SQLite database URLs only")
 

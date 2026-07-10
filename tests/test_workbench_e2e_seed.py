@@ -33,6 +33,52 @@ def test_seed_rejects_non_sqlite_database_urls() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "provider_base_url",
+    [
+        "https://api.anthropic.com/v1",
+        "http://10.0.0.8:8999/v1",
+        "http://192.168.1.20:8999/v1",
+        "http://172.16.0.4:8999/v1",
+    ],
+)
+def test_seed_rejects_non_loopback_provider_urls_before_database_mutation(
+    tmp_path: Path,
+    provider_base_url: str,
+) -> None:
+    database_path = tmp_path / "external-provider.db"
+
+    with pytest.raises(E2ESeedError, match="loopback"):
+        seed_workbench_e2e(
+            sqlite_url(database_path),
+            provider_base_url,
+            PROVIDER_SECRET,
+        )
+
+    assert database_path.exists() is False
+
+
+@pytest.mark.parametrize(
+    "provider_base_url",
+    [
+        "http://localhost:8999/v1",
+        "https://127.0.0.2:8999/v1",
+        "http://[::1]:8999/v1",
+    ],
+)
+def test_seed_accepts_http_loopback_provider_urls(
+    tmp_path: Path,
+    provider_base_url: str,
+) -> None:
+    database_url = sqlite_url(tmp_path / f"loopback-{provider_base_url.count(':')}.db")
+
+    seed_workbench_e2e(database_url, provider_base_url, PROVIDER_SECRET)
+
+    with Session(create_db_engine(database_url)) as session:
+        providers = list(session.exec(select(ModelProvider)).all())
+    assert {provider.base_url for provider in providers} == {provider_base_url}
+
+
 def test_seed_refuses_a_database_that_already_contains_users(tmp_path: Path) -> None:
     database_url = sqlite_url(tmp_path / "refusal.db")
     seed_workbench_e2e(database_url, PROVIDER_BASE_URL, PROVIDER_SECRET)
