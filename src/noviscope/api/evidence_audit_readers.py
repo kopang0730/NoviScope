@@ -75,7 +75,12 @@ def has_recorded_human_demand_evidence(stage: StageCard) -> bool:
     verdict = stage.evidence_payload.get("human_demand_verdict")
     if not isinstance(verdict, str) or verdict not in ACCEPTED_HUMAN_DEMAND_VERDICTS:
         return False
-    return bool(read_payload_refs(stage.evidence_payload, "human_demand_sources"))
+
+    sources = stage.evidence_payload.get("human_demand_sources")
+    if not isinstance(sources, list):
+        return False
+
+    return any(isinstance(source, str) and source.strip() for source in sources)
 
 
 def verified_experiment_result_records(stage: StageCard) -> tuple[JsonObject, ...]:
@@ -210,7 +215,7 @@ def audit_artifact_uri_is_valid(value: JsonValue | None) -> bool:
             normalized = uri.strip()
             if (
                 not normalized.startswith("/")
-                or normalized.startswith("//")
+                or "//" in normalized
                 or "\x00" in normalized
             ):
                 return False

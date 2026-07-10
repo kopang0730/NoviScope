@@ -45,8 +45,8 @@ def test_evidence_auditor_rejects_non_finite_snapshot_without_a_real_fingerprint
     evidence_payload: dict[str, JsonValue] = {
         "audit_artifact_uri": "/data/noviscope/audits/non-finite.json",
         "audit_policy_version": EVIDENCE_AUDIT_POLICY_VERSION,
-        "claim_reference_alignment": "verified",
-        "experiment_claim_alignment": "verified",
+        "claim_reference_alignment": True,
+        "experiment_claim_alignment": True,
     }
     if include_null_fingerprint:
         evidence_payload[EVIDENCE_AUDIT_FINGERPRINT_KEY] = None
@@ -69,6 +69,8 @@ def test_evidence_auditor_rejects_non_finite_snapshot_without_a_real_fingerprint
         "../audit.json",
         "javascript:alert(1)",
         "//remote-host/audit.json",
+        "/data//audit.json",
+        "/data/\x00/audit.json",
         "/data/../secrets.json",
     ],
 )
@@ -88,8 +90,8 @@ def test_evidence_auditor_rejects_non_local_or_traversing_artifact_uri(
         evidence_payload={
             "audit_artifact_uri": artifact_uri,
             "audit_policy_version": EVIDENCE_AUDIT_POLICY_VERSION,
-            "claim_reference_alignment": "verified",
-            "experiment_claim_alignment": "verified",
+            "claim_reference_alignment": True,
+            "experiment_claim_alignment": True,
             EVIDENCE_AUDIT_FINGERPRINT_KEY: fingerprint,
         },
         human_approved=True,
