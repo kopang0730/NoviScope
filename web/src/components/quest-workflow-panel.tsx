@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import type { Quest, StageCard } from "../api/types";
+import type { Quest, StageCard, WorkflowAgentCapability } from "../api/types";
+import { getWorkflowCapabilities } from "../api/workflow";
+import { getErrorMessage } from "../api/client";
 import { Badge } from "./badge";
 import { Button, buttonClassName } from "./button";
 import { Card, CardHeading } from "./card";
@@ -37,7 +39,38 @@ export function QuestWorkflowPanel({
 }) {
   const { t } = useI18n();
   const [viewMode, setViewMode] = useState<"canvas" | "list">("canvas");
+  const [capabilities, setCapabilities] = useState<readonly WorkflowAgentCapability[]>([]);
+  const [capabilitiesError, setCapabilitiesError] = useState<string | null>(null);
+  const [capabilitiesLoading, setCapabilitiesLoading] = useState(true);
   const providerReadinessData = useProviderReadinessData();
+
+  useEffect(() => {
+    let active = true;
+    void getWorkflowCapabilities()
+      .then((nextCapabilities) => {
+        if (active) {
+          setCapabilities(nextCapabilities);
+        }
+      })
+      .catch((error) => {
+        if (!active) {
+          return;
+        }
+        if (error instanceof Error) {
+          setCapabilitiesError(getErrorMessage(error));
+          return;
+        }
+        throw error;
+      })
+      .finally(() => {
+        if (active) {
+          setCapabilitiesLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <Card className="min-w-0">
@@ -106,15 +139,23 @@ export function QuestWorkflowPanel({
           ) : (
             <>
               <WorkflowProviderReadinessNotice readinessData={providerReadinessData} stages={stages} />
-              {viewMode === "canvas" ? (
+              {viewMode === "canvas" && capabilitiesError ? (
+                <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                  {capabilitiesError}
+                </p>
+              ) : null}
+              {viewMode === "canvas" && capabilitiesLoading ? (
+                <p className="text-sm text-slate-500">{t("loadingQuestDetail")}</p>
+              ) : null}
+              {viewMode === "canvas" && !capabilitiesError && !capabilitiesLoading ? (
                 <ResearchCanvas
+                  capabilities={capabilities}
+                  nextAction={null}
                   onRunStage={onRunStage}
                   providerReadinessData={providerReadinessData}
-                  runningStageId={runningStageId}
-                  selectedQuest={selectedQuest}
                   stages={stages}
                 />
-              ) : (
+              ) : viewMode === "list" ? (
                 <div className="space-y-3">
                   {stages.map((stage, index) => {
                     const stageRunGate = getStageRunGate({
@@ -166,7 +207,7 @@ export function QuestWorkflowPanel({
                     );
                   })}
                 </div>
-              )}
+              ) : null}
             </>
           )}
         </div>

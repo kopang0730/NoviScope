@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { getErrorMessage } from "../api/client";
+import { getAgentAssignments } from "../api/agent-assignments";
 import { getProviders } from "../api/providers";
 import { getQuest, getQuestStages, getQuests, runStage } from "../api/quests";
 import type {
+  AgentAssignment,
   Provider,
   Quest,
   StageCard,
@@ -22,9 +24,11 @@ import { CanvasReviewPacketButton } from "../components/canvas-review-packet-but
 import { Card } from "../components/card";
 import { Input, Select } from "../components/input";
 import { QuestNextActionStrip } from "../components/quest-next-action-strip";
+import { ResearchCanvas } from "../components/research-canvas";
 import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
-import { questTone, stageTone } from "../lib/status-tones";
+import type { ProviderReadinessData } from "../lib/provider-readiness-data";
+import { questTone } from "../lib/status-tones";
 
 function directionSummary(value: string) {
   const normalized = value.replace(/\s+/g, " ").trim();
@@ -45,6 +49,7 @@ export function CanvasWorkspacePage() {
   const [nextActions, setNextActions] = useState<readonly WorkflowNextAction[]>([]);
   const [capabilities, setCapabilities] = useState<readonly WorkflowAgentCapability[]>([]);
   const [providers, setProviders] = useState<readonly Provider[]>([]);
+  const [assignments, setAssignments] = useState<readonly AgentAssignment[]>([]);
   const [runningStageId, setRunningStageId] = useState<string | null>(null);
   const [stageRunError, setStageRunError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -60,6 +65,7 @@ export function CanvasWorkspacePage() {
       setNextActions([]);
       setCapabilities([]);
       setProviders([]);
+      setAssignments([]);
       setQuestsError(null);
       setQuestsLoading(false);
       return;
@@ -109,6 +115,7 @@ export function CanvasWorkspacePage() {
       setNextActions([]);
       setCapabilities([]);
       setProviders([]);
+      setAssignments([]);
       setDetailError(null);
       setStageRunError(null);
       setDetailLoading(false);
@@ -124,6 +131,7 @@ export function CanvasWorkspacePage() {
     setNextActions([]);
     setCapabilities([]);
     setProviders([]);
+    setAssignments([]);
 
     void Promise.all([
       getQuest(selectedQuestId),
@@ -132,8 +140,9 @@ export function CanvasWorkspacePage() {
       getWorkflowCapabilities(),
       getWorkflowCanvasTemplate(),
       getProviders(),
+      getAgentAssignments(),
     ])
-      .then(([quest, questStages, nextActionResponse, agentCapabilities, , visibleProviders]) => {
+      .then(([quest, questStages, nextActionResponse, agentCapabilities, , visibleProviders, agentAssignments]) => {
         if (!active) {
           return;
         }
@@ -142,6 +151,7 @@ export function CanvasWorkspacePage() {
         setNextActions(nextActionResponse.actions);
         setCapabilities(agentCapabilities);
         setProviders(visibleProviders);
+        setAssignments(agentAssignments);
       })
       .catch((error) => {
         if (!active) {
@@ -152,6 +162,7 @@ export function CanvasWorkspacePage() {
         setNextActions([]);
         setCapabilities([]);
         setProviders([]);
+        setAssignments([]);
         setDetailError(getErrorMessage(error));
       })
       .finally(() => {
@@ -164,6 +175,17 @@ export function CanvasWorkspacePage() {
       active = false;
     };
   }, [currentUser, selectedQuestId]);
+
+  const providerReadinessData: ProviderReadinessData = useMemo(
+    () => ({
+      assignments,
+      error: null,
+      loaded: !detailLoading,
+      loading: detailLoading,
+      providers,
+    }),
+    [assignments, detailLoading, providers],
+  );
 
   async function handleRunStage(stageId: string, providerId?: string) {
     if (!selectedQuest) {
@@ -333,42 +355,13 @@ export function CanvasWorkspacePage() {
                 runningStageId={runningStageId}
               />
 
-              <section aria-labelledby="workflow-stage-records-title">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-base font-semibold text-slate-900" id="workflow-stage-records-title">
-                    {t("workflowTitle")}
-                  </h2>
-                  <Badge tone="gray">{stages.length}</Badge>
-                </div>
-                {stages.length === 0 ? (
-                  <p className="mt-3 border-t border-dashed border-slate-300 py-5 text-sm text-slate-500">
-                    {t("noStagesFound")}
-                  </p>
-                ) : (
-                  <ul className="mt-3 divide-y divide-slate-200 border-y border-slate-200">
-                    {stages.map((stage) => (
-                      <li
-                        className="flex min-w-0 flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between"
-                        key={stage.id}
-                      >
-                        <div className="min-w-0">
-                          <p className="break-words text-sm font-medium text-slate-900">{stage.title}</p>
-                          <p className="mt-1 break-all text-xs text-slate-500">{stage.agent_id}</p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <Badge tone={stageTone(stage.status)}>{labelFromEnum(stage.status)}</Badge>
-                          <Link
-                            className={buttonClassName({ className: "min-h-11", variant: "secondary" })}
-                            to={`/stages/${stage.id}?quest=${selectedQuest.id}`}
-                          >
-                            {t("open")}
-                          </Link>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
+              <ResearchCanvas
+                capabilities={capabilities}
+                nextAction={nextActions[0] ?? null}
+                onRunStage={(stageId, providerId) => void handleRunStage(stageId, providerId)}
+                providerReadinessData={providerReadinessData}
+                stages={stages}
+              />
             </div>
           ) : null}
         </Card>

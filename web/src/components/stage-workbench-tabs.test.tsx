@@ -1,0 +1,137 @@
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Provider, StageCard } from "../api/types";
+import { I18nProvider } from "../i18n/i18n-context";
+import type { ProviderReadinessData } from "../lib/provider-readiness-data";
+import { StageWorkbenchTabs } from "./stage-workbench-tabs";
+
+const provider: Provider = {
+  base_url: "https://model.example.com/v1",
+  created_at: "2026-07-10T00:00:00Z",
+  default_model: "research-model",
+  id: "provider-1",
+  is_active: true,
+  kind: "openai_compatible",
+  name: "Lab Model",
+  owner_user_id: null,
+  scope: "shared",
+  updated_at: "2026-07-10T00:00:00Z",
+};
+
+const providerReadinessData: ProviderReadinessData = {
+  assignments: [],
+  error: null,
+  loaded: true,
+  loading: false,
+  providers: [provider],
+};
+
+function stage(overrides: Partial<StageCard> = {}): StageCard {
+  return {
+    agent_id: "demand_validator",
+    confidence: "high",
+    created_at: "2026-07-10T00:00:00Z",
+    evidence_payload: {
+      human_demand_sources: ["Customer interview"],
+      source_policy: "human_reviewed_sources",
+    },
+    human_approved: null,
+    id: "stage-1",
+    input_payload: { research_direction: "Reliable document restoration" },
+    output_payload: {
+      demand_assessment: "plausible",
+      real_world_scenario: "Education teams reuse marked worksheets.",
+    },
+    quest_id: "quest-1",
+    review_notes: "Review dataset ownership.",
+    status: "complete",
+    summary: "Demand evidence is ready for review.",
+    title: "Demand Validator",
+    updated_at: "2026-07-10T00:00:00Z",
+    ...overrides,
+  };
+}
+
+function renderTabs(currentStage: StageCard, onRunStage = vi.fn()) {
+  return render(
+    <MemoryRouter>
+      <I18nProvider>
+        <StageWorkbenchTabs
+          mode="compact"
+          onRunStage={onRunStage}
+          providerReadinessData={providerReadinessData}
+          stage={currentStage}
+          stages={[currentStage]}
+        />
+      </I18nProvider>
+    </MemoryRouter>,
+  );
+}
+
+describe("StageWorkbenchTabs", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  beforeEach(() => {
+    window.localStorage.setItem("noviscope-language", "en");
+  });
+
+  it("shows only meaningful tabs for an implemented review and output stage", () => {
+    renderTabs(stage());
+
+    expect(screen.getByRole("tab", { name: "Overview" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Evidence" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Run" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Review" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Artifacts" })).toBeInTheDocument();
+  });
+
+  it("keeps unavailable tabs out of a planned stage inspector", () => {
+    renderTabs(
+      stage({
+        agent_id: "code_runner",
+        evidence_payload: {},
+        output_payload: {},
+        status: "pending",
+        summary: "",
+        title: "Code Runner",
+      }),
+    );
+
+    expect(screen.getAllByRole("tab")).toHaveLength(1);
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("tab", { name: "Evidence" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Run" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Review" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Artifacts" })).not.toBeInTheDocument();
+  });
+
+  it("renders only the active tabpanel and keeps Advanced closed", async () => {
+    const user = userEvent.setup();
+    renderTabs(stage());
+
+    expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
+    expect(screen.getByRole("tabpanel", { name: "Overview" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Evidence" }));
+
+    expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
+    expect(screen.getByRole("tabpanel", { name: "Evidence" })).toBeInTheDocument();
+    expect(screen.queryByRole("tabpanel", { name: "Overview" })).not.toBeInTheDocument();
+    expect(screen.getByText("Advanced").closest("details")).not.toHaveAttribute("open");
+  });
+
+  it("runs the selected implemented stage from the Run panel", async () => {
+    const user = userEvent.setup();
+    const onRunStage = vi.fn();
+    renderTabs(stage({ status: "pending" }), onRunStage);
+
+    await user.click(screen.getByRole("tab", { name: "Run" }));
+    await user.click(screen.getByRole("button", { name: "Run stage" }));
+
+    expect(onRunStage).toHaveBeenCalledWith("stage-1", undefined);
+  });
+});
