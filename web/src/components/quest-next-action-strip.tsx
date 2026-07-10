@@ -16,6 +16,7 @@ import { Select } from "./input";
 type QuestNextActionStripProps = {
   readonly actions: readonly WorkflowNextAction[];
   readonly capabilities: readonly WorkflowAgentCapability[];
+  readonly currentUserId: string | null;
   readonly onRun: (stageId: string, providerId?: string) => void;
   readonly providers: readonly Provider[];
   readonly questId: string;
@@ -25,6 +26,7 @@ type QuestNextActionStripProps = {
 export function QuestNextActionStrip({
   actions,
   capabilities,
+  currentUserId,
   onRun,
   providers,
   questId,
@@ -56,7 +58,7 @@ export function QuestNextActionStrip({
   const view = buildWorkflowActionView(action, language);
   const stagePath = `/stages/${action.stage_id}?quest=${questId}`;
   const supportsProviderOverride = supportsWorkflowProviderOverride(action, capabilities);
-  const overrideProviders = getActivePersonalProviders(providers);
+  const overrideProviders = getActivePersonalProviders(providers, currentUserId);
 
   const primaryCommand = (() => {
     switch (view.command) {

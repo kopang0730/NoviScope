@@ -106,6 +106,18 @@ def approve_completed_demand_stage(client: TestClient, stage_id: str) -> None:
     assert response.status_code == 200
 
 
+def approve_completed_demand_without_evidence(client: TestClient, stage_id: str) -> None:
+    complete_demand_stage(client, stage_id)
+    response = client.patch(
+        f"/stages/{stage_id}",
+        json={
+            "human_approved": True,
+            "review_notes": "Demand approved, but the evidence source still needs recording.",
+        },
+    )
+    assert response.status_code == 200
+
+
 def reject_completed_demand_stage(client: TestClient, stage_id: str) -> None:
     complete_demand_stage(client, stage_id)
     response = client.post(
@@ -183,6 +195,32 @@ def test_workflow_next_actions_skips_approved_completed_stage(
         "stage_status": "pending",
         "stage_title": "Literature scout",
     }
+
+
+def test_workflow_next_actions_routes_missing_demand_evidence_to_demand_stage(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'next-actions-demand-evidence.db'}")
+    with TestClient(app) as client:
+        # Given: demand was approved without recording the evidence source required downstream.
+        register_and_login(client, "NEXT-ACTIONS-EVIDENCE", "next-actions-evidence@example.com")
+        create_personal_provider(client)
+        quest_id, demand_stage_id = create_quest(client)
+        approve_completed_demand_without_evidence(client, demand_stage_id)
+
+        # When: the workbench asks where the blocker can be resolved.
+        response = client.get(f"/quests/{quest_id}/workflow-next-actions")
+
+    # Then: the action opens Demand validation, where the evidence can actually be recorded.
+    assert response.status_code == 200
+    action = response.json()["actions"][0]
+    assert action["action_type"] == "resolve_blocker"
+    assert action["agent_id"] == DEMAND_VALIDATOR_AGENT_ID
+    assert action["blocking_reason"] == "demand_evidence_review_required"
+    assert action["stage_id"] == demand_stage_id
+    assert action["stage_status"] == "complete"
+    assert action["stage_title"] == "Demand validation"
 
 
 def test_workflow_next_actions_routes_rejected_demand_to_recovery_blocker(

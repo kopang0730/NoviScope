@@ -98,6 +98,7 @@ function renderCard(
       <StageNextActionCard
         action={action}
         capabilities={[workflowCapability]}
+        currentUserId="user-1"
         onNavigate={vi.fn()}
         onRun={onRun}
         providers={providers}

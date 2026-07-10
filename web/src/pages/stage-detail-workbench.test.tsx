@@ -209,4 +209,24 @@ describe("StageDetailPage shared workbench", () => {
     expect(screen.queryByText("Stage run completed")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: secondStage.title })).toBeInTheDocument();
   });
+
+  it("opens the Evidence tab when the stage URL targets the evidence hash", async () => {
+    render(
+      <MemoryRouter initialEntries={["/stages/stage-1?quest=quest-1#evidence"]}>
+        <AuthProvider>
+          <I18nProvider>
+            <Routes>
+              <Route element={<StageDetailPage />} path="/stages/:stageId" />
+            </Routes>
+          </I18nProvider>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("tab", { name: "Evidence" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("tabpanel", { name: "Evidence" })).toBeInTheDocument();
+  });
 });

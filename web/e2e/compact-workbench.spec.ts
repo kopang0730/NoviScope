@@ -232,6 +232,10 @@ test.describe.serial("compact Canvas workbench", () => {
     ).toBeVisible();
     await page.getByRole("link", { name: "查看证据与详情" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Demand validation" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "证据" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     await captureState(page, testInfo, "zh-stage-detail");
     await assertPageQuality(page, testInfo, "zh-stage-detail");
   });

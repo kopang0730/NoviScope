@@ -20,6 +20,13 @@ const personalProvider: Provider = {
   updated_at: "2026-07-10T00:00:00Z",
 };
 
+const otherUserProvider: Provider = {
+  ...personalProvider,
+  id: "other-user-provider",
+  name: "Other User Model",
+  owner_user_id: "user-2",
+};
+
 const sharedProvider: Provider = {
   base_url: "https://model.example.com/v1",
   created_at: "2026-07-10T00:00:00Z",
@@ -38,7 +45,7 @@ const providerReadinessData: ProviderReadinessData = {
   error: null,
   loaded: true,
   loading: false,
-  providers: [sharedProvider, personalProvider],
+  providers: [sharedProvider, personalProvider, otherUserProvider],
 };
 
 function stage(overrides: Partial<StageCard> = {}): StageCard {
@@ -72,15 +79,19 @@ function renderTabs(
   onRunStage = vi.fn(),
   mode: "compact" | "full" = "compact",
   onStageChange = vi.fn(),
+  readinessData = providerReadinessData,
+  runningStageId: string | null = null,
 ) {
   return render(
     <MemoryRouter>
       <I18nProvider>
         <StageWorkbenchTabs
+          currentUserId="user-1"
           mode={mode}
           onRunStage={onRunStage}
           onStageChange={onStageChange}
-          providerReadinessData={providerReadinessData}
+          providerReadinessData={readinessData}
+          runningStageId={runningStageId}
           stage={currentStage}
           stages={[currentStage]}
         />
@@ -150,6 +161,7 @@ describe("StageWorkbenchTabs", () => {
 
     await user.click(screen.getByRole("tab", { name: "Run" }));
     expect(screen.getByRole("option", { name: "Personal Lab Model" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Other User Model" })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Shared Lab Model" })).not.toBeInTheDocument();
     await user.selectOptions(
       screen.getByRole("combobox", { name: "Provider override" }),
@@ -158,6 +170,49 @@ describe("StageWorkbenchTabs", () => {
     await user.click(screen.getByRole("button", { name: "Run stage" }));
 
     expect(onRunStage).toHaveBeenCalledWith("stage-1", "personal-provider");
+  });
+
+  it("allows an owned personal override when the shared default is inactive", async () => {
+    const user = userEvent.setup();
+    const inactiveSharedProvider = { ...sharedProvider, is_active: false };
+    renderTabs(
+      stage({ status: "pending" }),
+      vi.fn(),
+      "compact",
+      vi.fn(),
+      {
+        ...providerReadinessData,
+        assignments: [{
+          agent_id: "demand_validator",
+          display_name: "Demand Validator",
+          effective_model: "research-model",
+          model_name: null,
+          provider_id: inactiveSharedProvider.id,
+          provider_is_active: false,
+          provider_kind: inactiveSharedProvider.kind,
+          provider_name: inactiveSharedProvider.name,
+        }],
+        providers: [inactiveSharedProvider, personalProvider],
+      },
+    );
+
+    await user.click(screen.getByRole("tab", { name: "Run" }));
+    expect(screen.getByRole("button", { name: "Run stage" })).toBeDisabled();
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Provider override" }),
+      personalProvider.id,
+    );
+
+    expect(screen.getByRole("button", { name: "Run stage" })).toBeEnabled();
+  });
+
+  it("disables the Run panel action while the stage is already in flight", async () => {
+    const user = userEvent.setup();
+    renderTabs(stage({ status: "pending" }), vi.fn(), "compact", vi.fn(), providerReadinessData, "stage-1");
+
+    await user.click(screen.getByRole("tab", { name: "Run" }));
+
+    expect(screen.getByRole("button", { name: "Working..." })).toBeDisabled();
   });
 
   it("keeps compact Artifacts read-only and links to Stage Detail", async () => {

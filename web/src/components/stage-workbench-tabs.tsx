@@ -29,12 +29,15 @@ import { StageRunSummary } from "./stage-run-summary";
 export type StageWorkbenchTabId = "overview" | "evidence" | "run" | "review" | "artifacts";
 
 export type StageWorkbenchTabsProps = {
+  readonly currentUserId: string | null;
+  readonly initialTabId?: StageWorkbenchTabId;
   readonly mode: "compact" | "full";
   readonly onRunStage: (stageId: string, providerId?: string) => void;
   readonly onStageChange?: (stage: StageCard) => void;
   readonly stage: StageCard;
   readonly stages: readonly StageCard[];
   readonly providerReadinessData: ProviderReadinessData;
+  readonly runningStageId: string | null;
 };
 
 type TabDefinition = {
@@ -55,7 +58,7 @@ function isTabAvailable(tabId: StageWorkbenchTabId, stage: StageCard) {
     case "overview":
       return true;
     case "evidence":
-      return hasStageEvidence(stage);
+      return isImplementedStageRole(stage) || hasStageEvidence(stage);
     case "run":
       return isImplementedStageRole(stage);
     case "review":
@@ -91,16 +94,21 @@ function AdvancedPayloads({ stage }: { readonly stage: StageCard }) {
 }
 
 export function StageWorkbenchTabs({
+  currentUserId,
+  initialTabId = "overview",
   mode,
   onRunStage,
   onStageChange,
   providerReadinessData,
+  runningStageId,
   stage,
   stages,
 }: StageWorkbenchTabsProps) {
   const { t } = useI18n();
   const instanceId = useId();
-  const [activeTabId, setActiveTabId] = useState<StageWorkbenchTabId>("overview");
+  const [activeTabId, setActiveTabId] = useState<StageWorkbenchTabId>(() =>
+    isTabAvailable(initialTabId, stage) ? initialTabId : "overview",
+  );
   const [currentStage, setCurrentStage] = useState(stage);
   const [selectedProviderId, setSelectedProviderId] = useState("");
   const isCurrentStage = useAsyncSelectionGuard(stage.id);
@@ -111,16 +119,30 @@ export function StageWorkbenchTabs({
     stage: currentStage,
     stages,
   });
-  const overrideProviders = getActivePersonalProviders(providerReadinessData.providers);
+  const overrideProviders = getActivePersonalProviders(
+    providerReadinessData.providers,
+    currentUserId,
+  );
+  const selectedOverrideReady = overrideProviders.some(
+    (provider) => provider.id === selectedProviderId,
+  );
+  const selectedOverrideCanRun =
+    stageRunGate.workflowReadiness.canRun
+    && providerReadinessData.loaded
+    && !providerReadinessData.loading
+    && !providerReadinessData.error
+    && selectedOverrideReady;
+  const canRun = selectedProviderId ? selectedOverrideCanRun : stageRunGate.canRun;
+  const isRunning = runningStageId === currentStage.id;
 
   useEffect(() => {
     setCurrentStage(stage);
   }, [stage]);
 
   useEffect(() => {
-    setActiveTabId("overview");
+    setActiveTabId(isTabAvailable(initialTabId, stage) ? initialTabId : "overview");
     setSelectedProviderId("");
-  }, [stage.id]);
+  }, [initialTabId, stage]);
 
   function handleStageChange(nextStage: StageCard) {
     if (!isCurrentStage() || nextStage.id !== stage.id) {
@@ -193,7 +215,13 @@ export function StageWorkbenchTabs({
                   </Select>
                 </div>
               ) : <p className="text-sm text-slate-600">{t("providerReadinessReasonServerManaged")}</p>}
-              <Button disabled={!stageRunGate.canRun} onClick={() => onRunStage(currentStage.id, selectedProviderId || undefined)}>{t("stageWorkbenchRunAction")}</Button>
+              <Button
+                disabled={!canRun || isRunning}
+                loading={isRunning}
+                onClick={() => onRunStage(currentStage.id, selectedProviderId || undefined)}
+              >
+                {t("stageWorkbenchRunAction")}
+              </Button>
             </section>
           </div>
         );

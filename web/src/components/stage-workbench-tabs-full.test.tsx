@@ -64,10 +64,12 @@ function renderFull(
     <MemoryRouter>
       <I18nProvider>
         <StageWorkbenchTabs
+          currentUserId="user-1"
           mode="full"
           onRunStage={vi.fn()}
           onStageChange={onStageChange}
           providerReadinessData={providerReadinessData}
+          runningStageId={null}
           stage={currentStage}
           stages={[currentStage]}
         />
@@ -198,5 +200,11 @@ describe("StageWorkbenchTabs full mode", () => {
       "href",
       "/api/stages/stage-1/artifacts/chinese_research_brief_markdown",
     );
+  });
+
+  it("includes paper artifacts in the human Review tab", async () => {
+    renderFull(stage({ agent_id: "paper_meeting_writer", title: "Paper and Meeting Writer" }));
+
+    expect(screen.getByRole("tab", { name: "Review" })).toBeInTheDocument();
   });
 });

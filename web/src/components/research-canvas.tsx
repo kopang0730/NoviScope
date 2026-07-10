@@ -17,16 +17,20 @@ import { StageWorkbenchTabs } from "./stage-workbench-tabs";
 export type ResearchCanvasProps = {
   readonly capabilities: readonly WorkflowAgentCapability[];
   readonly nextAction: WorkflowNextAction | null;
+  readonly currentUserId: string | null;
   readonly onRunStage: (stageId: string, providerId?: string) => void;
   readonly providerReadinessData: ProviderReadinessData;
+  readonly runningStageId: string | null;
   readonly stages: readonly StageCard[];
 };
 
 export function ResearchCanvas({
   capabilities,
   nextAction,
+  currentUserId,
   onRunStage,
   providerReadinessData,
+  runningStageId,
   stages,
 }: ResearchCanvasProps) {
   const { t } = useI18n();
@@ -58,9 +62,11 @@ export function ResearchCanvas({
 
       {selectedStage ? (
         <StageWorkbenchTabs
+          currentUserId={currentUserId}
           mode="compact"
           onRunStage={onRunStage}
           providerReadinessData={providerReadinessData}
+          runningStageId={runningStageId}
           stage={selectedStage}
           stages={stages}
         />

@@ -98,6 +98,7 @@ export function CanvasWorkspacePage() {
               <QuestNextActionStrip
                 actions={data.nextActions}
                 capabilities={data.capabilities}
+                currentUserId={currentUser?.id ?? null}
                 onRun={(stageId, providerId) => void data.runSelectedStage(stageId, providerId)}
                 providers={data.providers}
                 questId={data.selectedQuest.id}
@@ -106,9 +107,11 @@ export function CanvasWorkspacePage() {
 
               <ResearchCanvas
                 capabilities={data.capabilities}
+                currentUserId={currentUser?.id ?? null}
                 nextAction={data.nextActions[0] ?? null}
                 onRunStage={(stageId, providerId) => void data.runSelectedStage(stageId, providerId)}
                 providerReadinessData={providerReadinessData}
+                runningStageId={data.runningStageId}
                 stages={data.stages}
               />
             </div>

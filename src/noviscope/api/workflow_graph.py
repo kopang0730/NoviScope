@@ -256,7 +256,11 @@ def gate_status_for_stage(stage: StageCard, gate_required: bool) -> GateStatus:
     if stage.status != StageStatus.COMPLETE:
         return "waiting_for_completion"
     if stage.agent_id == IDEA_GENERATOR_AGENT_ID:
-        return "approved" if has_selected_idea(stage.output_payload) else "pending_review"
+        if stage.human_approved is True and has_selected_idea(stage.output_payload):
+            return "approved"
+        if stage.human_approved is False:
+            return "rejected"
+        return "pending_review"
     if stage.human_approved is True:
         return "approved"
     if stage.human_approved is False:

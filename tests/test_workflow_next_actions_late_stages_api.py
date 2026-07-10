@@ -237,6 +237,43 @@ def test_workflow_next_actions_runs_experiment_after_selected_idea_ids(
     assert action["stage_id"] == experiment_stage_id
 
 
+def test_workflow_next_actions_requires_reapproval_after_idea_review_reset(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'next-actions-idea-reset.db'}")
+    with TestClient(app) as client:
+        # Given: selected idea IDs remain stored after the human approval is reset.
+        register_and_login(client, "NEXT-ACTIONS-IDEA-RESET", "idea-reset@example.com")
+        create_personal_provider(client)
+        quest_id = create_quest(client)
+        approve_demand_stage(
+            client,
+            stage_id_for_agent(client, quest_id, DEMAND_VALIDATOR_AGENT_ID),
+        )
+        complete_literature_stage(
+            client,
+            stage_id_for_agent(client, quest_id, LITERATURE_SCOUT_AGENT_ID),
+        )
+        idea_stage_id = stage_id_for_agent(client, quest_id, IDEA_GENERATOR_AGENT_ID)
+        approve_idea_with_selected_ids_only(client, idea_stage_id)
+        update_stage(
+            client,
+            idea_stage_id,
+            {"human_approved": None, "review_notes": "Re-open idea selection review."},
+        )
+
+        # When: the workbench recomputes the authoritative next action.
+        response = client.get(f"/quests/{quest_id}/workflow-next-actions")
+
+    # Then: stale selected IDs do not bypass the renewed human review gate.
+    assert response.status_code == 200
+    action = response.json()["actions"][0]
+    assert action["action_type"] == "review_stage"
+    assert action["agent_id"] == IDEA_GENERATOR_AGENT_ID
+    assert action["stage_id"] == idea_stage_id
+
+
 def test_workflow_next_actions_surfaces_final_paper_review(
     tmp_path,
     dev_admin_header_enabled: None,

@@ -12,6 +12,7 @@ import { Select } from "./input";
 export type StageNextActionCardProps = {
   readonly action: WorkflowNextAction | null;
   readonly capabilities: readonly WorkflowAgentCapability[];
+  readonly currentUserId: string | null;
   readonly onNavigate: (path: string) => void;
   readonly onRun: (stageId: string, providerId?: string) => void;
   readonly providers: readonly Provider[];
@@ -26,6 +27,7 @@ function unsupportedActionType(actionType: never): never {
 export function StageNextActionCard({
   action,
   capabilities,
+  currentUserId,
   onNavigate,
   onRun,
   providers,
@@ -53,7 +55,7 @@ export function StageNextActionCard({
 
   const view = buildWorkflowActionView(action, language);
   const stagePath = `/stages/${action.stage_id}?quest=${questId}`;
-  const overrideProviders = getActivePersonalProviders(providers);
+  const overrideProviders = getActivePersonalProviders(providers, currentUserId);
   const supportsProviderOverride = supportsWorkflowProviderOverride(action, capabilities);
 
   const primaryCommand = (() => {

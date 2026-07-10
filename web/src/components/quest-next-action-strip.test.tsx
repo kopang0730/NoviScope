@@ -104,6 +104,7 @@ function renderStrip(
         <QuestNextActionStrip
           actions={actions}
           capabilities={[capability]}
+          currentUserId="user-1"
           onRun={onRun}
           providers={providers}
           questId="quest-1"

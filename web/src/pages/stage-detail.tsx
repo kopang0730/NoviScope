@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getErrorMessage } from "../api/client";
 import { runStage } from "../api/quests";
 import type { StageCard, StageStatus } from "../api/types";
@@ -36,6 +36,7 @@ function stageTone(status: StageStatus) {
 export function StageDetailPage() {
   const { stageId } = useParams();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const { authReady, currentUser } = useAuth();
   const { t } = useI18n();
@@ -184,6 +185,7 @@ export function StageDetailPage() {
           <StageNextActionCard
             action={nextAction}
             capabilities={capabilities}
+            currentUserId={currentUser?.id ?? null}
             onNavigate={(path) => void navigate(path)}
             onRun={(targetStageId, providerId) => void handleRunStage(targetStageId, providerId)}
             providers={providers}
@@ -192,10 +194,13 @@ export function StageDetailPage() {
           />
 
           <StageWorkbenchTabs
+            currentUserId={currentUser?.id ?? null}
+            initialTabId={location.hash === "#evidence" ? "evidence" : "overview"}
             mode="full"
             onRunStage={(targetStageId, providerId) => void handleRunStage(targetStageId, providerId)}
             onStageChange={handleWorkflowMutation}
             providerReadinessData={providerReadinessData}
+            runningStageId={runningStageId}
             stage={stage}
             stages={stages}
           />

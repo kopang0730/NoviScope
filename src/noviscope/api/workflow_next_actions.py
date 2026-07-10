@@ -13,6 +13,7 @@ from noviscope.api.workflow_graph import (
     WorkflowNodeResponse,
     build_workflow_graph,
 )
+from noviscope.core.stage_policy import DEMAND_VALIDATOR_AGENT_ID
 from noviscope.models.quest import StageCard, StageStatus
 from noviscope.quests.service import QuestService
 
@@ -27,6 +28,7 @@ WorkflowActionType: TypeAlias = Literal[
 ]
 BlockingActionType: TypeAlias = Literal["configure_provider", "resolve_blocker"]
 COMPLETED_STAGE_BLOCKING_REASON: Final = "stage_already_complete"
+DEMAND_EVIDENCE_BLOCKING_REASON: Final = "demand_evidence_review_required"
 
 
 class WorkflowNextActionResponse(BaseModel):
@@ -90,56 +92,56 @@ def node_next_action(
     if review_action_required(node.review_state):
         return WorkflowNextActionResponse(
             action_type="review_stage",
-            agent_id=node.agent_id,
+            agent_id=stage.agent_id,
             blocking_reason="human_review_required",
             can_run=False,
             detail=review_detail(stage, node),
-            label=f"Review {node.title}",
+            label=f"Review {stage.title}",
             priority=priority,
-            stage_id=node.stage_id,
-            stage_status=node.status,
-            stage_title=node.title,
+            stage_id=stage.id,
+            stage_status=stage.status,
+            stage_title=stage.title,
         )
     if node.can_run:
         return WorkflowNextActionResponse(
             action_type="run_stage",
-            agent_id=node.agent_id,
+            agent_id=stage.agent_id,
             blocking_reason="",
             can_run=True,
             detail="Stage is ready to run.",
-            label=f"Run {node.title}",
+            label=f"Run {stage.title}",
             priority=priority,
-            stage_id=node.stage_id,
-            stage_status=node.status,
-            stage_title=node.title,
+            stage_id=stage.id,
+            stage_status=stage.status,
+            stage_title=stage.title,
         )
     match node.status:
         case StageStatus.RUNNING:
             return WorkflowNextActionResponse(
                 action_type="wait_for_stage",
-                agent_id=node.agent_id,
+                agent_id=stage.agent_id,
                 blocking_reason="stage_already_running",
                 can_run=False,
                 detail="Wait for the current run to finish before taking the next action.",
-                label=f"Wait for {node.title}",
+                label=f"Wait for {stage.title}",
                 priority=priority,
-                stage_id=node.stage_id,
-                stage_status=node.status,
-                stage_title=node.title,
+                stage_id=stage.id,
+                stage_status=stage.status,
+                stage_title=stage.title,
             )
         case StageStatus.PENDING | StageStatus.BLOCKED | StageStatus.COMPLETE:
             action_type = blocking_action_type(node.blocking_reason)
             return WorkflowNextActionResponse(
                 action_type=action_type,
-                agent_id=node.agent_id,
+                agent_id=stage.agent_id,
                 blocking_reason=node.blocking_reason,
                 can_run=False,
                 detail=node.blocking_detail,
-                label=blocking_action_label(action_type, node.title),
+                label=blocking_action_label(action_type, stage.title),
                 priority=priority,
-                stage_id=node.stage_id,
-                stage_status=node.status,
-                stage_title=node.title,
+                stage_id=stage.id,
+                stage_status=stage.status,
+                stage_title=stage.title,
             )
         case unreachable:
             assert_never(unreachable)
@@ -170,8 +172,15 @@ def build_next_actions(
     stages: list[StageCard],
 ) -> WorkflowNextActionsResponse:
     stages_by_id = {stage.id: stage for stage in stages}
+    stages_by_agent = {stage.agent_id: stage for stage in stages}
     actions = [
-        node_next_action(node, stages_by_id[node.stage_id], priority)
+        node_next_action(
+            node,
+            stages_by_agent[DEMAND_VALIDATOR_AGENT_ID]
+            if node.blocking_reason == DEMAND_EVIDENCE_BLOCKING_REASON
+            else stages_by_id[node.stage_id],
+            priority,
+        )
         for priority, node in enumerate(graph.nodes, start=1)
         if node_needs_action(node)
     ]
