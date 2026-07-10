@@ -21,6 +21,8 @@ from noviscope.agents.paper_meeting_writer_types import (
 from noviscope.agents.stage_runner import StageRunContext
 from noviscope.core.json_types import JsonObject
 
+INVALID_STRUCTURED_RESPONSE_NOTICE = "The model response was not valid structured JSON."
+
 
 def parse_paper_meeting_writer_output(
     raw_content: str,
@@ -33,6 +35,7 @@ def parse_paper_meeting_writer_output(
                 **parsed_content,
                 "raw_response": raw_content,
                 "source_stage_ids": request.source_stage_ids,
+                "structured_response_valid": True,
             }
         )
     except (json.JSONDecodeError, TypeError, ValidationError):
@@ -47,9 +50,10 @@ def parse_paper_meeting_writer_output(
             model_generated_hypotheses=[],
             raw_response=raw_content,
             source_stage_ids=request.source_stage_ids,
-            summary="The model response was not valid structured JSON.",
+            structured_response_valid=False,
+            summary=INVALID_STRUCTURED_RESPONSE_NOTICE,
             verified_facts=[],
-            warnings=["The model response was not valid structured JSON."],
+            warnings=[INVALID_STRUCTURED_RESPONSE_NOTICE],
         )
     return constrain_output(output, request)
 
@@ -80,6 +84,19 @@ def constrain_output(
         warnings.append(NEEDS_REVIEW_WARNING)
     if HUMAN_REVIEW_NOTICE not in human_review_required:
         human_review_required.append(HUMAN_REVIEW_NOTICE)
+    summary = INVALID_STRUCTURED_RESPONSE_NOTICE
+    if output.structured_response_valid:
+        if result_context.has_verified_results:
+            result_label = "result" if result_context.verified_count == 1 else "results"
+            summary = (
+                "Generated four review-only Markdown artifacts from "
+                f"{result_context.verified_count} verified experiment {result_label}."
+            )
+        else:
+            summary = (
+                "Generated four review-only Markdown artifacts without verified "
+                "experiment results."
+            )
     return output.model_copy(
         update={
             "chinese_research_brief_markdown": artifacts.chinese_research_brief_markdown,
@@ -89,6 +106,7 @@ def constrain_output(
             "human_review_required": human_review_required,
             "ieee_paper_skeleton_markdown": artifacts.ieee_paper_skeleton_markdown,
             "meeting_outline_markdown": artifacts.meeting_outline_markdown,
+            "summary": summary,
             "verified_facts": verified_facts,
             "warnings": warnings,
         }

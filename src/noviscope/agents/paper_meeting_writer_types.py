@@ -53,6 +53,7 @@ class PaperMeetingWriterOutput(BaseModel):
     human_review_required: list[str]
     source_stage_ids: JsonObject
     raw_response: str
+    structured_response_valid: bool = Field(default=True, exclude=True)
     warnings: list[str] = []
 
 

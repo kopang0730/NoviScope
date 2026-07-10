@@ -28,6 +28,7 @@ ARTIFACT_KEYS = (
     "ieee_paper_skeleton_markdown",
 )
 UNTRUSTED_SENTINEL = "UNTRUSTED_RESULT_99_7_F1"
+INVALID_JSON_SUMMARY = "The model response was not valid structured JSON."
 
 
 def test_untrusted_model_result_text_never_enters_downloadable_artifacts() -> None:
@@ -80,7 +81,7 @@ class SentinelPaperRunner:
             model_generated_hypotheses=[],
             raw_response=UNTRUSTED_SENTINEL,
             source_stage_ids=request.source_stage_ids,
-            summary="Generated untrusted output.",
+            summary=f"Completed experiment result: {UNTRUSTED_SENTINEL}.",
             verified_facts=[UNTRUSTED_SENTINEL],
             warnings=[],
         )
@@ -88,6 +89,15 @@ class SentinelPaperRunner:
 
 def get_sentinel_paper_runner() -> SentinelPaperRunner:
     return SentinelPaperRunner()
+
+
+class InvalidJsonPaperRunner:
+    def run(self, request: PaperMeetingWriterRequest) -> PaperMeetingWriterOutput:
+        return parse_paper_meeting_writer_output("not json", request)
+
+
+def get_invalid_json_paper_runner() -> InvalidJsonPaperRunner:
+    return InvalidJsonPaperRunner()
 
 
 def test_stage_run_and_download_never_publish_runner_markdown(
@@ -127,6 +137,44 @@ def test_stage_run_and_download_never_publish_runner_markdown(
     assert all(UNTRUSTED_SENTINEL not in output_payload[key] for key in ARTIFACT_KEYS)
     assert output_payload["verified_facts"] == []
     assert output_payload["raw_response"] == UNTRUSTED_SENTINEL
+    assert output_payload["summary"] == (
+        "Generated four review-only Markdown artifacts without verified experiment results."
+    )
+    assert run_response.json()["summary"] == output_payload["summary"]
     assert evidence_payload["artifact_policy_version"] == "server-guardrailed-v1"
     assert download_response.status_code == 200
     assert UNTRUSTED_SENTINEL not in download_response.text
+
+
+def test_stage_run_preserves_invalid_json_failure_summary(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'invalid-json-summary.db'}")
+    app.dependency_overrides[get_paper_meeting_writer_runner] = get_invalid_json_paper_runner
+
+    with TestClient(app) as client:
+        register_and_login(client, "INVALID-JSON-SUMMARY", "invalid-json@example.com")
+        create_personal_provider(client)
+        _, _, _, _, experiment_stage_id, paper_stage_id = create_quest_with_stages(client)
+        assert (
+            client.patch(f"/stages/{experiment_stage_id}", json={"status": "running"}).status_code
+            == 200
+        )
+        assert (
+            client.patch(
+                f"/stages/{experiment_stage_id}",
+                json={
+                    "human_approved": True,
+                    "output_payload": {"summary": "Experiment plan completed."},
+                    "status": "complete",
+                },
+            ).status_code
+            == 200
+        )
+        run_response = client.post(f"/stages/{paper_stage_id}/run", json={})
+
+    assert run_response.status_code == 200
+    assert run_response.json()["summary"] == INVALID_JSON_SUMMARY
+    assert run_response.json()["output_payload"]["summary"] == INVALID_JSON_SUMMARY
+    assert run_response.json()["output_payload"]["raw_response"] == "not json"

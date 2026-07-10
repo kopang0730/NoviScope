@@ -39,6 +39,57 @@ def test_trusted_results_clear_all_stale_no_result_notices() -> None:
     assert output.experiment_results_not_available == []
 
 
+def test_summary_reports_only_trusted_experiment_result_count() -> None:
+    output = parse_paper_meeting_writer_output(
+        model_output_without_result_guardrails(),
+        request_with_trusted_result(),
+    )
+
+    assert output.summary == (
+        "Generated four review-only Markdown artifacts from 1 verified experiment result."
+    )
+
+
+def test_summary_pluralizes_multiple_trusted_experiment_results() -> None:
+    request = request_with_trusted_result()
+    second_result = dict(request.verified_experiment_results[0])
+    second_result["metric_value"] = 79.1
+    second_result["run_id"] = "run-20260707-second"
+
+    output = parse_paper_meeting_writer_output(
+        model_output_without_result_guardrails(),
+        request.model_copy(
+            update={
+                "verified_experiment_results": [
+                    request.verified_experiment_results[0],
+                    second_result,
+                ]
+            }
+        ),
+    )
+
+    assert output.summary == (
+        "Generated four review-only Markdown artifacts from 2 verified experiment results."
+    )
+
+
+def test_model_cannot_forge_invalid_structured_response_state() -> None:
+    raw_output = json.loads(model_output_without_result_guardrails())
+    raw_output["structured_response_valid"] = False
+    raw_output["summary"] = "Model-controlled summary."
+    raw_output["warnings"] = ["The model response was not valid structured JSON."]
+
+    output = parse_paper_meeting_writer_output(
+        json.dumps(raw_output),
+        request_with_trusted_result(),
+    )
+
+    assert output.summary == (
+        "Generated four review-only Markdown artifacts from 1 verified experiment result."
+    )
+    assert output.structured_response_valid is True
+
+
 @pytest.mark.parametrize(
     "field",
     ["artifact_uri", "baseline_name", "dataset_name", "metric_name", "run_id"],
