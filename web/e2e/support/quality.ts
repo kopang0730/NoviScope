@@ -17,6 +17,13 @@ export async function assertTextFits(locator: Locator): Promise<void> {
   expect(fits).toBe(true);
 }
 
+export async function assertTabsStayOnOneRow(tablist: Locator): Promise<void> {
+  const tabTopOffsets = await tablist.getByRole("tab").evaluateAll((tabs) =>
+    tabs.map((tab) => Math.round(tab.getBoundingClientRect().top)),
+  );
+  expect(new Set(tabTopOffsets).size).toBe(1);
+}
+
 export async function assertPageQuality(
   page: Page,
   testInfo: TestInfo,

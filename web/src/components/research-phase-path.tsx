@@ -81,7 +81,7 @@ export function ResearchPhasePath({
 
   return (
     <nav aria-label={t("researchCanvasTitle")} id="research-phase-path">
-      <ol className="grid gap-3 md:grid-cols-5">
+      <ol className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         {phases.map((phase, index) => {
           const presentation = buildMacroPhasePresentation(
             phase,
@@ -111,16 +111,18 @@ export function ResearchPhasePath({
                 onKeyDown={(event) => handleKeyDown(event, index)}
                 type="button"
               >
-                <span className="flex w-full items-start justify-between gap-2">
-                  <span className="min-w-0">
+                <span className="block w-full min-w-0">
+                  <span className="flex items-start justify-between gap-2">
                     <span className="block text-xs font-semibold text-slate-500">
                       {t("canvasPhaseLabel")} {index + 1}
                     </span>
-                    <span className="mt-1 block text-sm font-semibold text-slate-950">{phaseTitle}</span>
+                    <Badge tone={phaseTone(presentation.state)}>
+                      {t(macroPhaseStateKey(presentation.state))}
+                    </Badge>
                   </span>
-                  <Badge tone={phaseTone(presentation.state)}>
-                    {t(macroPhaseStateKey(presentation.state))}
-                  </Badge>
+                  <span className="mt-1 block text-pretty text-sm font-semibold text-slate-950">
+                    {phaseTitle}
+                  </span>
                 </span>
 
                 <span className="mt-3 block text-xs leading-5 text-slate-600">
@@ -131,7 +133,7 @@ export function ResearchPhasePath({
                   {presentation.signal}
                 </span>
 
-                <span className="mt-auto flex flex-wrap gap-1.5 pt-3">
+                <span className="mt-auto grid w-full min-w-0 gap-1.5 pt-3">
                   {phase.agents.map((agent) => (
                     <span
                       aria-label={`${agent.displayName}: ${
@@ -141,7 +143,7 @@ export function ResearchPhasePath({
                       }`}
                       aria-disabled={agent.status === "planned" ? "true" : undefined}
                       className={[
-                        "inline-flex min-h-6 items-center gap-1 rounded border px-2 py-1 text-xs",
+                        "grid min-h-6 w-full min-w-0 gap-0.5 rounded border px-2 py-1 text-xs",
                         agent.status === "planned"
                           ? "border-slate-200 bg-slate-50 text-slate-500"
                           : "border-teal-200 bg-teal-50 text-teal-800",
@@ -149,8 +151,8 @@ export function ResearchPhasePath({
                       key={agent.agentId}
                       role="status"
                     >
-                      {agent.displayName}
-                      <span className="font-semibold">
+                      <span className="min-w-0 break-words text-pretty">{agent.displayName}</span>
+                      <span className="font-semibold leading-4">
                         {agent.status === "planned"
                           ? t("canvasRolePlanned")
                           : t("canvasRoleImplemented")}

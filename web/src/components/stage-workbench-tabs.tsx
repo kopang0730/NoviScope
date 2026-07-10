@@ -15,6 +15,7 @@ import {
 import { readSourceStageIds } from "../lib/source-stage-ids";
 import { getStageRunGate } from "../lib/stage-run-gate";
 import { stageTone } from "../lib/status-tones";
+import { useAsyncSelectionGuard } from "../lib/use-async-selection-guard";
 import { Badge } from "./badge";
 import { Button, buttonClassName } from "./button";
 import { Select } from "./input";
@@ -101,6 +102,7 @@ export function StageWorkbenchTabs({
   const [activeTabId, setActiveTabId] = useState<StageWorkbenchTabId>("overview");
   const [currentStage, setCurrentStage] = useState(stage);
   const [selectedProviderId, setSelectedProviderId] = useState("");
+  const isCurrentStage = useAsyncSelectionGuard(stage.id);
   const availableTabs = tabDefinitions.filter((tab) => isTabAvailable(tab.id, currentStage));
   const sourceStageIds = readSourceStageIds(currentStage.output_payload);
   const stageRunGate = getStageRunGate({
@@ -108,10 +110,7 @@ export function StageWorkbenchTabs({
     stage: currentStage,
     stages,
   });
-  const activeProviders = providerReadinessData.providers.filter(
-    (provider) =>
-      provider.is_active && (provider.kind === "openai_compatible" || provider.kind === "custom"),
-  );
+  const activeProviders = providerReadinessData.providers.filter((provider) => provider.is_active);
 
   useEffect(() => {
     setCurrentStage(stage);
@@ -123,6 +122,9 @@ export function StageWorkbenchTabs({
   }, [stage.id]);
 
   function handleStageChange(nextStage: StageCard) {
+    if (!isCurrentStage() || nextStage.id !== stage.id) {
+      return;
+    }
     setCurrentStage(nextStage);
     onStageChange?.(nextStage);
   }
@@ -229,13 +231,13 @@ export function StageWorkbenchTabs({
 
   return (
     <div className="min-w-0">
-      <div aria-label={t("stageWorkbenchTabsLabel")} className="flex flex-wrap gap-1 border-b border-slate-200" role="tablist">
+      <div aria-label={t("stageWorkbenchTabsLabel")} className="flex flex-nowrap gap-1 overflow-x-auto border-b border-slate-200" role="tablist">
         {availableTabs.map((tab) => (
           <button
             aria-controls={`${instanceId}-${tab.id}-panel`}
             aria-selected={activeTabId === tab.id}
             className={[
-              "min-h-11 border-b-2 px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500",
+              "min-h-11 shrink-0 border-b-2 px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500",
               activeTabId === tab.id ? "border-teal-600 text-teal-800" : "border-transparent text-slate-600 hover:text-slate-900",
             ].join(" ")}
             id={`${instanceId}-${tab.id}-tab`}

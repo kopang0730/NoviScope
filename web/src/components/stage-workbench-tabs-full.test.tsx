@@ -55,7 +55,11 @@ function stage(overrides: Partial<StageCard> = {}): StageCard {
   };
 }
 
-function renderFull(currentStage: StageCard, onStageChange = vi.fn()) {
+function renderFull(
+  currentStage: StageCard,
+  onStageChange = vi.fn(),
+  providerReadinessData = readiness,
+) {
   return render(
     <MemoryRouter>
       <I18nProvider>
@@ -63,7 +67,7 @@ function renderFull(currentStage: StageCard, onStageChange = vi.fn()) {
           mode="full"
           onRunStage={vi.fn()}
           onStageChange={onStageChange}
-          providerReadinessData={readiness}
+          providerReadinessData={providerReadinessData}
           stage={currentStage}
           stages={[currentStage]}
         />
@@ -125,6 +129,26 @@ describe("StageWorkbenchTabs full mode", () => {
     await user.click(screen.getByRole("tab", { name: "Artifacts" }));
 
     expect(screen.getByRole("button", { name: "Select for experiment design" })).toBeInTheDocument();
+  });
+
+  it("offers Anthropic when it is the only active provider for a model-backed run", async () => {
+    const user = userEvent.setup();
+    const anthropicProvider: Provider = {
+      ...provider,
+      default_model: "claude-research",
+      id: "provider-anthropic",
+      kind: "anthropic",
+      name: "Anthropic Lab",
+    };
+    renderFull(stage({ status: "pending" }), vi.fn(), {
+      ...readiness,
+      providers: [anthropicProvider],
+    });
+
+    await user.click(screen.getByRole("tab", { name: "Run" }));
+
+    expect(screen.getByRole("option", { name: "Anthropic Lab" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Run stage" })).toBeEnabled();
   });
 
   it("keeps artifact download actions available in Artifacts", async () => {

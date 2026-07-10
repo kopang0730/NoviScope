@@ -1,10 +1,11 @@
-import { cleanup, render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getAgentAssignments } from "../api/agent-assignments";
 import { getCurrentUser } from "../api/auth";
 import { getProviders } from "../api/providers";
-import { getQuest, getQuestStages } from "../api/quests";
+import { getQuest, getQuestStages, runStage } from "../api/quests";
 import type {
   Provider,
   Quest,
@@ -79,6 +80,11 @@ const stage: StageCard = {
   title: "Idea Generator",
   updated_at: timestamp,
 };
+const secondStage: StageCard = {
+  ...stage,
+  id: "stage-2",
+  title: "Second stage",
+};
 const nextAction: WorkflowNextAction = {
   action_type: "run_stage",
   agent_id: stage.agent_id,
@@ -100,6 +106,28 @@ const capability: WorkflowAgentCapability = {
   status_detail: "Runnable with a provider.",
   tool_permissions: [],
 };
+
+type Deferred<Value> = {
+  readonly promise: Promise<Value>;
+  readonly resolve: (value: Value) => void;
+};
+
+function deferred<Value>(): Deferred<Value> {
+  let resolve: (value: Value) => void = (_value) => undefined;
+  const promise = new Promise<Value>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
+}
+
+function NavigateToSecondStage() {
+  const navigate = useNavigate();
+  return (
+    <button onClick={() => navigate("/stages/stage-2?quest=quest-1")} type="button">
+      Navigate to second stage
+    </button>
+  );
+}
 
 describe("StageDetailPage shared workbench", () => {
   afterEach(cleanup);
@@ -141,5 +169,44 @@ describe("StageDetailPage shared workbench", () => {
     expect(screen.getByText("Advanced editor").closest("details")).not.toHaveAttribute("open");
     expect(screen.getByRole("button", { name: "Download review packet" })).toBeInTheDocument();
     expect(getWorkflowCapabilities).toHaveBeenCalledOnce();
+  });
+
+  it("does not refresh or show run success for a stage left during a delayed run", async () => {
+    const pendingRun = deferred<StageCard>();
+    vi.mocked(runStage).mockReturnValue(pendingRun.promise);
+    vi.mocked(getQuestStages).mockResolvedValue([stage, secondStage]);
+    const userEvents = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/stages/stage-1?quest=quest-1"]}>
+        <AuthProvider>
+          <I18nProvider>
+            <Routes>
+              <Route
+                element={
+                  <>
+                    <StageDetailPage />
+                    <NavigateToSecondStage />
+                  </>
+                }
+                path="/stages/:stageId"
+              />
+            </Routes>
+          </I18nProvider>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+    await screen.findByRole("heading", { level: 1, name: stage.title });
+    await userEvents.click(screen.getByRole("button", { name: "Run agent" }));
+    await userEvents.click(screen.getByRole("button", { name: "Navigate to second stage" }));
+    await screen.findByRole("heading", { level: 1, name: secondStage.title });
+
+    await act(async () => {
+      pendingRun.resolve({ ...stage, status: "complete" });
+      await pendingRun.promise;
+    });
+
+    await waitFor(() => expect(getQuestStages).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText("Stage run completed")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: secondStage.title })).toBeInTheDocument();
   });
 });

@@ -109,26 +109,31 @@ describe("ResearchPhasePath", () => {
     const phaseButtons = screen.getAllByRole("button", { name: /phase/i });
     expect(phaseButtons).toHaveLength(5);
     expect(phaseButtons.map((button) => button.getAttribute("aria-label"))).toEqual([
-      "Phase 1: Demand & scope",
-      "Phase 2: Literature & gap",
-      "Phase 3: Hypothesis & idea",
-      "Phase 4: Experiment & verification",
-      "Phase 5: Paper & meeting",
+      "Phase 1: Demand scope",
+      "Phase 2: Literature gap",
+      "Phase 3: Hypothesis framing",
+      "Phase 4: Experiment verification",
+      "Phase 5: Paper planning",
     ]);
-    expect(screen.getByText("Code Runner")).toHaveTextContent("Planned");
-    expect(screen.getByText("Evidence Auditor")).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("status", { name: "Code Runner: Planned" })).toHaveTextContent(
+      "Planned",
+    );
+    expect(screen.getByRole("status", { name: "Evidence Auditor: Planned" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("moves selection and focus with arrow keys", async () => {
     const user = userEvent.setup();
     render(<PhasePathHarness nextActionPhaseId={null} />);
 
-    const firstPhase = screen.getByRole("button", { name: "Phase 1: Demand & scope" });
+    const firstPhase = screen.getByRole("button", { name: "Phase 1: Demand scope" });
     firstPhase.focus();
     await user.keyboard("{ArrowRight}");
 
-    expect(screen.getByRole("button", { name: "Phase 2: Literature & gap" })).toHaveFocus();
-    expect(screen.getByRole("button", { name: "Phase 2: Literature & gap" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Phase 2: Literature gap" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Phase 2: Literature gap" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
@@ -137,12 +142,12 @@ describe("ResearchPhasePath", () => {
   it("marks the selected phase and the authoritative action phase independently", () => {
     render(<PhasePathHarness nextActionPhaseId="literature_gap" />);
 
-    expect(screen.getByRole("button", { name: "Phase 1: Demand & scope" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Phase 1: Demand scope" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
     expect(
-      within(screen.getByRole("button", { name: "Phase 2: Literature & gap" })).getByText(
+      within(screen.getByRole("button", { name: "Phase 2: Literature gap" })).getByText(
         "Current action",
       ),
     ).toBeInTheDocument();

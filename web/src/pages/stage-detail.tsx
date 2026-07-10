@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getErrorMessage } from "../api/client";
 import { runStage } from "../api/quests";
@@ -48,6 +48,7 @@ export function StageDetailPage() {
   const {
     applyStageChange,
     capabilities,
+    isCurrentSelection,
     loadError,
     loading,
     nextAction,
@@ -60,11 +61,21 @@ export function StageDetailPage() {
 
   const workflowBackLink = useMemo(() => (questId ? `/?quest=${questId}` : "/"), [questId]);
 
+  useEffect(() => {
+    setRunError(null);
+    setSuccessMessage(null);
+    setRunningStageId(null);
+  }, [questId, stageId]);
+
   function handleWorkflowMutation(nextStage: StageCard) {
-    applyStageChange(nextStage);
+    if (!applyStageChange(nextStage)) {
+      return;
+    }
     setRunError(null);
     void refresh().catch((error: unknown) => {
-      setRunError(getErrorMessage(error));
+      if (isCurrentSelection()) {
+        setRunError(getErrorMessage(error));
+      }
     });
   }
 
@@ -82,7 +93,9 @@ export function StageDetailPage() {
         targetStageId,
         providerId ? { provider_id: providerId } : {},
       );
-      await refresh();
+      if (!isCurrentSelection() || !(await refresh())) {
+        return;
+      }
       setSuccessMessage(
         updatedStage.status === "blocked" ? t("stageRunBlocked") : t("stageRunComplete"),
       );
@@ -90,13 +103,18 @@ export function StageDetailPage() {
         navigate(`/stages/${targetStageId}?quest=${questId}`);
       }
     } catch (error) {
+      if (!isCurrentSelection()) {
+        return;
+      }
       if (error instanceof Error) {
         setRunError(getErrorMessage(error));
       } else {
         throw error;
       }
     } finally {
-      setRunningStageId(null);
+      if (isCurrentSelection()) {
+        setRunningStageId(null);
+      }
     }
   }
 

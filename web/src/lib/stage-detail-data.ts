@@ -11,6 +11,7 @@ import type {
   WorkflowNextAction,
 } from "../api/types";
 import { getWorkflowCapabilities, getWorkflowNextActions } from "../api/workflow";
+import { useAsyncSelectionGuard } from "./use-async-selection-guard";
 
 type StageDetailDataOptions = {
   readonly currentUser: User | null;
@@ -39,29 +40,45 @@ export function useStageDetailData({
   const [providers, setProviders] = useState<readonly Provider[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const selectionKey = currentUser && questId && stageId
+    ? `${currentUser.id}:${questId}:${stageId}`
+    : null;
+  const isCurrentSelection = useAsyncSelectionGuard(selectionKey);
 
   const applyStageChange = useCallback((nextStage: StageCard) => {
+    if (
+      !isCurrentSelection() ||
+      nextStage.id !== stageId ||
+      nextStage.quest_id !== questId
+    ) {
+      return false;
+    }
     setStage(nextStage);
     setStages((currentStages) =>
       currentStages.map((candidate) =>
         candidate.id === nextStage.id ? nextStage : candidate,
       ),
     );
-  }, []);
+    return true;
+  }, [isCurrentSelection, questId, stageId]);
 
   const refresh = useCallback(async () => {
     if (!questId || !stageId) {
-      return;
+      return false;
     }
 
     const [nextStages, nextActions] = await Promise.all([
       getQuestStages(questId),
       getWorkflowNextActions(questId),
     ]);
+    if (!isCurrentSelection()) {
+      return false;
+    }
     setStage(selectedStage(nextStages, stageId));
     setStages(nextStages);
     setNextAction(nextActions.actions[0] ?? null);
-  }, [questId, stageId]);
+    return true;
+  }, [isCurrentSelection, questId, stageId]);
 
   useEffect(() => {
     if (!stageId || !questId || !currentUser) {
@@ -117,6 +134,7 @@ export function useStageDetailData({
   return {
     applyStageChange,
     capabilities,
+    isCurrentSelection,
     loadError,
     loading,
     nextAction,

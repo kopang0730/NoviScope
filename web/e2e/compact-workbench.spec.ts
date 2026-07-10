@@ -1,5 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
-import { assertPageQuality, assertTextFits, captureState } from "./support/quality";
+import {
+  assertPageQuality,
+  assertTabsStayOnOneRow,
+  assertTextFits,
+  captureState,
+} from "./support/quality";
 import { loginAs, selectSeededQuest } from "./support/session";
 
 const runtimeErrors = new WeakMap<Page, string[]>();
@@ -84,7 +89,9 @@ test.describe.serial("compact Canvas workbench", () => {
     const phases = page.getByRole("button", { name: /^Phase \d:/ });
     await expect(phases).toHaveCount(5);
     for (const roleName of roleNames) {
-      await expect(page.getByRole("status", { name: new RegExp(roleName) })).toBeVisible();
+      const role = page.getByRole("status", { name: new RegExp(roleName) });
+      await expect(role).toBeVisible();
+      await assertTextFits(role);
     }
     await expect(
       page.getByRole("status", { name: "Code Runner: Planned" }),
@@ -110,6 +117,7 @@ test.describe.serial("compact Canvas workbench", () => {
     const direction = `Analyze badminton serve technique for ${testInfo.project.name} E2E`;
     await page.getByRole("textbox", { name: /^Research direction/ }).fill(direction);
     await expect(page.getByText(/Human review required/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Create Quest" })).toBeInViewport();
     await captureState(page, testInfo, "new-quest-collapsed");
     await page.getByRole("button", { name: "Add research context" }).click();
     await expect(page.getByRole("heading", { name: "Demand Reality" })).toBeVisible();
@@ -130,6 +138,9 @@ test.describe.serial("compact Canvas workbench", () => {
     await page.getByRole("tab", { name: "Review" }).click();
     await page.getByRole("link", { name: "Open Stage Detail" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Demand validation" })).toBeVisible();
+    if (page.viewportSize()?.width === 390) {
+      await assertTabsStayOnOneRow(page.getByRole("tablist", { name: "Stage workbench" }));
+    }
     await captureState(page, testInfo, "stage-detail-overview");
     await assertPageQuality(page, testInfo, "stage-detail");
     await page.getByRole("tab", { name: "Evidence" }).click();
@@ -164,6 +175,16 @@ test.describe.serial("compact Canvas workbench", () => {
     ).toBeDisabled();
     await captureState(page, testInfo, "providers-shared");
     await assertPageQuality(page, testInfo, "providers-member");
+    if (page.viewportSize()?.width !== 1440) {
+      const matrix = page.getByRole("table", { name: "Agent defaults" });
+      await matrix.scrollIntoViewIfNeeded();
+      const providerControl = page.getByRole("combobox", {
+        name: "Demand Validator Default provider",
+      });
+      await providerControl.scrollIntoViewIfNeeded();
+      await expect(providerControl).toBeInViewport();
+      await captureState(page, testInfo, "providers-shared-matrix");
+    }
 
     await page.getByRole("button", { name: "Logout" }).click();
     await loginAs(page, "admin");
@@ -180,10 +201,46 @@ test.describe.serial("compact Canvas workbench", () => {
     await assertTextFits(englishCommand);
     await page.getByRole("button", { name: "中文" }).click();
     const chineseCommand = page.getByRole("button", { name: "运行智能体" });
+    await expect(page.getByRole("button", { name: "中文" })).toHaveCSS(
+      "background-color",
+      "rgb(11, 118, 111)",
+    );
     await expect(chineseCommand).toBeVisible();
     await assertTextFits(chineseCommand);
     await expect(page.locator("body")).not.toContainText(/missing translation|undefined/i);
     await page.getByRole("button", { name: "English" }).click();
     await expect(englishCommand).toBeVisible();
+  });
+
+  test("10. captures Chinese Canvas, Quest, Provider, and Stage Detail surfaces", async ({ page }, testInfo) => {
+    await loginAs(page, "member");
+    await selectSeededQuest(page);
+    const selectedCanvasUrl = page.url();
+    await page.getByRole("button", { name: "中文" }).click();
+    await expect(page.getByRole("button", { name: "中文" })).toHaveCSS(
+      "background-color",
+      "rgb(11, 118, 111)",
+    );
+    await captureState(page, testInfo, "zh-canvas");
+    await assertPageQuality(page, testInfo, "zh-canvas");
+
+    await page.goto("/quests/new");
+    await expect(page.getByRole("heading", { name: "新建 Quest" })).toBeVisible();
+    await captureState(page, testInfo, "zh-new-quest");
+    await assertPageQuality(page, testInfo, "zh-new-quest");
+
+    await page.goto("/providers");
+    await expect(page.getByRole("tab", { name: /^个人/ })).toBeVisible();
+    await captureState(page, testInfo, "zh-providers");
+    await assertPageQuality(page, testInfo, "zh-providers");
+
+    await page.goto(selectedCanvasUrl);
+    await expect(
+      page.getByRole("heading", { exact: true, name: "Badminton Performance Analysis" }),
+    ).toBeVisible();
+    await page.getByRole("link", { name: "查看证据与详情" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Demand validation" })).toBeVisible();
+    await captureState(page, testInfo, "zh-stage-detail");
+    await assertPageQuality(page, testInfo, "zh-stage-detail");
   });
 });

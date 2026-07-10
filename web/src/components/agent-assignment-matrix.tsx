@@ -34,7 +34,7 @@ function buildDrafts(rows: readonly AgentAssignmentRow[]): Readonly<Record<strin
 }
 
 function providerLabel(provider: Provider): string {
-  return `${provider.name} (${provider.default_model})`;
+  return provider.name;
 }
 
 function failedRoleLabels(rows: readonly AgentAssignmentRow[], updates: ReturnType<typeof buildAssignmentUpdates>, results: readonly PromiseSettledResult<AgentAssignment>[]): readonly string[] {
@@ -136,7 +136,7 @@ export function AgentAssignmentMatrix({ assignments, capabilities, currentUser, 
 
       <div className="mt-5 overflow-hidden rounded-lg border border-slate-200">
         <table aria-label={t("agentAssignmentTitle")} className="w-full text-left text-sm">
-          <thead className="hidden bg-slate-50 text-xs font-medium uppercase text-slate-500 md:table-header-group">
+          <thead className="hidden bg-slate-50 text-xs font-medium uppercase text-slate-500 xl:table-header-group">
             <tr>
               <th className="px-4 py-3">{t("agentAssignmentRole")}</th>
               <th className="px-4 py-3">{t("agentAssignmentCapability")}</th>
@@ -145,19 +145,19 @@ export function AgentAssignmentMatrix({ assignments, capabilities, currentUser, 
               <th className="px-4 py-3">{t("agentAssignmentConnection")}</th>
             </tr>
           </thead>
-          <tbody className="block divide-y divide-slate-200 md:table-row-group">
+          <tbody className="block divide-y divide-slate-200 xl:table-row-group">
             {rows.map((row) => {
               const draft = drafts[row.agentId] ?? { modelName: "", providerId: "" };
               const selectedProvider = sharedProviders.find((provider) => provider.id === draft.providerId);
               const controlDisabled = !canEdit || !row.editable;
               return (
-                <tr className="block p-4 md:table-row md:p-0" key={row.agentId}>
-                  <td className="block pb-3 align-top md:table-cell md:px-4 md:py-4">
+                <tr className="grid gap-3 p-4 sm:grid-cols-2 xl:table-row xl:p-0" key={row.agentId}>
+                  <td className="block min-w-0 pb-3 align-top xl:table-cell xl:px-4 xl:py-4">
                     <p className="font-medium text-slate-900">{row.displayName}</p>
                     <p className="mt-1 text-xs text-slate-500">{row.agentId}</p>
                   </td>
-                  <td className="block pb-3 align-top md:table-cell md:px-4 md:py-4">
-                    <span className="mb-1 block text-xs font-medium text-slate-500 md:hidden">{t("agentAssignmentCapability")}</span>
+                  <td className="block min-w-0 pb-3 align-top xl:table-cell xl:px-4 xl:py-4">
+                    <span className="mb-1 block text-xs font-medium text-slate-500 xl:hidden">{t("agentAssignmentCapability")}</span>
                     {row.status === "planned" ? (
                       <Badge tone="amber">{t("agentAssignmentPlanned")}</Badge>
                     ) : row.providerRequirement === "server_managed" ? (
@@ -167,9 +167,9 @@ export function AgentAssignmentMatrix({ assignments, capabilities, currentUser, 
                     )}
                     <p className="mt-2 max-w-xs text-xs text-slate-500">{row.statusDetail}</p>
                   </td>
-                  <td className="block pb-3 align-top md:table-cell md:min-w-[210px] md:px-4 md:py-4">
+                  <td className="block min-w-0 pb-3 align-top xl:table-cell xl:min-w-[210px] xl:px-4 xl:py-4">
                     <label className="block">
-                      <span className="mb-1 block text-xs font-medium text-slate-500 md:sr-only">{t("agentAssignmentProvider")}</span>
+                      <span className="mb-1 block text-xs font-medium text-slate-500 xl:sr-only">{t("agentAssignmentProvider")}</span>
                       <select
                         aria-label={`${row.displayName} ${t("agentAssignmentProvider")}`}
                         className={`${fieldClassName} min-h-11`}
@@ -192,9 +192,9 @@ export function AgentAssignmentMatrix({ assignments, capabilities, currentUser, 
                       </select>
                     </label>
                   </td>
-                  <td className="block pb-3 align-top md:table-cell md:min-w-[190px] md:px-4 md:py-4">
+                  <td className="block min-w-0 pb-3 align-top xl:table-cell xl:min-w-[190px] xl:px-4 xl:py-4">
                     <label className="block">
-                      <span className="mb-1 block text-xs font-medium text-slate-500 md:sr-only">{t("agentAssignmentModel")}</span>
+                      <span className="mb-1 block text-xs font-medium text-slate-500 xl:sr-only">{t("agentAssignmentModel")}</span>
                       <input
                         aria-label={`${row.displayName} ${t("agentAssignmentModel")}`}
                         className={`${fieldClassName} min-h-11`}
@@ -205,8 +205,8 @@ export function AgentAssignmentMatrix({ assignments, capabilities, currentUser, 
                       />
                     </label>
                   </td>
-                  <td className="block align-top md:table-cell md:px-4 md:py-4">
-                    <span className="mb-1 block text-xs font-medium text-slate-500 md:hidden">{t("agentAssignmentConnection")}</span>
+                  <td className="block min-w-0 align-top xl:table-cell xl:px-4 xl:py-4">
+                    <span className="mb-1 block text-xs font-medium text-slate-500 xl:hidden">{t("agentAssignmentConnection")}</span>
                     {row.status === "planned" ? (
                       <span className="text-sm text-slate-500">{t("agentAssignmentNotImplemented")}</span>
                     ) : row.providerRequirement === "server_managed" ? (

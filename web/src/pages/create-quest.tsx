@@ -70,8 +70,8 @@ export function CreateQuestPage() {
           </p>
         ) : null}
 
-        <form className="mt-6 space-y-5" onSubmit={(event) => void handleSubmit(event)}>
-          <section className="grid gap-4 lg:grid-cols-2">
+        <form className="mt-5 space-y-4 pb-20 sm:mt-6 sm:space-y-5 sm:pb-0" onSubmit={(event) => void handleSubmit(event)}>
+          <section className="grid gap-3 sm:gap-4 lg:grid-cols-2">
             <TextArea
               className="lg:col-span-2"
               hint={t("questDirectionHint")}
@@ -79,7 +79,7 @@ export function CreateQuestPage() {
               onChange={(event) => updateField("direction", event.target.value)}
               placeholder={t("questDirectionPlaceholder")}
               required
-              rows={4}
+              rows={3}
               value={formState.direction}
             />
             <Input
@@ -110,19 +110,19 @@ export function CreateQuestPage() {
             </Button>
           </div>
 
+          {error ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p> : null}
+          <div className="fixed bottom-4 left-4 right-4 z-20 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-2 shadow-panel sm:static sm:flex-row sm:items-center sm:justify-between sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
+            <p className="hidden text-sm text-slate-500 sm:block">{t("questSubmitHint")}</p>
+            <Button className="w-full sm:w-auto" loading={submitting} type="submit">
+              {t("questCreate")}
+            </Button>
+          </div>
+
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="note">
             {t("questDemandReviewNotice")}
           </p>
 
           <QuestContextFields formState={formState} onFieldChange={updateField} />
-
-          {error ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p> : null}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-slate-500">{t("questSubmitHint")}</p>
-            <Button loading={submitting} type="submit">
-              {t("questCreate")}
-            </Button>
-          </div>
         </form>
       </Card>
 
