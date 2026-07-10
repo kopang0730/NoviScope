@@ -49,6 +49,7 @@ def add_approved_evidence_auditor_stage(
     database_url: str,
     quest_id: str,
     *,
+    alignment_value: JsonValue = True,
     valid_contract: bool = True,
 ) -> None:
     evidence_payload: dict[str, JsonValue] = {}
@@ -56,8 +57,8 @@ def add_approved_evidence_auditor_stage(
         evidence_payload = {
             "audit_artifact_uri": "/data/noviscope/audits/quest-audit.json",
             "audit_policy_version": EVIDENCE_AUDIT_POLICY_VERSION,
-            "claim_reference_alignment": "verified",
-            "experiment_claim_alignment": "verified",
+            "claim_reference_alignment": alignment_value,
+            "experiment_claim_alignment": alignment_value,
         }
     engine = create_db_engine(database_url)
     try:

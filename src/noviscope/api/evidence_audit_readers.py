@@ -195,8 +195,8 @@ def evidence_auditor_is_approved(
     stored_fingerprint = evidence.get(EVIDENCE_AUDIT_FINGERPRINT_KEY)
     return (
         evidence.get("audit_policy_version") == EVIDENCE_AUDIT_POLICY_VERSION
-        and evidence.get("claim_reference_alignment") == "verified"
-        and evidence.get("experiment_claim_alignment") == "verified"
+        and evidence.get("claim_reference_alignment") is True
+        and evidence.get("experiment_claim_alignment") is True
         and isinstance(computed_fingerprint, str)
         and isinstance(stored_fingerprint, str)
         and stored_fingerprint == computed_fingerprint
