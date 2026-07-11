@@ -1,3 +1,5 @@
+from urllib.parse import urlsplit, urlunsplit
+
 from sqlmodel import Session, select
 
 from noviscope.agents.assignments import AgentAssignmentService
@@ -5,6 +7,17 @@ from noviscope.core.crypto import SecretBox
 from noviscope.models.common import utc_now
 from noviscope.models.provider import ModelProvider, ProviderKind, ProviderScope
 from noviscope.models.user import User, UserRole
+
+ProviderUpdateValue = ProviderKind | bool | str | None
+
+
+def _normalize_provider_base_url(base_url: str) -> str:
+    parsed_url = urlsplit(base_url.strip())
+    if not parsed_url.scheme or not parsed_url.netloc:
+        return parsed_url.path.rstrip("/")
+
+    host = parsed_url.netloc.rsplit("@", maxsplit=1)[-1]
+    return urlunsplit((parsed_url.scheme, host, parsed_url.path.rstrip("/"), "", ""))
 
 
 class ProviderService:
@@ -27,7 +40,7 @@ class ProviderService:
         provider = ModelProvider(
             name=name,
             kind=kind,
-            base_url=base_url,
+            base_url=_normalize_provider_base_url(base_url),
             default_model=default_model,
             api_key_ciphertext=self.secret_box.encrypt(api_key),
             scope=scope,
@@ -85,7 +98,7 @@ class ProviderService:
         if kind is not None:
             provider.kind = kind
         if base_url is not None:
-            provider.base_url = base_url
+            provider.base_url = _normalize_provider_base_url(base_url)
         if default_model is not None:
             provider.default_model = default_model
         if api_key is not None:
@@ -102,7 +115,7 @@ class ProviderService:
         self,
         provider_id: str,
         user: User,
-        **updates: object,
+        **updates: ProviderUpdateValue,
     ) -> ModelProvider:
         provider = self.get_provider_for_user(provider_id, user)
         if provider.scope == ProviderScope.SHARED and user.role != UserRole.ADMIN:
