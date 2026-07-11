@@ -135,4 +135,35 @@ describe("research phase provider projection", () => {
     expect(presentation.state).toBe("blocked");
     expect(presentation.signal).toBe(nextAction.detail);
   });
+
+  it("projects a provider configuration action as a blocked phase", () => {
+    const phase = buildMacroPhaseViews([stage], [capability])[0];
+    const nextAction: WorkflowNextAction = {
+      action_type: "configure_provider",
+      agent_id: stage.agent_id,
+      blocking_reason: "missing_provider",
+      can_run: false,
+      detail: "Configure an active supported provider before running this stage.",
+      label: "Configure provider for Demand Validator",
+      priority: 1,
+      stage_id: stage.id,
+      stage_status: stage.status,
+      stage_title: stage.title,
+    };
+    expect(phase).toBeDefined();
+    if (!phase) {
+      return;
+    }
+
+    const presentation = buildMacroPhasePresentation({
+      nextAction,
+      phase,
+      providerReadinessData: { ...readiness, providers: [] },
+      stages: [stage],
+      t: (key: TranslationKey) => key,
+    });
+
+    expect(presentation.state).toBe("blocked");
+    expect(presentation.signal).toBe(nextAction.detail);
+  });
 });

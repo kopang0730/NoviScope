@@ -109,7 +109,8 @@ export function buildMacroPhasePresentation({
   }
 
   if (
-    nextAction?.action_type === "resolve_blocker"
+    (nextAction?.action_type === "resolve_blocker"
+      || nextAction?.action_type === "configure_provider")
     && nextAction.stage_id === stage.id
   ) {
     return {
