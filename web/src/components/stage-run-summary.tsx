@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import type { StageCard } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
-import { labelFromEnum } from "../lib/format";
+import { localizedResearchLabel } from "../lib/research-labels";
+import { getReadableStageSummary } from "../lib/stage-summary";
 import {
   getLocalizedStageRunGateReason,
   type StageRunGate,
@@ -48,12 +49,13 @@ export function StageRunSummary({
       : getLocalizedStageRunReason(stage, t);
   const canRun = stageRunGate?.canRun ?? workflowReadiness?.canRun ?? availability.canRun;
   const blockingStages = stageRunGate?.workflowReadiness.blockingStages ?? workflowReadiness?.blockingStages ?? [];
+  const summary = getReadableStageSummary(stage);
 
   return (
-    <div className="mt-3 space-y-2">
+    <div className="mt-4">
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone={stage.confidence === "unknown" ? "gray" : "teal"}>
-          {t("stageConfidence")}: {labelFromEnum(stage.confidence)}
+          {t("stageConfidence")}: {localizedResearchLabel(stage.confidence, t)}
         </Badge>
         {provider ? (
           <Badge tone="blue">
@@ -61,8 +63,13 @@ export function StageRunSummary({
           </Badge>
         ) : null}
       </div>
-      <p className="text-sm text-slate-600">{stage.summary || t("noSummaryYet")}</p>
-      <p className="text-xs text-slate-500">
+      <div className="mt-4 border-l-2 border-teal-500 pl-4">
+        <p className="text-xs font-semibold text-teal-700">{t("researchConclusion")}</p>
+        <p className="mt-1 max-w-5xl text-sm leading-6 text-slate-800">
+          {summary || t("noSummaryYet")}
+        </p>
+      </div>
+      <p className="mt-3 text-xs text-slate-500">
         {canRun ? t("stageRunReady") : t("stageRunUnavailable")}: {availabilityReason}
       </p>
       {!canRun && blockingStages.length > 0 ? (

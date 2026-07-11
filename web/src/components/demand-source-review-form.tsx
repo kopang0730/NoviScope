@@ -114,6 +114,7 @@ export function DemandSourceReviewForm({ onStageChange, stage }: {
         evidence_payload: {
           ...stage.evidence_payload,
           human_demand_review_notes: formState.notes.trim(),
+          human_demand_reviewed: true,
           human_demand_reviewed_at: new Date().toISOString(),
           human_demand_sources: splitSources(formState.sourcesText),
           human_demand_verdict: formState.verdict,

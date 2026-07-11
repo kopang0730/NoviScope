@@ -1,58 +1,10 @@
 import type { ReactNode } from "react";
 import type { StageCard } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
-import { labelFromEnum } from "../lib/format";
-import { demandValidatorAgentId } from "../lib/stages";
+import { buildDemandValidationView } from "../lib/demand-validation-view";
+import { localizedResearchLabel } from "../lib/research-labels";
 import { Badge } from "./badge";
 import { DemandSourceReviewForm } from "./demand-source-review-form";
-
-type DemandValidationView = {
-  readonly assessment: string;
-  readonly confidence: string;
-  readonly evidenceForDemand: readonly string[];
-  readonly goNoGoRecommendation: string;
-  readonly missingEvidence: readonly string[];
-  readonly nextStep: string;
-  readonly realWorldScenario: string;
-  readonly risks: readonly string[];
-  readonly sourcePolicy: string;
-  readonly suggestedHumanChecklist: readonly string[];
-  readonly targetUserOrCustomer: string;
-};
-
-function readString(payload: Readonly<Record<string, unknown>>, key: string) {
-  const value = payload[key];
-  return typeof value === "string" ? value : "";
-}
-
-function isString(value: unknown): value is string {
-  return typeof value === "string";
-}
-
-function readStringArray(payload: Readonly<Record<string, unknown>>, key: string) {
-  const value = payload[key];
-  return Array.isArray(value) ? value.filter(isString) : [];
-}
-
-function buildDemandValidationView(stage: StageCard): DemandValidationView | null {
-  if (stage.agent_id !== demandValidatorAgentId || stage.status !== "complete") {
-    return null;
-  }
-
-  return {
-    assessment: readString(stage.output_payload, "demand_assessment"),
-    confidence: stage.confidence,
-    evidenceForDemand: readStringArray(stage.output_payload, "evidence_for_demand"),
-    goNoGoRecommendation: readString(stage.output_payload, "go_or_no_go_recommendation"),
-    missingEvidence: readStringArray(stage.output_payload, "missing_evidence"),
-    nextStep: readString(stage.output_payload, "next_step"),
-    realWorldScenario: readString(stage.output_payload, "real_world_scenario"),
-    risks: readStringArray(stage.output_payload, "risks"),
-    sourcePolicy: readString(stage.evidence_payload, "source_policy"),
-    suggestedHumanChecklist: readStringArray(stage.output_payload, "suggested_human_checklist"),
-    targetUserOrCustomer: readString(stage.output_payload, "target_user_or_customer"),
-  };
-}
 
 function BulletList({ emptyLabel, items }: { readonly emptyLabel: string; readonly items: readonly string[] }) {
   if (items.length === 0) {
@@ -105,17 +57,20 @@ export function DemandValidationOutput({
       <div className="mt-5 grid gap-3 lg:grid-cols-3">
         <DetailBlock title={t("demandAssessment")}>
           <p className="text-base font-semibold text-slate-900">
-            {labelFromEnum(demandValidation.assessment || "unclear")}
+            {localizedResearchLabel(demandValidation.assessment || "unclear", t)}
           </p>
         </DetailBlock>
         <DetailBlock title={t("stageConfidence")}>
           <p className="text-base font-semibold text-slate-900">
-            {labelFromEnum(demandValidation.confidence)}
+            {localizedResearchLabel(demandValidation.confidence, t)}
           </p>
         </DetailBlock>
         <DetailBlock title={t("goNoGoRecommendation")}>
           <p className="text-base font-semibold text-slate-900">
-            {labelFromEnum(demandValidation.goNoGoRecommendation || "needs_more_evidence")}
+            {localizedResearchLabel(
+              demandValidation.goNoGoRecommendation || "needs_more_evidence",
+              t,
+            )}
           </p>
         </DetailBlock>
       </div>
@@ -123,7 +78,9 @@ export function DemandValidationOutput({
       <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="amber">{t("sourcePolicy")}</Badge>
-          <Badge tone="gray">{labelFromEnum(demandValidation.sourcePolicy || "unknown")}</Badge>
+          <Badge tone="gray">
+            {localizedResearchLabel(demandValidation.sourcePolicy || "unknown", t)}
+          </Badge>
         </div>
         <p className="mt-2 text-sm text-amber-900">
           {demandValidation.sourcePolicy === "model_only_no_external_source_verification"
