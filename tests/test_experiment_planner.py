@@ -8,10 +8,12 @@ from noviscope.agents.experiment_planner import (
     ExperimentPlannerRequest,
     ExperimentPlannerStageRunner,
     OpenAICompatibleExperimentPlannerRunner,
+    build_stage_output_payload,
     has_selected_idea,
     parse_experiment_plan_output,
 )
 from noviscope.agents.provider_chat import DEFAULT_MAX_TOKENS, ProviderChatClient
+from noviscope.core.json_types import JsonObject
 from noviscope.models.provider import ProviderKind
 from noviscope.models.quest import StageCard, StageStatus
 
@@ -69,6 +71,35 @@ def test_parse_experiment_plan_output_caps_confidence_and_marks_plan_only() -> N
     assert output.warnings == [PLAN_ONLY_WARNING]
 
 
+def test_build_stage_output_payload_marks_experiment_results_not_run() -> None:
+    # Given
+    raw_content = json.dumps(
+        {
+            "ablation_variables": ["temporal window size"],
+            "baselines_to_reproduce": ["Baseline action recognizer"],
+            "compute_requirements": "One A800 GPU.",
+            "confidence": "medium",
+            "data_availability_status": "ready",
+            "datasets_needed": ["/data/badminton"],
+            "expected_figures": ["Failure case grid"],
+            "expected_tables": ["Baseline and ablation table"],
+            "failure_risks": ["Data labels may be noisy."],
+            "first_runnable_script_plan": ["Build manifest", "Run baseline inference"],
+            "metrics": ["Action accuracy"],
+            "summary": "Plan the first baseline and ablation run.",
+        }
+    )
+    output = parse_experiment_plan_output(raw_content, build_request())
+
+    # When
+    payload = build_stage_output_payload(output)
+
+    # Then
+    assert payload["plan_only"] is True
+    assert payload["no_experiment_results"] is True
+    assert payload["experiment_results_status"] == "not_run"
+
+
 def test_parse_experiment_plan_output_fails_closed_on_invalid_json() -> None:
     output = parse_experiment_plan_output("not json", build_request())
 
@@ -80,7 +111,7 @@ def test_parse_experiment_plan_output_fails_closed_on_invalid_json() -> None:
 
 
 def test_experiment_runner_executes_anthropic_messages_api() -> None:
-    captured_payload: dict[str, object] = {}
+    captured_payload: JsonObject = {}
     model_response = {
         "ablation_variables": ["temporal window size"],
         "baselines_to_reproduce": ["Baseline action recognizer"],
