@@ -5,7 +5,14 @@ from typing import Final, Literal, NotRequired, TypedDict, assert_never
 import httpx
 from pydantic import BaseModel, ConfigDict, SecretStr, ValidationError
 
-from noviscope.models.provider import ProviderKind
+from noviscope.agents.provider_chat_types import ChatMessage
+from noviscope.agents.responses_api import (
+    ResponsesParseError,
+    ResponsesPayload,
+    build_responses_payload,
+    parse_responses_output,
+)
+from noviscope.models.provider import ProviderApiMode, ProviderKind
 
 ANTHROPIC_API_VERSION: Final = "2023-06-01"
 DEFAULT_MAX_TOKENS: Final = 2048
@@ -20,11 +27,6 @@ class ProviderChatRunError(Exception):
 
     def __str__(self) -> str:
         return self.reason
-
-
-class ChatMessage(TypedDict):
-    role: Literal["system", "user"]
-    content: str
 
 
 class ChatCompletionPayload(TypedDict):
@@ -53,6 +55,7 @@ class ProviderChatRequest:
     api_key: SecretStr
     messages: list[ChatMessage]
     temperature: float
+    api_mode: ProviderApiMode = ProviderApiMode.AUTO
 
 
 class ChatCompletionMessage(BaseModel):
@@ -86,23 +89,49 @@ class AnthropicMessagesResponse(BaseModel):
     content: list[AnthropicContentBlock]
 
 
+class _ProviderEndpointUnavailable(Exception):
+    def __init__(self, endpoint: str, status_code: int) -> None:
+        super().__init__(endpoint, status_code)
+        self.endpoint = endpoint
+        self.status_code = status_code
+
+
 class ProviderChatClient:
     def __init__(self, client_factory: ClientFactory | None = None) -> None:
         self._client_factory = client_factory or self._default_client
 
     def complete(self, request: ProviderChatRequest) -> str:
-        match request.provider_kind:
-            case ProviderKind.OPENAI_COMPATIBLE | ProviderKind.CUSTOM:
-                return self._complete_openai_compatible(request)
-            case ProviderKind.ANTHROPIC:
-                return self._complete_anthropic(request)
-            case unreachable:
-                assert_never(unreachable)
+        try:
+            match request.provider_kind:
+                case ProviderKind.OPENAI_COMPATIBLE | ProviderKind.CUSTOM:
+                    return self._complete_openai_compatible(request)
+                case ProviderKind.ANTHROPIC:
+                    return self._complete_anthropic(request)
+                case unreachable:
+                    assert_never(unreachable)
+        except _ProviderEndpointUnavailable as exc:
+            raise ProviderChatRunError(
+                f"Model provider endpoint unavailable ({exc.status_code}): {exc.endpoint}"
+            ) from exc
 
     def _default_client(self) -> httpx.Client:
         return httpx.Client(timeout=_MODEL_REQUEST_TIMEOUT, follow_redirects=True)
 
     def _complete_openai_compatible(self, request: ProviderChatRequest) -> str:
+        match request.api_mode:
+            case ProviderApiMode.AUTO:
+                try:
+                    return self._complete_chat_completions(request)
+                except _ProviderEndpointUnavailable:
+                    return self._complete_responses(request)
+            case ProviderApiMode.CHAT_COMPLETIONS:
+                return self._complete_chat_completions(request)
+            case ProviderApiMode.RESPONSES:
+                return self._complete_responses(request)
+            case unreachable:
+                assert_never(unreachable)
+
+    def _complete_chat_completions(self, request: ProviderChatRequest) -> str:
         endpoint = f"{request.base_url.rstrip('/')}/chat/completions"
         payload: ChatCompletionPayload = {
             "messages": request.messages,
@@ -124,6 +153,23 @@ class ProviderChatClient:
         if not completion.choices:
             raise ProviderChatRunError("Model provider returned no choices.")
         return completion.choices[0].message.content
+
+    def _complete_responses(self, request: ProviderChatRequest) -> str:
+        endpoint = f"{request.base_url.rstrip('/')}/responses"
+        payload = build_responses_payload(
+            request.messages,
+            request.model,
+            request.temperature,
+        )
+        headers = {
+            "Authorization": f"Bearer {request.api_key.get_secret_value()}",
+            "Content-Type": "application/json",
+        }
+        response = self._post_json(endpoint, payload, headers)
+        try:
+            return parse_responses_output(response)
+        except ResponsesParseError as exc:
+            raise ProviderChatRunError(str(exc)) from exc
 
     def _complete_anthropic(self, request: ProviderChatRequest) -> str:
         endpoint = f"{request.base_url.rstrip('/')}/messages"
@@ -153,13 +199,20 @@ class ProviderChatClient:
     def _post_json(
         self,
         endpoint: str,
-        payload: ChatCompletionPayload | AnthropicMessagesPayload,
+        payload: ChatCompletionPayload | AnthropicMessagesPayload | ResponsesPayload,
         headers: dict[str, str],
     ) -> httpx.Response:
         try:
             with self._client_factory() as client:
                 response = client.post(endpoint, json=payload, headers=headers)
                 response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code in {404, 405}:
+                raise _ProviderEndpointUnavailable(
+                    endpoint=endpoint,
+                    status_code=exc.response.status_code,
+                ) from exc
+            raise ProviderChatRunError(f"Model provider request failed: {exc}") from exc
         except httpx.HTTPError as exc:
             raise ProviderChatRunError(f"Model provider request failed: {exc}") from exc
         return response

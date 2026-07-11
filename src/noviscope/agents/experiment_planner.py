@@ -13,7 +13,7 @@ from noviscope.agents.provider_chat import (
 from noviscope.agents.stage_runner import StageRunContext, StageRunner, StageRunResult
 from noviscope.core.json_types import JsonObject
 from noviscope.core.stage_policy import EXPERIMENT_PLANNER_AGENT_ID, IDEA_GENERATOR_AGENT_ID
-from noviscope.models.provider import ProviderKind
+from noviscope.models.provider import ProviderApiMode, ProviderKind
 from noviscope.models.quest import StageCard, StageStatus
 
 MAX_TEXT_FIELD_CHARS = 700
@@ -49,6 +49,7 @@ class ExperimentPlannerRequest(BaseModel):
     code_repository: str
     environment_notes: str
     source_stage_ids: JsonObject
+    api_mode: ProviderApiMode = ProviderApiMode.AUTO
 
 
 class ExperimentPlanOutput(BaseModel):
@@ -103,6 +104,7 @@ class OpenAICompatibleExperimentPlannerRunner:
             raw_content = self._chat_client.complete(
                 ProviderChatRequest(
                     api_key=request.api_key,
+                    api_mode=request.api_mode,
                     base_url=request.base_url,
                     messages=payload["messages"],
                     model=request.model,
@@ -154,6 +156,7 @@ class ExperimentPlannerStageRunner(StageRunner):
 
         output = self.experiment_runner.run(
             ExperimentPlannerRequest(
+                api_mode=context.provider.api_mode,
                 api_key=context.provider.api_key,
                 base_url=context.provider.base_url,
                 code_repository=setup["code_repository"],

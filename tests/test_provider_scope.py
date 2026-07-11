@@ -112,10 +112,18 @@ def test_create_schema_upgrades_legacy_provider_table_and_allows_duplicate_names
             row[1]
             for row in connection.execute(text("PRAGMA table_info('modelprovider')")).fetchall()
         }
-        assert {"scope", "owner_user_id", "created_by_user_id"}.issubset(columns)
+        assert {
+            "api_mode",
+            "scope",
+            "owner_user_id",
+            "created_by_user_id",
+        }.issubset(columns)
         assert connection.execute(
             text("SELECT scope FROM modelprovider WHERE id = 'provider_legacy_1'")
         ).scalar_one() == "shared"
+        assert connection.execute(
+            text("SELECT api_mode FROM modelprovider WHERE id = 'provider_legacy_1'")
+        ).scalar_one() == "auto"
 
         index_rows = connection.execute(
             text("PRAGMA index_list('modelprovider')")

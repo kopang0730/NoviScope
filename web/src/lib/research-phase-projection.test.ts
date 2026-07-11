@@ -38,6 +38,7 @@ const capability: WorkflowAgentCapability = {
 };
 const provider: Provider = {
   base_url: "https://model.example.com/v1",
+  api_mode: "auto",
   created_at: timestamp,
   default_model: "claude-research",
   id: "provider-anthropic",

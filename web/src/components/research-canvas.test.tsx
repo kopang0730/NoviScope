@@ -14,6 +14,7 @@ import { ResearchCanvas } from "./research-canvas";
 const timestamp = "2026-07-10T00:00:00Z";
 const provider: Provider = {
   base_url: "https://model.example.com/v1",
+  api_mode: "auto",
   created_at: timestamp,
   default_model: "research-model",
   id: "provider-1",

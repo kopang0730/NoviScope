@@ -26,7 +26,12 @@ from noviscope.core.stage_policy import (
     normalize_stage_output_payload,
     stage_confidence,
 )
-from noviscope.models.provider import ModelProvider, ProviderKind, ProviderScope
+from noviscope.models.provider import (
+    ModelProvider,
+    ProviderApiMode,
+    ProviderKind,
+    ProviderScope,
+)
 from noviscope.models.quest import Quest, QuestStatus, StageCard, StageStatus
 from noviscope.models.user import InviteCode, InviteStatus, User, UserRole
 from noviscope.providers.service import ProviderService
@@ -209,6 +214,7 @@ class ProviderCreateRequest(BaseModel):
     default_model: str
     api_key: SecretStr = Field(repr=False)
     scope: ProviderScope = ProviderScope.PERSONAL
+    api_mode: ProviderApiMode = ProviderApiMode.AUTO
 
 
 class ProviderUpdateRequest(BaseModel):
@@ -218,6 +224,7 @@ class ProviderUpdateRequest(BaseModel):
     default_model: str | None = None
     api_key: SecretStr | None = Field(default=None, repr=False)
     is_active: bool | None = None
+    api_mode: ProviderApiMode | None = None
 
 
 class ProviderResponse(BaseModel):
@@ -227,6 +234,7 @@ class ProviderResponse(BaseModel):
     scope: ProviderScope
     owner_user_id: str | None
     base_url: str
+    api_mode: ProviderApiMode
     default_model: str
     is_active: bool
     created_at: str
@@ -449,6 +457,7 @@ def create_provider(
         base_url=request.base_url,
         default_model=request.default_model,
         api_key=request.api_key.get_secret_value(),
+        api_mode=request.api_mode,
         scope=scope,
         owner_user_id=None if scope == ProviderScope.SHARED else current_user.id,
         created_by_user_id=current_user.id,
@@ -498,6 +507,7 @@ def update_provider(
             base_url=request.base_url,
             default_model=request.default_model,
             api_key=request.api_key.get_secret_value() if request.api_key is not None else None,
+            api_mode=request.api_mode,
             is_active=request.is_active,
         )
         return provider_response(provider)

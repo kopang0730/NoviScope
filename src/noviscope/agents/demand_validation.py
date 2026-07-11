@@ -13,7 +13,7 @@ from noviscope.agents.provider_chat import (
 from noviscope.agents.stage_runner import StageRunContext, StageRunner, StageRunResult
 from noviscope.core.json_types import JsonObject
 from noviscope.core.stage_policy import DEMAND_VALIDATOR_AGENT_ID, NO_EXTERNAL_VERIFICATION_RISK
-from noviscope.models.provider import ProviderKind
+from noviscope.models.provider import ProviderApiMode, ProviderKind
 
 
 class DemandValidationRequest(BaseModel):
@@ -28,6 +28,7 @@ class DemandValidationRequest(BaseModel):
     base_url: str
     model: str
     api_key: SecretStr
+    api_mode: ProviderApiMode = ProviderApiMode.AUTO
 
 
 class DemandValidationOutput(BaseModel):
@@ -82,6 +83,7 @@ class OpenAICompatibleDemandValidationRunner:
             raw_content = self._chat_client.complete(
                 ProviderChatRequest(
                     api_key=request.api_key,
+                    api_mode=request.api_mode,
                     base_url=request.base_url,
                     messages=payload["messages"],
                     model=request.model,
@@ -120,6 +122,7 @@ class DemandValidationStageRunner(StageRunner):
         output = self.demand_runner.run(
             DemandValidationRequest(
                 api_key=context.provider.api_key,
+                api_mode=context.provider.api_mode,
                 base_url=context.provider.base_url,
                 initial_direction=context.quest.initial_direction,
                 model=context.provider.model,

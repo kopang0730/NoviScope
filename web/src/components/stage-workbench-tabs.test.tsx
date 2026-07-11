@@ -9,6 +9,7 @@ import { StageWorkbenchTabs } from "./stage-workbench-tabs";
 
 const personalProvider: Provider = {
   base_url: "https://personal.example.com/v1",
+  api_mode: "auto",
   created_at: "2026-07-10T00:00:00Z",
   default_model: "personal-model",
   id: "personal-provider",
@@ -29,6 +30,7 @@ const otherUserProvider: Provider = {
 
 const sharedProvider: Provider = {
   base_url: "https://model.example.com/v1",
+  api_mode: "auto",
   created_at: "2026-07-10T00:00:00Z",
   default_model: "research-model",
   id: "shared-provider",

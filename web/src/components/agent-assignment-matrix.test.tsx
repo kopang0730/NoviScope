@@ -55,6 +55,7 @@ const assignments = capabilityDefinitions.map(
 const providers = [
   {
     base_url: "https://shared.example.com/v1",
+    api_mode: "auto",
     created_at: "2026-07-10T00:00:00Z",
     default_model: "shared-model",
     id: "shared-provider",

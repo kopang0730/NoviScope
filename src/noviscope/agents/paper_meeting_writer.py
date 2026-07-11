@@ -21,7 +21,7 @@ from noviscope.core.stage_policy import (
     IDEA_GENERATOR_AGENT_ID,
     PAPER_MEETING_WRITER_AGENT_ID,
 )
-from noviscope.models.provider import ProviderKind
+from noviscope.models.provider import ProviderApiMode, ProviderKind
 from noviscope.models.quest import StageCard, StageStatus
 
 MAX_TEXT_FIELD_CHARS = 900
@@ -53,6 +53,7 @@ class PaperMeetingWriterRequest(BaseModel):
     selected_ideas: list[JsonObject]
     experiment_plan: JsonObject
     source_stage_ids: JsonObject
+    api_mode: ProviderApiMode = ProviderApiMode.AUTO
 
 
 class PaperMeetingWriterOutput(BaseModel):
@@ -105,6 +106,7 @@ class OpenAICompatiblePaperMeetingWriterRunner:
             raw_content = self._chat_client.complete(
                 ProviderChatRequest(
                     api_key=request.api_key,
+                    api_mode=request.api_mode,
                     base_url=request.base_url,
                     messages=payload["messages"],
                     model=request.model,
@@ -174,6 +176,7 @@ class PaperMeetingWriterStageRunner(StageRunner):
 
         output = self.paper_runner.run(
             PaperMeetingWriterRequest(
+                api_mode=context.provider.api_mode,
                 api_key=context.provider.api_key,
                 base_url=context.provider.base_url,
                 demand_validation=compact_payload(

@@ -420,6 +420,7 @@ curl -s -b /tmp/noviscope-cookies.txt -X POST http://127.0.0.1:8000/providers \
     "name":"primary-openai",
     "kind":"openai_compatible",
     "base_url":"https://api.openai.com/v1",
+    "api_mode":"auto",
     "default_model":"gpt-4.1",
     "api_key":"example-provider-key",
     "scope":"personal"
@@ -428,6 +429,13 @@ curl -s -b /tmp/noviscope-cookies.txt -X POST http://127.0.0.1:8000/providers \
 
 Provider responses never include the raw API key or encrypted key. For shared
 deployment, set `NOVISCOPE_PROVIDER_SECRET_KEY` before storing real keys.
+
+OpenAI-compatible and custom providers support `api_mode` values `auto`,
+`chat_completions`, and `responses`. `auto` preserves existing Chat Completions
+behavior and retries Responses only when Chat Completions returns HTTP 404 or 405.
+The provider **Test** action checks credentials and model availability through
+`GET /models`; it does not spend tokens probing the selected generation API.
+Running a stage is the authoritative end-to-end check for the configured mode.
 
 Create a research quest as an authenticated user:
 

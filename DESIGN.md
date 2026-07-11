@@ -162,6 +162,8 @@ All spacing derives from 4px.
 ### Provider Matrix
 
 - Structure: agent role, capability status, shared default model, connection state, and test action, organized in Shared and Personal views.
+- OpenAI-compatible and custom provider forms expose an API mode selector: Auto, Chat Completions, or Responses. Provider lists show the configured mode.
+- Auto is the compatibility default: attempt Chat Completions first and fall back to Responses only when the Chat endpoint is unavailable.
 - States: implemented, requires review, planned, unavailable, connected, and unconfigured.
 - Planned agent rows remain visible for roadmap clarity but disable assignment controls and explain why configuration is unavailable.
 - Interaction: assignment changes use one page-level save action; provider tests remain explicit, accessible row-level actions.

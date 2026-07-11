@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import type { Provider, ProviderKind, ProviderScope } from "./types";
+import type { Provider, ProviderApiMode, ProviderKind, ProviderScope } from "./types";
 
 type ProvidersResponse = {
   providers: Provider[];
@@ -12,6 +12,7 @@ export type CreateProviderPayload = {
   default_model: string;
   api_key: string;
   scope: ProviderScope;
+  api_mode: ProviderApiMode;
 };
 
 export type UpdateProviderPayload = {
@@ -21,6 +22,7 @@ export type UpdateProviderPayload = {
   default_model?: string;
   api_key?: string;
   is_active?: boolean;
+  api_mode?: ProviderApiMode;
 };
 
 export type ProviderConnectionTestResult = {

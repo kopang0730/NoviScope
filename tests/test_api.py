@@ -266,12 +266,14 @@ def test_provider_crud_endpoints_do_not_return_api_key(
                 "base_url": "https://api.openai.com/v1",
                 "default_model": "gpt-4.1",
                 "api_key": "sk-realistic-test-key",
+                "api_mode": "responses",
             },
         )
 
         assert create_response.status_code == 201
         provider = create_response.json()
         assert provider["name"] == "primary-openai"
+        assert provider["api_mode"] == "responses"
         assert "api_key" not in provider
         assert "api_key_ciphertext" not in provider
 
@@ -286,10 +288,15 @@ def test_provider_crud_endpoints_do_not_return_api_key(
 
         update_response = client.patch(
             f"/providers/{provider_id}",
-            json={"default_model": "gpt-4.1-mini", "is_active": False},
+            json={
+                "api_mode": "chat_completions",
+                "default_model": "gpt-4.1-mini",
+                "is_active": False,
+            },
         )
         assert update_response.status_code == 200
         assert update_response.json()["default_model"] == "gpt-4.1-mini"
+        assert update_response.json()["api_mode"] == "chat_completions"
         assert update_response.json()["is_active"] is False
 
         inactive_test_response = client.post(f"/providers/{provider_id}/test")

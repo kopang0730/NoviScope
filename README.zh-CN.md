@@ -370,6 +370,7 @@ curl -s -b /tmp/noviscope-cookies.txt -X POST http://127.0.0.1:8000/providers \
     "name":"primary-openai",
     "kind":"openai_compatible",
     "base_url":"https://api.openai.com/v1",
+    "api_mode":"auto",
     "default_model":"gpt-4.1",
     "api_key":"example-provider-key",
     "scope":"personal"
@@ -377,6 +378,12 @@ curl -s -b /tmp/noviscope-cookies.txt -X POST http://127.0.0.1:8000/providers \
 ```
 
 Provider API 响应不会返回原始 API key 或密文。共享部署保存真实 key 前，应先设置 `NOVISCOPE_PROVIDER_SECRET_KEY`。
+
+OpenAI-compatible 和 custom provider 支持 `auto`、`chat_completions`、
+`responses` 三种 `api_mode`。`auto` 保持原有 Chat Completions 行为，仅在
+Chat Completions 返回 HTTP 404 或 405 时尝试 Responses 端点。
+Provider 的“测试”操作通过 `GET /models` 检查凭证和模型可用性，不会消耗
+token 去探测所选生成接口；阶段运行才是该 API 模式的端到端验证。
 
 以已登录用户身份创建科研 quest：
 

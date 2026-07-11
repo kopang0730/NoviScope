@@ -1,5 +1,6 @@
 export type UserRole = "admin" | "member";
 export type ProviderKind = "openai_compatible" | "anthropic" | "custom";
+export type ProviderApiMode = "auto" | "chat_completions" | "responses";
 export type ProviderScope = "personal" | "shared";
 export type InviteStatus = "active" | "disabled" | "exhausted";
 export type StageConfidence = "high" | "medium" | "low" | "unknown";
@@ -55,6 +56,7 @@ export interface Provider {
   scope: ProviderScope;
   owner_user_id: string | null;
   base_url: string;
+  api_mode: ProviderApiMode;
   default_model: string;
   is_active: boolean;
   created_at: string;
