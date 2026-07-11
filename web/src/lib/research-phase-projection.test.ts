@@ -166,4 +166,40 @@ describe("research phase provider projection", () => {
     expect(presentation.state).toBe("blocked");
     expect(presentation.signal).toBe(nextAction.detail);
   });
+
+  it("projects a reopened rejected gate as runnable when the backend allows a rerun", () => {
+    const reopenedStage = {
+      ...stage,
+      human_approved: false,
+      status: "blocked" as const,
+      summary: "Demand validation was reopened for rerun.",
+    };
+    const phase = buildMacroPhaseViews([reopenedStage], [capability])[0];
+    const nextAction: WorkflowNextAction = {
+      action_type: "run_stage",
+      agent_id: reopenedStage.agent_id,
+      blocking_reason: "",
+      can_run: true,
+      detail: "Stage is ready to run.",
+      label: "Run Demand Validator",
+      priority: 1,
+      stage_id: reopenedStage.id,
+      stage_status: reopenedStage.status,
+      stage_title: reopenedStage.title,
+    };
+    expect(phase).toBeDefined();
+    if (!phase) {
+      return;
+    }
+
+    const presentation = buildMacroPhasePresentation({
+      nextAction,
+      phase,
+      providerReadinessData: readiness,
+      stages: [reopenedStage],
+      t: (key: TranslationKey) => key,
+    });
+
+    expect(presentation.state).toBe("runnable");
+  });
 });

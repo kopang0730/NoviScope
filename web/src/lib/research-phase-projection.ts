@@ -99,7 +99,11 @@ export function buildMacroPhasePresentation({
     };
   }
 
-  if (isHumanGateStage(stage) && stage.human_approved === false) {
+  if (
+    isHumanGateStage(stage)
+    && stage.status === "complete"
+    && stage.human_approved === false
+  ) {
     return {
       flow,
       signal: stage.review_notes || stage.summary || t("canvasWaitingForOutput"),
