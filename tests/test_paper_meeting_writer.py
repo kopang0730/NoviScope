@@ -66,6 +66,9 @@ def test_parse_paper_writer_output_caps_confidence_and_preserves_review_sections
     output = parse_paper_meeting_writer_output(raw_content, build_request())
 
     assert output.confidence == "medium"
+    assert output.summary == (
+        "Generated four review-only Markdown artifacts without verified experiment results."
+    )
     assert output.source_stage_ids["experiment_planner"] == "stage_experiment"
     assert output.chinese_research_brief_markdown.startswith("# 中文研究 Brief")
     assert output.english_research_brief_markdown.startswith("# Research Brief")
@@ -130,7 +133,9 @@ def test_paper_writer_runner_executes_anthropic_messages_api() -> None:
 
     output = runner.run(request)
 
-    assert output.summary == "Generated four traceable draft artifacts."
+    assert output.summary == (
+        "Generated four review-only Markdown artifacts without verified experiment results."
+    )
     assert NO_RESULTS_NOTICE in output.experiment_results_not_available
     assert HUMAN_REVIEW_NOTICE in output.human_review_required
     assert captured_payload["model"] == "claude-test-model"

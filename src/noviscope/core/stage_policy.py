@@ -3,6 +3,8 @@ from typing import Literal, TypeAlias
 from noviscope.core.json_types import JsonObject
 
 DEMAND_VALIDATOR_AGENT_ID = "demand_validator"
+CODE_RUNNER_AGENT_ID = "code_runner"
+EVIDENCE_AUDITOR_AGENT_ID = "evidence_auditor"
 IDEA_GENERATOR_AGENT_ID = "idea_generator"
 EXPERIMENT_PLANNER_AGENT_ID = "experiment_planner"
 PAPER_MEETING_WRITER_AGENT_ID = "paper_meeting_writer"

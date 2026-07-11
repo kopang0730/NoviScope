@@ -9,6 +9,11 @@ from sqlmodel import Session
 from noviscope.agents.assignments import AgentAssignmentService
 from noviscope.agents.registry import AGENT_REGISTRY, AgentSpec
 from noviscope.api.dependencies import get_session
+from noviscope.api.stage_patch_policy import (
+    ServerManagedStagePatch,
+    StagePatchPolicyError,
+    ensure_server_managed_stage_patch_is_review_only,
+)
 from noviscope.auth.dependencies import (
     clear_session_cookie,
     create_session_token,
@@ -599,6 +604,17 @@ def update_stage(
     service = QuestService(session)
     try:
         existing_stage = service.get_stage_card_for_user(stage_id, current_user)
+        ensure_server_managed_stage_patch_is_review_only(
+            existing_stage,
+            patch=ServerManagedStagePatch(
+                evidence_payload=request.evidence_payload,
+                fields=frozenset(request.model_fields_set),
+                input_payload=request.input_payload,
+                output_payload=request.output_payload,
+                summary=request.summary,
+                target_status=request.status,
+            ),
+        )
         output_payload = (
             normalize_stage_output_payload(existing_stage.agent_id, request.output_payload)
             if request.output_payload is not None
@@ -620,5 +636,7 @@ def update_stage(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except PermissionError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except StagePatchPolicyError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
