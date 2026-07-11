@@ -143,11 +143,8 @@ class ProviderChatClient:
             ) from exc
 
         for block in message.content:
-            match block.type:
-                case "text" if block.text:
-                    return block.text
-                case _:
-                    continue
+            if block.type == "text" and block.text:
+                return block.text
         raise ProviderChatRunError("Anthropic provider returned no text content.")
 
     def _post_json(
@@ -160,8 +157,16 @@ class ProviderChatClient:
             with self._client_factory() as client:
                 response = client.post(endpoint, json=payload, headers=headers)
                 response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise ProviderChatRunError(
+                f"Model provider request failed: HTTP {exc.response.status_code}."
+            ) from exc
+        except httpx.TimeoutException as exc:
+            raise ProviderChatRunError("Model provider request failed: timeout.") from exc
         except httpx.HTTPError as exc:
-            raise ProviderChatRunError(f"Model provider request failed: {exc}") from exc
+            raise ProviderChatRunError(
+                f"Model provider request failed: {exc.__class__.__name__}."
+            ) from exc
         return response
 
 
