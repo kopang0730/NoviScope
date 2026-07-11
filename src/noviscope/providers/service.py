@@ -1,10 +1,30 @@
+from typing import assert_never
+
 from sqlmodel import Session, select
 
 from noviscope.agents.assignments import AgentAssignmentService
 from noviscope.core.crypto import SecretBox
 from noviscope.models.common import utc_now
-from noviscope.models.provider import ModelProvider, ProviderKind, ProviderScope
+from noviscope.models.provider import (
+    ModelProvider,
+    ProviderApiMode,
+    ProviderKind,
+    ProviderScope,
+)
 from noviscope.models.user import User, UserRole
+
+
+def normalize_api_mode(
+    kind: ProviderKind,
+    api_mode: ProviderApiMode,
+) -> ProviderApiMode:
+    match kind:
+        case ProviderKind.ANTHROPIC:
+            return ProviderApiMode.AUTO
+        case ProviderKind.OPENAI_COMPATIBLE | ProviderKind.CUSTOM:
+            return api_mode
+        case unreachable:
+            assert_never(unreachable)
 
 
 class ProviderService:
@@ -20,6 +40,7 @@ class ProviderService:
         base_url: str,
         default_model: str,
         api_key: str,
+        api_mode: ProviderApiMode = ProviderApiMode.AUTO,
         scope: ProviderScope = ProviderScope.PERSONAL,
         owner_user_id: str | None = None,
         created_by_user_id: str | None = None,
@@ -30,6 +51,7 @@ class ProviderService:
             base_url=base_url,
             default_model=default_model,
             api_key_ciphertext=self.secret_box.encrypt(api_key),
+            api_mode=normalize_api_mode(kind, api_mode),
             scope=scope,
             owner_user_id=owner_user_id,
             created_by_user_id=created_by_user_id,
@@ -77,13 +99,16 @@ class ProviderService:
         base_url: str | None = None,
         default_model: str | None = None,
         api_key: str | None = None,
+        api_mode: ProviderApiMode | None = None,
         is_active: bool | None = None,
     ) -> ModelProvider:
         provider = self.get_provider(provider_id)
         if name is not None:
             provider.name = name
-        if kind is not None:
-            provider.kind = kind
+        effective_kind = kind or provider.kind
+        effective_api_mode = api_mode or provider.api_mode
+        provider.kind = effective_kind
+        provider.api_mode = normalize_api_mode(effective_kind, effective_api_mode)
         if base_url is not None:
             provider.base_url = base_url
         if default_model is not None:

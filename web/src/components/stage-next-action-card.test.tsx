@@ -26,6 +26,7 @@ const action: WorkflowNextAction = {
 const providers: readonly Provider[] = [
   {
     base_url: "https://personal.example.com/v1",
+    api_mode: "auto",
     created_at: "2026-07-10T00:00:00Z",
     default_model: "personal-model",
     id: "personal-provider",
@@ -38,6 +39,7 @@ const providers: readonly Provider[] = [
   },
   {
     base_url: "https://shared.example.com/v1",
+    api_mode: "auto",
     created_at: "2026-07-10T00:00:00Z",
     default_model: "shared-model",
     id: "shared-provider",
@@ -50,6 +52,7 @@ const providers: readonly Provider[] = [
   },
   {
     base_url: "https://personal-anthropic.example.com/v1",
+    api_mode: "auto",
     created_at: "2026-07-10T00:00:00Z",
     default_model: "claude-sonnet",
     id: "personal-anthropic",
@@ -62,6 +65,7 @@ const providers: readonly Provider[] = [
   },
   {
     base_url: "https://inactive.example.com/v1",
+    api_mode: "auto",
     created_at: "2026-07-10T00:00:00Z",
     default_model: "inactive-model",
     id: "inactive-provider",

@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import type { ProviderKind, User } from "../api/types";
+import type { ProviderApiMode, ProviderKind, User } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
 import { labelFromEnum } from "../lib/format";
 import type { ProviderFormState } from "../lib/provider-form";
@@ -10,6 +10,15 @@ import { Card, CardHeading } from "./card";
 import { Input, Select } from "./input";
 
 const providerKinds: readonly ProviderKind[] = ["openai_compatible", "anthropic", "custom"];
+const providerApiModes: readonly ProviderApiMode[] = [
+  "auto",
+  "chat_completions",
+  "responses",
+];
+
+function unsupportedProviderApiMode(mode: never): never {
+  throw new TypeError(`Unsupported provider API mode: ${mode}`);
+}
 
 type ProviderFormCardProps = {
   readonly currentUser: User | null;
@@ -42,6 +51,31 @@ export function ProviderFormCard({
 
   function providerKindFromValue(value: string): ProviderKind {
     return providerKinds.find((kind) => kind === value) ?? "openai_compatible";
+  }
+
+  function providerApiModeFromValue(value: string): ProviderApiMode {
+    return providerApiModes.find((mode) => mode === value) ?? "auto";
+  }
+
+  function providerApiModeLabel(mode: ProviderApiMode) {
+    switch (mode) {
+      case "auto":
+        return t("providerApiModeAuto");
+      case "chat_completions":
+        return t("providerApiModeChatCompletions");
+      case "responses":
+        return t("providerApiModeResponses");
+      default:
+        return unsupportedProviderApiMode(mode);
+    }
+  }
+
+  function updateProviderKind(kind: ProviderKind) {
+    onUpdate({
+      ...formState,
+      apiMode: kind === "anthropic" ? "auto" : formState.apiMode,
+      kind,
+    });
   }
 
   const canCreateInScope = scope === "personal" || currentUser?.role === "admin";
@@ -83,7 +117,7 @@ export function ProviderFormCard({
         />
         <Select
           label={t("providerKind")}
-          onChange={(event) => updateField("kind", providerKindFromValue(event.target.value))}
+          onChange={(event) => updateProviderKind(providerKindFromValue(event.target.value))}
           value={formState.kind}
         >
           {providerKinds.map((kind) => (
@@ -92,6 +126,22 @@ export function ProviderFormCard({
             </option>
           ))}
         </Select>
+        {formState.kind !== "anthropic" ? (
+          <Select
+            hint={t("providerApiModeHint")}
+            label={t("providerApiMode")}
+            onChange={(event) =>
+              updateField("apiMode", providerApiModeFromValue(event.target.value))
+            }
+            value={formState.apiMode}
+          >
+            {providerApiModes.map((mode) => (
+              <option key={mode} value={mode}>
+                {providerApiModeLabel(mode)}
+              </option>
+            ))}
+          </Select>
+        ) : null}
         <Input
           label={t("providerBaseUrl")}
           onChange={(event) => updateField("baseUrl", event.target.value)}

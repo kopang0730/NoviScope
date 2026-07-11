@@ -5,7 +5,7 @@ from typing import Protocol
 from pydantic import SecretStr
 
 from noviscope.core.json_types import JsonObject
-from noviscope.models.provider import ProviderKind
+from noviscope.models.provider import ProviderApiMode, ProviderKind
 from noviscope.models.quest import Quest, StageCard
 
 
@@ -17,10 +17,12 @@ class ModelProviderCredentials:
     base_url: str
     model: str
     api_key: SecretStr
+    api_mode: ProviderApiMode = ProviderApiMode.AUTO
 
     def provenance_payload(self) -> JsonObject:
         return {
             "provider_id": self.id,
+            "provider_api_mode": self.api_mode.value,
             "provider_kind": self.kind.value,
             "provider_model": self.model,
             "provider_name": self.name,

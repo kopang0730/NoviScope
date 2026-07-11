@@ -14,7 +14,7 @@ from noviscope.agents.provider_chat import (
 from noviscope.agents.stage_runner import StageRunContext, StageRunner, StageRunResult
 from noviscope.core.json_types import JsonObject
 from noviscope.core.stage_policy import DEMAND_VALIDATOR_AGENT_ID, IDEA_GENERATOR_AGENT_ID
-from noviscope.models.provider import ProviderKind
+from noviscope.models.provider import ProviderApiMode, ProviderKind
 from noviscope.models.quest import StageCard, StageStatus
 
 MAX_PAPERS_FOR_PROMPT = 8
@@ -40,6 +40,7 @@ class GapHypothesisRequest(BaseModel):
     demand_validation: JsonObject
     papers: list[JsonObject]
     source_stage_ids: JsonObject
+    api_mode: ProviderApiMode = ProviderApiMode.AUTO
 
 
 class GapEvidence(BaseModel):
@@ -119,6 +120,7 @@ class OpenAICompatibleGapHypothesisRunner:
             raw_content = self._chat_client.complete(
                 ProviderChatRequest(
                     api_key=request.api_key,
+                    api_mode=request.api_mode,
                     base_url=request.base_url,
                     messages=payload["messages"],
                     model=request.model,
@@ -174,6 +176,7 @@ class GapHypothesisStageRunner(StageRunner):
             output = self.gap_runner.run(
                 GapHypothesisRequest(
                     api_key=context.provider.api_key,
+                    api_mode=context.provider.api_mode,
                     base_url=context.provider.base_url,
                     demand_validation=demand_stage.output_payload,
                     initial_direction=context.quest.initial_direction,

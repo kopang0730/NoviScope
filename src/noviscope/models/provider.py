@@ -12,6 +12,12 @@ class ProviderKind(StrEnum):
     CUSTOM = "custom"
 
 
+class ProviderApiMode(StrEnum):
+    AUTO = "auto"
+    CHAT_COMPLETIONS = "chat_completions"
+    RESPONSES = "responses"
+
+
 class ProviderScope(StrEnum):
     SHARED = "shared"
     PERSONAL = "personal"
@@ -30,6 +36,13 @@ class ModelProvider(SQLModel, table=True):
     owner_user_id: str | None = Field(default=None, foreign_key="user.id", index=True)
     created_by_user_id: str | None = Field(default=None, foreign_key="user.id")
     base_url: str
+    api_mode: ProviderApiMode = Field(
+        default=ProviderApiMode.AUTO,
+        sa_type=SAEnum(
+            ProviderApiMode,
+            values_callable=lambda enum: [item.value for item in enum],
+        ),
+    )
     default_model: str
     api_key_ciphertext: str
     is_active: bool = True

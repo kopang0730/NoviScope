@@ -1,7 +1,14 @@
-import type { Provider, ProviderKind, ProviderScope, User } from "../api/types";
+import type {
+  Provider,
+  ProviderApiMode,
+  ProviderKind,
+  ProviderScope,
+  User,
+} from "../api/types";
 
 export type ProviderFormState = {
   readonly apiKey: string;
+  readonly apiMode: ProviderApiMode;
   readonly baseUrl: string;
   readonly defaultModel: string;
   readonly isActive: boolean;
@@ -12,6 +19,7 @@ export type ProviderFormState = {
 
 export const initialProviderFormState: ProviderFormState = {
   apiKey: "",
+  apiMode: "auto",
   baseUrl: "https://api.openai.com/v1",
   defaultModel: "",
   isActive: true,
@@ -23,6 +31,7 @@ export const initialProviderFormState: ProviderFormState = {
 export function providerToFormState(provider: Provider): ProviderFormState {
   return {
     apiKey: "",
+    apiMode: provider.api_mode,
     baseUrl: provider.base_url,
     defaultModel: provider.default_model,
     isActive: provider.is_active,

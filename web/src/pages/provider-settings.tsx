@@ -146,6 +146,7 @@ export function ProviderSettingsPage() {
           is_active: formState.isActive,
           kind: formState.kind,
           name: formState.name,
+          api_mode: formState.apiMode,
         });
         resetForm();
       } else {
@@ -156,6 +157,7 @@ export function ProviderSettingsPage() {
           kind: formState.kind,
           name: formState.name,
           scope: formState.scope,
+          api_mode: formState.apiMode,
         });
         setFormState({
           ...initialProviderFormState,

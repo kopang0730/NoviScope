@@ -57,6 +57,21 @@ class ChatCompletionResponse(BaseModel):
     choices: list[ChatChoice]
 
 
+class ResponsesRequest(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    input: str
+    instructions: str | None = None
+    model: str
+    temperature: float
+
+
+class ResponsesResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    output_text: str
+
+
 DEMAND_OUTPUT = DemandValidationOutput(
     confidence="medium",
     demand_assessment="plausible",
@@ -105,3 +120,8 @@ def create_chat_completion(request: ChatCompletionRequest) -> ChatCompletionResp
         ],
         model=request.model,
     )
+
+
+@app.post("/v1/responses")
+def create_response(_: ResponsesRequest) -> ResponsesResponse:
+    return ResponsesResponse(output_text=DEMAND_OUTPUT.model_dump_json())

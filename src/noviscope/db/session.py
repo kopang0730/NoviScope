@@ -46,6 +46,7 @@ def _upgrade_modelprovider_schema(engine: Engine) -> None:
 
         columns = {column["name"] for column in inspector.get_columns("modelprovider")}
         missing_columns = {
+            "api_mode",
             "scope",
             "owner_user_id",
             "created_by_user_id",
@@ -74,6 +75,13 @@ def _upgrade_modelprovider_schema(engine: Engine) -> None:
                 text("ALTER TABLE modelprovider ALTER COLUMN scope SET DEFAULT 'shared'")
             )
             connection.execute(text("ALTER TABLE modelprovider ALTER COLUMN scope SET NOT NULL"))
+        if "api_mode" in missing_columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE modelprovider "
+                    "ADD COLUMN api_mode VARCHAR NOT NULL DEFAULT 'auto'"
+                )
+            )
         if "owner_user_id" in missing_columns:
             connection.execute(text("ALTER TABLE modelprovider ADD COLUMN owner_user_id VARCHAR"))
         if "created_by_user_id" in missing_columns:
@@ -125,6 +133,7 @@ def _upgrade_sqlite_modelprovider_schema(engine: Engine, existing_columns: set[s
                 id VARCHAR NOT NULL PRIMARY KEY,
                 name VARCHAR NOT NULL,
                 kind VARCHAR NOT NULL,
+                api_mode VARCHAR NOT NULL DEFAULT 'auto',
                 scope VARCHAR NOT NULL DEFAULT 'personal',
                 owner_user_id VARCHAR,
                 created_by_user_id VARCHAR,
@@ -145,6 +154,7 @@ def _upgrade_sqlite_modelprovider_schema(engine: Engine, existing_columns: set[s
                 id,
                 name,
                 kind,
+                api_mode,
                 scope,
                 owner_user_id,
                 created_by_user_id,
@@ -159,6 +169,7 @@ def _upgrade_sqlite_modelprovider_schema(engine: Engine, existing_columns: set[s
                 id,
                 name,
                 kind,
+                {"COALESCE(api_mode, 'auto')" if "api_mode" in existing_columns else "'auto'"},
                 {"COALESCE(scope, 'shared')" if "scope" in existing_columns else "'shared'"},
                 {"owner_user_id" if "owner_user_id" in existing_columns else "NULL"},
                 {"created_by_user_id" if "created_by_user_id" in existing_columns else "NULL"},

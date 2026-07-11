@@ -17,6 +17,7 @@ vi.mock("../api/quests", () => ({
 
 const provider: Provider = {
   base_url: "https://model.example.com/v1",
+  api_mode: "auto",
   created_at: "2026-07-10T00:00:00Z",
   default_model: "research-model",
   id: "provider-1",
@@ -168,6 +169,39 @@ describe("StageWorkbenchTabs full mode", () => {
     await user.click(screen.getByRole("tab", { name: "Artifacts" }));
 
     expect(screen.getByRole("button", { name: "Select for experiment design" })).toBeInTheDocument();
+  });
+
+  it("marks saved demand evidence as human reviewed", async () => {
+    const user = userEvent.setup();
+    const reviewedStage = stage({
+      evidence_payload: {
+        human_demand_reviewed: true,
+        human_demand_sources: ["Customer interview"],
+        human_demand_verdict: "verified",
+      },
+    });
+    vi.mocked(updateStage).mockResolvedValue(reviewedStage);
+    renderFull(stage());
+
+    await user.click(screen.getByRole("tab", { name: "Artifacts" }));
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Demand evidence verdict" }),
+      "verified",
+    );
+    await user.click(screen.getByRole("button", { name: "Save demand evidence" }));
+
+    await waitFor(() => {
+      expect(updateStage).toHaveBeenCalledWith(
+        "stage-1",
+        expect.objectContaining({
+          evidence_payload: expect.objectContaining({
+            human_demand_reviewed: true,
+            human_demand_sources: ["Customer interview"],
+            human_demand_verdict: "verified",
+          }),
+        }),
+      );
+    });
   });
 
   it("keeps shared Anthropic ready as the default while only personal Anthropic is selectable", async () => {

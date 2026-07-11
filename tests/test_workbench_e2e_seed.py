@@ -184,3 +184,20 @@ def test_fake_provider_returns_a_review_gated_demand_result() -> None:
     assert output.go_or_no_go_recommendation == "go_with_human_review"
     assert any("unverified" in item.lower() for item in output.risks)
     assert any("no experiment" in item.lower() for item in output.risks)
+
+
+def test_fake_provider_supports_responses_api() -> None:
+    with TestClient(fake_provider_app) as client:
+        response = client.post(
+            "/v1/responses",
+            json={
+                "input": "Validate badminton demand",
+                "instructions": "Return structured JSON",
+                "model": "noviscope-e2e-model",
+                "temperature": 0.2,
+            },
+        )
+
+    assert response.status_code == 200
+    output = DemandValidationOutput.model_validate_json(response.json()["output_text"])
+    assert output.summary.startswith("The badminton-analysis demand")

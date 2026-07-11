@@ -1,32 +1,33 @@
 import { useEffect, useId, useState } from "react";
 import { Link } from "react-router-dom";
 import type { StageCard } from "../api/types";
-import { useI18n, type TranslationKey } from "../i18n/i18n-context";
+import { useI18n } from "../i18n/i18n-context";
 import { formatDateTime, labelFromEnum } from "../lib/format";
 import { getActivePersonalProviders } from "../lib/personal-provider-overrides";
 import type { ProviderReadinessData } from "../lib/provider-readiness-data";
 import { isModelBackedStage } from "../lib/provider-readiness";
-import {
-  buildStageDetails,
-  hasStageEvidence,
-  isHumanGateStage,
-  isImplementedStageRole,
-  isOutputCapableStage,
-} from "../lib/research-canvas-data";
+import { buildStageDetails } from "../lib/research-canvas-data";
 import { readSourceStageIds } from "../lib/source-stage-ids";
 import { getStageRunGate } from "../lib/stage-run-gate";
 import { stageTone } from "../lib/status-tones";
+import {
+  isStageWorkbenchTabAvailable,
+  stageWorkbenchTabs,
+  type StageWorkbenchTabId,
+} from "../lib/stage-workbench-tabs";
 import { useAsyncSelectionGuard } from "../lib/use-async-selection-guard";
 import { Badge } from "./badge";
 import { Button, buttonClassName } from "./button";
+import { DemandValidationOverview } from "./demand-validation-overview";
 import { Select } from "./input";
 import { SourceStageList } from "./source-stage-list";
+import { StageAdvancedPayloads } from "./stage-advanced-payloads";
 import { StageOutputPanel } from "./stage-output-summary";
 import { StageProviderReadinessCard } from "./stage-provider-readiness";
 import { StageReviewGateCard } from "./stage-review-gate-card";
 import { StageRunSummary } from "./stage-run-summary";
 
-export type StageWorkbenchTabId = "overview" | "evidence" | "run" | "review" | "artifacts";
+export type { StageWorkbenchTabId } from "../lib/stage-workbench-tabs";
 
 export type StageWorkbenchTabsProps = {
   readonly currentUserId: string | null;
@@ -39,59 +40,6 @@ export type StageWorkbenchTabsProps = {
   readonly providerReadinessData: ProviderReadinessData;
   readonly runningStageId: string | null;
 };
-
-type TabDefinition = {
-  readonly id: StageWorkbenchTabId;
-  readonly labelKey: TranslationKey;
-};
-
-const tabDefinitions: readonly TabDefinition[] = [
-  { id: "overview", labelKey: "stageWorkbenchOverview" },
-  { id: "evidence", labelKey: "stageWorkbenchEvidence" },
-  { id: "run", labelKey: "stageWorkbenchRun" },
-  { id: "review", labelKey: "stageWorkbenchReview" },
-  { id: "artifacts", labelKey: "stageWorkbenchArtifacts" },
-];
-
-function isTabAvailable(tabId: StageWorkbenchTabId, stage: StageCard) {
-  switch (tabId) {
-    case "overview":
-      return true;
-    case "evidence":
-      return isImplementedStageRole(stage) || hasStageEvidence(stage);
-    case "run":
-      return isImplementedStageRole(stage);
-    case "review":
-      return isHumanGateStage(stage);
-    case "artifacts":
-      return isOutputCapableStage(stage);
-  }
-}
-
-function AdvancedPayloads({ stage }: { readonly stage: StageCard }) {
-  const { t } = useI18n();
-  return (
-    <details className="mt-4 rounded-lg border border-slate-200 bg-white">
-      <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-slate-800">
-        {t("stageWorkbenchAdvanced")}
-      </summary>
-      <div className="grid gap-4 border-t border-slate-200 p-4 xl:grid-cols-3">
-        {[
-          [t("stageInputPayload"), stage.input_payload],
-          [t("stageOutputPayload"), stage.output_payload],
-          [t("stageEvidencePayload"), stage.evidence_payload],
-        ].map(([label, payload]) => (
-          <div className="min-w-0" key={String(label)}>
-            <p className="text-xs font-semibold text-slate-500">{String(label)}</p>
-            <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-950 p-3 text-xs leading-5 text-slate-100">
-              {JSON.stringify(payload, null, 2)}
-            </pre>
-          </div>
-        ))}
-      </div>
-    </details>
-  );
-}
 
 export function StageWorkbenchTabs({
   currentUserId,
@@ -107,12 +55,14 @@ export function StageWorkbenchTabs({
   const { t } = useI18n();
   const instanceId = useId();
   const [activeTabId, setActiveTabId] = useState<StageWorkbenchTabId>(() =>
-    isTabAvailable(initialTabId, stage) ? initialTabId : "overview",
+    isStageWorkbenchTabAvailable(initialTabId, stage) ? initialTabId : "overview",
   );
   const [currentStage, setCurrentStage] = useState(stage);
   const [selectedProviderId, setSelectedProviderId] = useState("");
   const isCurrentStage = useAsyncSelectionGuard(stage.id);
-  const availableTabs = tabDefinitions.filter((tab) => isTabAvailable(tab.id, currentStage));
+  const availableTabs = stageWorkbenchTabs.filter((tab) =>
+    isStageWorkbenchTabAvailable(tab.id, currentStage),
+  );
   const sourceStageIds = readSourceStageIds(currentStage.output_payload);
   const stageRunGate = getStageRunGate({
     providerReadinessData,
@@ -140,7 +90,9 @@ export function StageWorkbenchTabs({
   }, [stage]);
 
   useEffect(() => {
-    setActiveTabId(isTabAvailable(initialTabId, stage) ? initialTabId : "overview");
+    setActiveTabId(
+      isStageWorkbenchTabAvailable(initialTabId, stage) ? initialTabId : "overview",
+    );
   }, [initialTabId, stage.id]);
 
   useEffect(() => {
@@ -167,10 +119,10 @@ export function StageWorkbenchTabs({
               </div>
               <div className="flex flex-wrap gap-2">
                 <Badge tone={stageTone(currentStage.status)}>{labelFromEnum(currentStage.status)}</Badge>
-                <Badge tone="gray">{labelFromEnum(currentStage.confidence)}</Badge>
               </div>
             </div>
             <StageRunSummary stage={currentStage} stageRunGate={stageRunGate} />
+            <DemandValidationOverview stage={currentStage} />
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
               <p className="text-xs text-slate-500">{t("updated")} {formatDateTime(currentStage.updated_at)}</p>
               {mode === "compact" ? (
@@ -201,7 +153,7 @@ export function StageWorkbenchTabs({
                 <SourceStageList sourceStageIds={sourceStageIds} />
               </div>
             ) : null}
-            <AdvancedPayloads stage={currentStage} />
+            <StageAdvancedPayloads stage={currentStage} />
           </section>
         );
       }

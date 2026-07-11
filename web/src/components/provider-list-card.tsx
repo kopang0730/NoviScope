@@ -9,6 +9,10 @@ import { Button } from "./button";
 import { Card, CardHeading } from "./card";
 import { MobileStack, Table, TableCell, TableHead } from "./table";
 
+function unsupportedProviderApiMode(mode: never): never {
+  throw new TypeError(`Unsupported provider API mode: ${mode}`);
+}
+
 type ProviderListCardProps = {
   readonly currentUser: User | null;
   readonly loading: boolean;
@@ -23,6 +27,22 @@ type ProviderListCardProps = {
 
 function statusTone(provider: Provider) {
   return provider.is_active ? "green" : "gray";
+}
+
+function providerApiModeLabel(provider: Provider, t: ReturnType<typeof useI18n>["t"]) {
+  if (provider.kind === "anthropic") {
+    return t("providerApiModeAnthropic");
+  }
+  switch (provider.api_mode) {
+    case "auto":
+      return t("providerApiModeAuto");
+    case "chat_completions":
+      return t("providerApiModeChatCompletions");
+    case "responses":
+      return t("providerApiModeResponses");
+    default:
+      return unsupportedProviderApiMode(provider.api_mode);
+  }
 }
 
 function ProviderTestResult({ result }: { readonly result: ProviderConnectionTestResult | undefined }) {
@@ -128,7 +148,12 @@ export function ProviderListCard({
                     <div className="mt-1 text-xs text-slate-500">{provider.base_url}</div>
                     <ProviderTestResult result={testResults[provider.id]} />
                   </TableCell>
-                  <TableCell className="min-w-[120px]">{labelFromEnum(provider.kind)}</TableCell>
+                  <TableCell className="min-w-[150px]">
+                    <p>{labelFromEnum(provider.kind)}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {providerApiModeLabel(provider, t)}
+                    </p>
+                  </TableCell>
                   <TableCell className="min-w-[130px]">{provider.default_model}</TableCell>
                   <TableCell>
                     <Badge tone={statusTone(provider)}>{provider.is_active ? t("providerActive") : t("providerInactive")}</Badge>
@@ -150,6 +175,9 @@ export function ProviderListCard({
                   <div>
                     <p className="font-medium text-slate-900">{provider.name}</p>
                     <p className="mt-1 text-sm text-slate-500">{provider.default_model}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {providerApiModeLabel(provider, t)}
+                    </p>
                   </div>
                   <Badge tone={statusTone(provider)}>{provider.is_active ? t("providerActive") : t("providerInactive")}</Badge>
                 </div>

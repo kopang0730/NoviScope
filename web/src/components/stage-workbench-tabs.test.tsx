@@ -9,6 +9,7 @@ import { StageWorkbenchTabs } from "./stage-workbench-tabs";
 
 const personalProvider: Provider = {
   base_url: "https://personal.example.com/v1",
+  api_mode: "auto",
   created_at: "2026-07-10T00:00:00Z",
   default_model: "personal-model",
   id: "personal-provider",
@@ -29,6 +30,7 @@ const otherUserProvider: Provider = {
 
 const sharedProvider: Provider = {
   base_url: "https://model.example.com/v1",
+  api_mode: "auto",
   created_at: "2026-07-10T00:00:00Z",
   default_model: "research-model",
   id: "shared-provider",
@@ -54,8 +56,9 @@ function stage(overrides: Partial<StageCard> = {}): StageCard {
     confidence: "high",
     created_at: "2026-07-10T00:00:00Z",
     evidence_payload: {
+      human_demand_reviewed: true,
       human_demand_sources: ["Customer interview"],
-      source_policy: "human_reviewed_sources",
+      source_policy: "model_only_no_external_source_verification",
     },
     human_approved: null,
     id: "stage-1",
@@ -117,6 +120,97 @@ describe("StageWorkbenchTabs", () => {
     expect(screen.getByRole("tab", { name: "Run" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Review" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Artifacts" })).toBeInTheDocument();
+  });
+
+  it("presents a structured demand conclusion instead of serialized JSON", () => {
+    const serializedSummary = JSON.stringify({
+      summary: "The worksheet-restoration demand is plausible but still needs customer evidence.",
+      demand_assessment: "plausible",
+      confidence: "medium",
+    });
+
+    renderTabs(stage({
+      confidence: "medium",
+      output_payload: {
+        demand_assessment: "plausible",
+        evidence_for_demand: ["A tutoring company reuses completed worksheets."],
+        go_or_no_go_recommendation: "go_with_human_review",
+        missing_evidence: ["No customer interview has been independently verified."],
+        next_step: "Verify the workflow with a customer before planning experiments.",
+        real_world_scenario: "Restore completed worksheets for reuse.",
+        risks: ["Available data may not represent real classroom handwriting."],
+        target_user_or_customer: "Education content providers",
+      },
+      summary: serializedSummary,
+    }));
+
+    expect(screen.getByText("Research conclusion")).toBeInTheDocument();
+    expect(screen.getByText(
+      "The worksheet-restoration demand is plausible but still needs customer evidence.",
+    )).toBeInTheDocument();
+    expect(screen.getByText("Continue after human review")).toBeInTheDocument();
+    expect(screen.getByText("Restore completed worksheets for reuse.")).toBeInTheDocument();
+    expect(screen.getByText("A tutoring company reuses completed worksheets.")).toBeInTheDocument();
+    expect(screen.getByText("No customer interview has been independently verified.")).toBeInTheDocument();
+    expect(screen.queryByText(serializedSummary)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\"demand_assessment\"/)).not.toBeInTheDocument();
+  });
+
+  it("does not expose malformed JSON-like summaries", () => {
+    const malformedSummary = '{"summary":"Broken serialized model output",';
+
+    renderTabs(stage({
+      output_payload: {
+        demand_assessment: "plausible",
+        go_or_no_go_recommendation: "needs_more_evidence",
+      },
+      summary: malformedSummary,
+    }));
+
+    expect(screen.getByText("No summary yet.")).toBeInTheDocument();
+    expect(screen.queryByText(malformedSummary)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\{"summary"/)).not.toBeInTheDocument();
+  });
+
+  it("does not label unreviewed demand leads as human-reviewed sources", () => {
+    renderTabs(stage({
+      evidence_payload: {
+        human_demand_reviewed: false,
+        human_demand_sources: ["Unverified customer lead"],
+        source_policy: "model_only_no_external_source_verification",
+      },
+    }));
+
+    expect(screen.getByText("Source verification: Model output only")).toBeInTheDocument();
+    expect(screen.queryByText(/Human-reviewed sources/)).not.toBeInTheDocument();
+  });
+
+  it("localizes demand decisions and advanced payload labels for Chinese readers", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem("noviscope-language", "zh");
+
+    renderTabs(stage({
+      confidence: "medium",
+      output_payload: {
+        demand_assessment: "weak",
+        go_or_no_go_recommendation: "go_with_human_review",
+        next_step: "先核验企业工作流，再进入实验设计。",
+        real_world_scenario: "擦除已填写试卷中的手写内容。",
+      },
+      summary: "需求基本可信，但仍需要企业证据。",
+    }));
+
+    expect(screen.getByText("科研结论")).toBeInTheDocument();
+    expect(screen.getByText("需求证据较弱")).toBeInTheDocument();
+    expect(screen.getByText("人工复核后继续")).toBeInTheDocument();
+    expect(screen.getByText("置信度: 中")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "证据" }));
+    await user.click(screen.getByText("高级信息"));
+
+    expect(screen.getByText("输入数据")).toBeInTheDocument();
+    expect(screen.getByText("输出数据")).toBeInTheDocument();
+    expect(screen.getByText("证据数据")).toBeInTheDocument();
   });
 
   it("keeps unavailable tabs out of a planned stage inspector", () => {

@@ -182,6 +182,7 @@ def build_provider_credentials(
 ) -> ModelProviderCredentials:
     return ModelProviderCredentials(
         api_key=SecretStr(provider_service.decrypt_api_key(provider)),
+        api_mode=provider.api_mode,
         base_url=provider.base_url,
         id=provider.id,
         kind=provider.kind,
