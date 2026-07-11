@@ -42,7 +42,11 @@ const modelBackedAgentIds = new Set([
 ]);
 
 function isSupportedModelProvider(provider: Provider) {
-  return provider.kind === "openai_compatible" || provider.kind === "custom";
+  return (
+    provider.kind === "openai_compatible" ||
+    provider.kind === "anthropic" ||
+    provider.kind === "custom"
+  );
 }
 
 function providerReadiness(

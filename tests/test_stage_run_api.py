@@ -43,6 +43,7 @@ from noviscope.core.stage_policy import (
 )
 from noviscope.db.session import create_db_engine
 from noviscope.main import create_app
+from noviscope.models.quest import StageCard
 from noviscope.models.user import User, UserRole
 
 DEV_ADMIN_HEADERS = {"X-NoviScope-Dev-Admin": "test-dev-admin-token-0123456789abcdef"}
@@ -459,6 +460,36 @@ def test_run_demand_validation_uses_agent_default_provider_model(
     assert body["input_payload"]["provider_name"] == "Shared Provider"
     assert body["input_payload"]["provider_model"] == "assigned-model"
     assert body["evidence_payload"]["provider_model"] == "assigned-model"
+
+
+def test_run_demand_validation_rejects_member_explicit_shared_provider_override(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    database_url = f"sqlite:///{tmp_path / 'stage-run-shared-override.db'}"
+    app = create_app(database_url=database_url)
+    app.dependency_overrides[get_demand_validation_runner] = get_fake_runner
+
+    with TestClient(app) as client:
+        register_and_login(client, "RUN-OVERRIDE-ADMIN", "override-admin@example.com")
+        promote_user_to_admin(database_url, "override-admin@example.com")
+        provider_id = create_shared_provider(client)
+        client.post("/auth/logout")
+
+        register_and_login(client, "RUN-OVERRIDE-MEMBER", "override-member@example.com")
+        stage_id = create_quest(client)
+
+        response = client.post(f"/stages/{stage_id}/run", json={"provider_id": provider_id})
+
+    engine = create_db_engine(database_url)
+    with Session(engine) as session:
+        stage = session.get(StageCard, stage_id)
+
+    assert response.status_code == 403
+    assert stage is not None
+    assert stage.status == "pending"
+    assert stage.input_payload == {}
+    assert stage.output_payload == {}
 
 
 def test_run_demand_validation_stage_blocks_without_provider(

@@ -4,6 +4,7 @@ import { getErrorMessage } from "../api/client";
 import { updateStage } from "../api/quests";
 import type { StageCard } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
+import { useAsyncSelectionGuard } from "../lib/use-async-selection-guard";
 import { Badge } from "./badge";
 import { Button } from "./button";
 import { Select, TextArea } from "./input";
@@ -84,6 +85,7 @@ export function DemandSourceReviewForm({ onStageChange, stage }: {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const isCurrentStage = useAsyncSelectionGuard(stage.id);
   const savedSources = readStringArray(stage.evidence_payload, "human_demand_sources");
   const savedNotes = readString(stage.evidence_payload, "human_demand_review_notes");
   const savedVerdict = parseDemandReviewVerdict(readString(stage.evidence_payload, "human_demand_verdict"));
@@ -117,16 +119,24 @@ export function DemandSourceReviewForm({ onStageChange, stage }: {
           human_demand_verdict: formState.verdict,
         },
       });
+      if (!isCurrentStage()) {
+        return;
+      }
       onStageChange(updatedStage);
       setSaved(true);
     } catch (error) {
+      if (!isCurrentStage()) {
+        return;
+      }
       if (error instanceof Error) {
         setSaveError(getErrorMessage(error));
         return;
       }
       throw error;
     } finally {
-      setSaving(false);
+      if (isCurrentStage()) {
+        setSaving(false);
+      }
     }
   }
 

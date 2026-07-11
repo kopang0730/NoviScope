@@ -2,6 +2,7 @@ import type { StageCard } from "../api/types";
 import type { TranslationKey } from "../i18n/i18n-context";
 import { labelFromEnum } from "./format";
 import type { ProviderReadinessData } from "./provider-readiness-data";
+import { readSourceStageIds } from "./source-stage-ids";
 import { getStageRunGate } from "./stage-run-gate";
 import {
   demandValidatorAgentId,
@@ -55,12 +56,34 @@ export function isHumanGateStage(stage: StageCard) {
   return (
     stage.agent_id === demandValidatorAgentId ||
     stage.agent_id === ideaGeneratorAgentId ||
-    stage.agent_id === experimentPlannerAgentId
+    stage.agent_id === experimentPlannerAgentId ||
+    stage.agent_id === paperMeetingWriterAgentId
   );
 }
 
 export function needsHumanReview(stage: StageCard) {
   return stage.status === "complete" && isHumanGateStage(stage) && stage.human_approved === null;
+}
+
+export function hasStageEvidence(stage: StageCard) {
+  return (
+    Object.keys(stage.evidence_payload).length > 0
+    || Object.keys(readSourceStageIds(stage.output_payload)).length > 0
+  );
+}
+
+export function isImplementedStageRole(stage: StageCard) {
+  return (
+    stage.agent_id === demandValidatorAgentId
+    || stage.agent_id === literatureScoutAgentId
+    || stage.agent_id === ideaGeneratorAgentId
+    || stage.agent_id === experimentPlannerAgentId
+    || stage.agent_id === paperMeetingWriterAgentId
+  );
+}
+
+export function isOutputCapableStage(stage: StageCard) {
+  return isImplementedStageRole(stage) || Object.keys(stage.output_payload).length > 0;
 }
 
 export function findNextActionStage(

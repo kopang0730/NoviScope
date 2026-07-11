@@ -60,6 +60,17 @@ NoviScope 最终产出的不应该只是几段文字，而是一套可追踪的�
 - 证据审计报告
 - 英文论文草稿、中文论文草稿和中文组会材料
 
+### Canvas 工作台
+
+用户登录后默认进入 Research Canvas 工作台。Canvas 把 9 个能力角色组织为
+5 个宏观阶段：需求与范围、文献与 Gap、假设与 Idea、实验与验证、论文与组会。
+尚未实现 runner 的规划中角色仍会以文字状态显示，但不能执行。
+
+管理员可以为每个可运行角色配置 shared provider 默认值；成员可以在单次运行时
+选择自己拥有的 personal provider，且不会改动 shared 默认值。创建 Quest 时只需
+输入研究方向，NoviScope 会派生初始标题，并强制需求阶段先经过人工复核，后续阶段
+才能依赖其输出。
+
 ## 智能体团队
 
 NoviScope 把科研流程拆成 9 个智能体。当前基础版本已经实现了智能体契约注册表，并通过 API 暴露。
@@ -93,7 +104,9 @@ NoviScope 把科研流程拆成 9 个智能体。当前基础版本已经实现�
 - Literature Scout 使用 OpenAlex 元数据，而不是由模型编造引用。
 - 支持基于证据的 hypothesis 生成、idea 选择 gate、实验设置备注和实验计划生成。
 - 支持生成待复核的 Markdown 产物：中文研究 brief、英文 research brief、组会提纲和 IEEE 风格论文骨架，并明确标注没有真实实验结果。
-- 位于 `web/` 的 React + TypeScript + Vite + Tailwind Web 应用，已经支持注册、登录、quest 列表与详情、quest 创建、stage 更新、stage 输出审阅、artifact 下载和 provider 设置。
+- 位于 `web/` 的 React + TypeScript + Vite + Tailwind Web 应用，以 Research Canvas
+  作为默认工作台，并支持 Quest 创建、stage 审阅、artifact 下载和 shared/personal
+  provider 设置。
 - 密钥脱敏和私有数据外发保护 helper。
 - 测试覆盖 security、auth、models、agents、gateway、quests 和 API 行为。
 - GitHub issue 模板、PR 模板、贡献指南、协作规范和 MIT license。GitHub Actions CI 已在 issue #4 跟踪，等待具备 `workflow` scope 的 token 后启用。
@@ -102,7 +115,6 @@ NoviScope 把科研流程拆成 9 个智能体。当前基础版本已经实现�
 
 - 专门的首个 admin bootstrap CLI/route
 - Web 端的 admin 邀请码管理页面
-- 实验室级别的 per-agent 默认 provider/model 配置
 - OpenAlex 之外的 source adapter，例如 arXiv、Semantic Scholar、IEEE、ACM、CVF
 - 需求来源抓取和投毒风险评分。
 - 实验室 A800 服务器上的 GPU job 调度。

@@ -34,5 +34,5 @@ export function logoutUser() {
 }
 
 export function getCurrentUser() {
-  return apiRequest<User>("/api/auth/me");
+  return apiRequest<User | null>("/api/auth/session");
 }

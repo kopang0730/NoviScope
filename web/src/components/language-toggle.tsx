@@ -14,7 +14,7 @@ export function LanguageToggle() {
           <button
             aria-pressed={isActive}
             className={[
-              "h-8 min-w-16 rounded-md px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500",
+              "h-11 min-w-16 rounded-md px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500",
               isActive ? "bg-teal-600 text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
             ].join(" ")}
             key={item}

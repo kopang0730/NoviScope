@@ -9,6 +9,7 @@ import {
   buildExperimentPlannerView,
   readExperimentPlannerSetup,
 } from "../lib/experiment-planner-view";
+import { useAsyncSelectionGuard } from "../lib/use-async-selection-guard";
 import { Badge } from "./badge";
 import { Button } from "./button";
 import { Input, TextArea } from "./input";
@@ -61,6 +62,7 @@ export function ExperimentSetupForm({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const isCurrentStage = useAsyncSelectionGuard(stage.id);
 
   useEffect(() => {
     const nextSetup = readExperimentPlannerSetup(stage);
@@ -85,16 +87,24 @@ export function ExperimentSetupForm({
           environment_notes: environmentNotes.trim(),
         },
       });
+      if (!isCurrentStage()) {
+        return;
+      }
       onStageChange?.(updatedStage);
       setSuccessMessage(t("experimentSetupSaved"));
     } catch (error) {
+      if (!isCurrentStage()) {
+        return;
+      }
       if (error instanceof Error) {
         setSaveError(getErrorMessage(error));
         return;
       }
       throw error;
     } finally {
-      setSaving(false);
+      if (isCurrentStage()) {
+        setSaving(false);
+      }
     }
   }
 

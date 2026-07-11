@@ -55,7 +55,7 @@ from noviscope.core.stage_policy import (
     PAPER_MEETING_WRITER_AGENT_ID,
     normalize_stage_output_payload,
 )
-from noviscope.models.provider import ModelProvider, ProviderKind
+from noviscope.models.provider import ModelProvider, ProviderKind, ProviderScope
 from noviscope.models.quest import StageCard, StageStatus
 from noviscope.models.user import User
 from noviscope.providers.service import ProviderService
@@ -79,6 +79,7 @@ class ProviderSelectionContext:
     provider_id: str | None
     model_name: str | None
     runner: StageRunner
+    explicit_provider_override: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,6 +94,14 @@ class ProviderSelection:
 class StageBlock:
     summary: str
     evidence_payload: JsonObject
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderOverridePermissionError(PermissionError):
+    provider_id: str
+
+    def __str__(self) -> str:
+        return f"Provider {self.provider_id} is not available as a personal override"
 
 
 def get_stage_runner_registry(
@@ -123,6 +132,11 @@ def select_provider(context: ProviderSelectionContext) -> ProviderSelection:
             context.provider_id,
             context.current_user,
         )
+        if context.explicit_provider_override and (
+            provider.scope != ProviderScope.PERSONAL
+            or provider.owner_user_id != context.current_user.id
+        ):
+            raise ProviderOverridePermissionError(context.provider_id)
         if not provider.is_active:
             return ProviderSelection(
                 blocking_detail="Activate this provider before running the stage.",
@@ -455,6 +469,7 @@ def run_stage(
             runner,
             ProviderSelectionContext(
                 current_user=current_user,
+                explicit_provider_override=request.provider_id is not None,
                 model_name=effective_model_name,
                 provider_id=effective_provider_id,
                 provider_service=provider_service,

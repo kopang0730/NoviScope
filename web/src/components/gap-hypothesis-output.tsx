@@ -5,6 +5,7 @@ import { updateStage } from "../api/quests";
 import type { StageCard } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
 import { buildIdeaGeneratorView, type IdeaItem } from "../lib/gap-hypothesis-view";
+import { useAsyncSelectionGuard } from "../lib/use-async-selection-guard";
 import { buttonClassName } from "./button";
 import { GapSummarySection, IdeaCardList } from "./gap-hypothesis-sections";
 import { GapTable } from "./gap-table";
@@ -23,6 +24,7 @@ export function GapHypothesisOutput({
   const [pendingIdeaId, setPendingIdeaId] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const isCurrentStage = useAsyncSelectionGuard(stage.id);
 
   useEffect(() => {
     setCurrentStage(stage);
@@ -71,17 +73,25 @@ export function GapHypothesisOutput({
         },
         review_notes: reviewNotes,
       });
+      if (!isCurrentStage()) {
+        return;
+      }
       setCurrentStage(updatedStage);
       onStageChange?.(updatedStage);
       setSuccessMessage(t("ideaSelectionSaved"));
     } catch (error) {
+      if (!isCurrentStage()) {
+        return;
+      }
       if (error instanceof Error) {
         setSubmitError(getErrorMessage(error));
       } else {
         throw error;
       }
     } finally {
-      setPendingIdeaId(null);
+      if (isCurrentStage()) {
+        setPendingIdeaId(null);
+      }
     }
   }
 

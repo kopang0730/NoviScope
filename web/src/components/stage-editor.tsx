@@ -5,6 +5,7 @@ import { getErrorMessage } from "../api/client";
 import type { StageCard, StageStatus } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
 import { labelFromEnum, stringifyJson } from "../lib/format";
+import { useAsyncSelectionGuard } from "../lib/use-async-selection-guard";
 import { Button } from "./button";
 import { Card, CardHeading } from "./card";
 import { Select, TextArea } from "./input";
@@ -86,6 +87,7 @@ export function StageEditor({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [stageSaved, setStageSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const isCurrentStage = useAsyncSelectionGuard(stage.id);
 
   useEffect(() => {
     setFormState(buildFormState(stage));
@@ -116,12 +118,22 @@ export function StageEditor({
         summary: formState.summary,
       });
 
+      if (!isCurrentStage()) {
+        return;
+      }
       onStageChange(updatedStage);
       setStageSaved(true);
     } catch (error) {
-      setSubmitError(getErrorMessage(error));
+      if (!(error instanceof Error)) {
+        throw error;
+      }
+      if (isCurrentStage()) {
+        setSubmitError(getErrorMessage(error));
+      }
     } finally {
-      setSubmitting(false);
+      if (isCurrentStage()) {
+        setSubmitting(false);
+      }
     }
   }
 

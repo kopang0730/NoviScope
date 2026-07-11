@@ -133,3 +133,87 @@ export interface MarkdownArtifactManifestResponse {
   readonly stage_id: string;
   readonly artifacts: readonly MarkdownArtifactManifestItem[];
 }
+
+export type WorkflowActionType =
+  | "configure_provider"
+  | "resolve_blocker"
+  | "review_stage"
+  | "run_stage"
+  | "wait_for_stage";
+
+export type AutomationStatus = "implemented" | "planned";
+export type ProviderRequirement = "model_provider" | "not_implemented" | "server_managed";
+
+export interface WorkflowAgentCapability {
+  readonly agent_id: string;
+  readonly automation_status: AutomationStatus;
+  readonly display_name: string;
+  readonly provider_requirement: ProviderRequirement;
+  readonly stage_runner_available: boolean;
+  readonly status_detail: string;
+  readonly tool_permissions: readonly string[];
+}
+
+export interface WorkflowCapabilitiesResponse {
+  readonly agents: readonly WorkflowAgentCapability[];
+  readonly implemented_count: number;
+  readonly planned_count: number;
+  readonly total_count: number;
+}
+
+export type CanvasRole = "audit_gate" | "core_stage" | "planned_extension";
+export type CanvasEdgeKind =
+  | "audit_feedback"
+  | "default_flow"
+  | "human_gate"
+  | "planned_extension";
+
+export interface WorkflowCanvasNode {
+  readonly agent_id: string;
+  readonly canvas_role: CanvasRole;
+  readonly column: number;
+  readonly display_name: string;
+  readonly lane_id: string;
+  readonly row: number;
+}
+
+export interface WorkflowCanvasEdge {
+  readonly edge_kind: CanvasEdgeKind;
+  readonly from_agent_id: string;
+  readonly label: string;
+  readonly to_agent_id: string;
+}
+
+export interface WorkflowCanvasLane {
+  readonly description: string;
+  readonly lane_id: string;
+  readonly title: string;
+}
+
+export interface WorkflowCanvasTemplate {
+  readonly core_flow_agent_ids: readonly string[];
+  readonly edges: readonly WorkflowCanvasEdge[];
+  readonly entry_agent_id: string;
+  readonly lanes: readonly WorkflowCanvasLane[];
+  readonly nodes: readonly WorkflowCanvasNode[];
+  readonly terminal_agent_id: string;
+}
+
+export interface WorkflowNextAction {
+  readonly action_type: WorkflowActionType;
+  readonly agent_id: string;
+  readonly blocking_reason: string;
+  readonly can_run: boolean;
+  readonly detail: string;
+  readonly label: string;
+  readonly priority: number;
+  readonly stage_id: string;
+  readonly stage_status: StageStatus;
+  readonly stage_title: string;
+}
+
+export interface WorkflowNextActionsResponse {
+  readonly quest_id: string;
+  readonly action_count: number;
+  readonly actions: readonly WorkflowNextAction[];
+}

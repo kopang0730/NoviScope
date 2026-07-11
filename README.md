@@ -74,6 +74,20 @@ research package:
 - evidence audit report
 - English paper draft, Chinese paper draft, and Chinese meeting slides
 
+### Canvas workbench
+
+Research Canvas is the default workbench after sign-in. It groups the nine
+capability roles into five macro phases: Demand & scope, Literature & gap,
+Hypothesis & idea, Experiment & verification, and Paper & meeting. The Canvas
+keeps planned roles visible with a textual status, but those roles cannot be run
+until their stage runner exists.
+
+Administrators can assign a shared provider default to each runnable role.
+Members can select one of their personal providers for a single run without
+changing that shared default. Creating a Quest requires only a research
+direction; NoviScope derives the initial title and always sends the demand stage
+through human review before downstream work may rely on it.
+
 ## Agent Team
 
 NoviScope models the research process as a 9-agent team. The current foundation
@@ -119,9 +133,9 @@ Implemented lab alpha slice:
   notes, and experiment-plan generation.
 - Review-only Markdown artifacts for Chinese/English research briefs, meeting
   outline, and IEEE-style paper skeleton with explicit no-results warnings.
-- React + TypeScript + Vite + Tailwind web app in `web/` for registration, login,
-  quest list/detail, quest creation, stage updates, stage output review, artifact
-  downloads, and provider settings.
+- React + TypeScript + Vite + Tailwind web app in `web/` with Research Canvas as
+  the default workbench, plus quest creation, stage review, artifact downloads,
+  and shared/personal provider settings.
 - Secret redaction and private outbound upload guard helpers.
 - Test suite covering security, auth, models, agents, gateway, quests, and API
   behavior.
@@ -133,7 +147,6 @@ Not implemented yet:
 
 - dedicated first-admin bootstrap CLI/route
 - admin invite-management page in the web UI
-- lab-wide per-agent default provider/model controls
 - source adapters beyond OpenAlex, such as arXiv, Semantic Scholar, IEEE, ACM, or CVF
 - demand-source crawling and poisoning-risk scoring
 - GPU job scheduling on the lab A800 server

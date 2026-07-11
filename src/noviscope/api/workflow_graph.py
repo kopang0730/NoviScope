@@ -40,6 +40,7 @@ HUMAN_REVIEW_AGENT_IDS: Final = frozenset(
         DEMAND_VALIDATOR_AGENT_ID,
         IDEA_GENERATOR_AGENT_ID,
         EXPERIMENT_PLANNER_AGENT_ID,
+        PAPER_MEETING_WRITER_AGENT_ID,
     }
 )
 
@@ -255,7 +256,11 @@ def gate_status_for_stage(stage: StageCard, gate_required: bool) -> GateStatus:
     if stage.status != StageStatus.COMPLETE:
         return "waiting_for_completion"
     if stage.agent_id == IDEA_GENERATOR_AGENT_ID:
-        return "approved" if has_selected_idea(stage.output_payload) else "pending_review"
+        if stage.human_approved is True and has_selected_idea(stage.output_payload):
+            return "approved"
+        if stage.human_approved is False:
+            return "rejected"
+        return "pending_review"
     if stage.human_approved is True:
         return "approved"
     if stage.human_approved is False:
@@ -265,8 +270,12 @@ def gate_status_for_stage(stage: StageCard, gate_required: bool) -> GateStatus:
 
 def has_selected_idea(output_payload: JsonObject) -> bool:
     selected_ideas = output_payload.get("selected_ideas")
-    return isinstance(selected_ideas, list) and any(
-        isinstance(selected_idea, dict) for selected_idea in selected_ideas
+    if isinstance(selected_ideas, list) and any(isinstance(idea, dict) for idea in selected_ideas):
+        return True
+    selected_idea_ids = output_payload.get("selected_idea_ids")
+    ideas = output_payload.get("ideas")
+    return isinstance(selected_idea_ids, list) and isinstance(ideas, list) and any(
+        isinstance(idea, dict) and idea.get("idea_id") in selected_idea_ids for idea in ideas
     )
 
 

@@ -12,7 +12,7 @@ export function buttonClassName({
   size?: ButtonSize;
   variant?: ButtonVariant;
 }) {
-  const sizeClassName = size === "sm" ? "h-9 px-3 text-sm" : "h-10 px-4 text-sm";
+  const sizeClassName = size === "sm" ? "h-11 px-3 text-sm" : "h-11 px-4 text-sm";
   const variantClassName =
     variant === "primary"
       ? "bg-teal-600 text-white hover:bg-teal-700"

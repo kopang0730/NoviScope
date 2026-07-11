@@ -5,6 +5,7 @@ import type { StageCard } from "../api/types";
 import { useI18n, type TranslationKey } from "../i18n/i18n-context";
 import { labelFromEnum } from "../lib/format";
 import { stageTone } from "../lib/status-tones";
+import { useAsyncSelectionGuard } from "../lib/use-async-selection-guard";
 import { Badge, type BadgeTone } from "./badge";
 import { Button } from "./button";
 import { Card, CardHeading } from "./card";
@@ -55,6 +56,7 @@ export function StageReviewGateCard({
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reopening, setReopening] = useState(false);
   const [successKey, setSuccessKey] = useState<TranslationKey | null>(null);
+  const isCurrentStage = useAsyncSelectionGuard(stage.id);
   const decision = reviewDecision(stage);
   const canRecordReview = stage.status === "complete";
   const canReopenForRerun = canRecordReview && stage.human_approved === false;
@@ -84,16 +86,24 @@ export function StageReviewGateCard({
         human_approved: approvalValue(nextDecision),
         review_notes: notes.trim(),
       });
+      if (!isCurrentStage()) {
+        return;
+      }
       onStageChange(updatedStage);
       setSuccessKey("stageReviewSaved");
     } catch (error) {
+      if (!isCurrentStage()) {
+        return;
+      }
       if (error instanceof Error) {
         setReviewError(getErrorMessage(error));
         return;
       }
       throw error;
     } finally {
-      setPendingDecision(null);
+      if (isCurrentStage()) {
+        setPendingDecision(null);
+      }
     }
   }
 
@@ -108,16 +118,24 @@ export function StageReviewGateCard({
 
     try {
       const updatedStage = await updateStage(stage.id, { status: "blocked" });
+      if (!isCurrentStage()) {
+        return;
+      }
       onStageChange(updatedStage);
       setSuccessKey("stageReviewReopened");
     } catch (error) {
+      if (!isCurrentStage()) {
+        return;
+      }
       if (error instanceof Error) {
         setReviewError(getErrorMessage(error));
         return;
       }
       throw error;
     } finally {
-      setReopening(false);
+      if (isCurrentStage()) {
+        setReopening(false);
+      }
     }
   }
 
