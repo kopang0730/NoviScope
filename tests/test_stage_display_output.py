@@ -55,14 +55,18 @@ def complete_demand_stage_with_raw_response(client: TestClient, stage_id: str) -
                 "evidence_for_demand": [
                     "Court owners need repeatable badminton training feedback."
                 ],
+                "human_review_required": ["Confirm the customer source before experiments."],
                 "raw_response": "provider response should not be in the default UI",
                 "risks": ["Demand source still needs external verification."],
+                "source_stage_ids": {"demand_validation": stage_id},
                 "summary": "Demand is plausible but requires human review.",
                 "trace": {
                     "raw_response": "nested provider details should also stay hidden",
                     "stage": "demand_validation",
                 },
+                "warnings": ["Demand source still needs external verification."],
             },
+            "evidence_payload": {"requires_human_review": True},
             "status": "complete",
             "summary": "Demand is plausible but requires human review.",
         },
@@ -94,6 +98,10 @@ def test_stage_display_output_hides_raw_model_responses(
     assert body["raw_response_available"] is True
     assert body["confidence"] == "medium"
     assert body["summary"] == "Demand is plausible but requires human review."
+    assert body["requires_human_review"] is True
+    assert body["review_items"] == ["Confirm the customer source before experiments."]
+    assert body["warnings"] == ["Demand source still needs external verification."]
+    assert body["source_stage_ids"] == {"demand_validation": demand_stage_id}
     assert body["display_payload"]["evidence_for_demand"] == [
         "Court owners need repeatable badminton training feedback."
     ]

@@ -19,6 +19,7 @@ import { LiteratureScoutOutput } from "./literature-scout-output";
 import { PaperMeetingOutput } from "./paper-meeting-output";
 import { StageAuditTrail } from "./stage-audit-trail";
 import { StageRunSummary } from "./stage-run-summary";
+import { StageTrustSummary } from "./stage-trust-summary";
 
 export function StageOutputPanel({
   onStageChange,
@@ -50,6 +51,7 @@ export function StageOutputPanel({
         <div className="mt-5">
           <StageRunSummary stage={stage} stageRunGate={stageRunGate} />
         </div>
+        <StageTrustSummary stage={stage} />
         <div className="mt-5">
           <LiteratureScoutOutput stage={stage} />
         </div>
@@ -65,6 +67,7 @@ export function StageOutputPanel({
         <div className="mt-5">
           <StageRunSummary stage={stage} stageRunGate={stageRunGate} />
         </div>
+        <StageTrustSummary stage={stage} />
         <div className="mt-5">
           <GapHypothesisOutput
             experimentPlannerStage={experimentPlannerStage}
@@ -84,6 +87,7 @@ export function StageOutputPanel({
         <div className="mt-5">
           <StageRunSummary stage={stage} stageRunGate={stageRunGate} />
         </div>
+        <StageTrustSummary stage={stage} />
         <div className="mt-5">
           <ExperimentPlannerOutput onStageChange={onStageChange} stage={stage} />
         </div>
@@ -99,6 +103,7 @@ export function StageOutputPanel({
         <div className="mt-5">
           <StageRunSummary stage={stage} stageRunGate={stageRunGate} />
         </div>
+        <StageTrustSummary stage={stage} />
         <div className="mt-5">
           <PaperMeetingOutput stage={stage} />
         </div>
@@ -112,6 +117,7 @@ export function StageOutputPanel({
       <Card>
         <CardHeading description={runStateDescription} title={t("stageRunState")} />
         <StageRunSummary stage={stage} stageRunGate={stageRunGate} />
+        <StageTrustSummary stage={stage} />
         {auditTrail}
       </Card>
     );
@@ -120,6 +126,7 @@ export function StageOutputPanel({
   return (
     <Card>
       <CardHeading description={t("demandValidationDescription")} title={t("demandValidationResult")} />
+      <StageTrustSummary stage={stage} />
       <DemandValidationOutput onStageChange={onStageChange} stage={stage} />
       {auditTrail}
     </Card>
