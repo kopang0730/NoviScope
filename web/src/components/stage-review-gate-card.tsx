@@ -9,6 +9,7 @@ import { useAsyncSelectionGuard } from "../lib/use-async-selection-guard";
 import { Badge, type BadgeTone } from "./badge";
 import { Button } from "./button";
 import { Card, CardHeading } from "./card";
+import { StageReviewGuidancePanel } from "./stage-review-guidance-panel";
 import { TextArea } from "./input";
 
 type ReviewDecision = "approved" | "pending" | "rejected";
@@ -164,6 +165,8 @@ export function StageReviewGateCard({
           </Badge>
         </div>
       </div>
+
+      <StageReviewGuidancePanel stage={stage} />
 
       <div className="mt-4">
         <TextArea
