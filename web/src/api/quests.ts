@@ -34,6 +34,11 @@ export type RunStagePayload = {
   readonly provider_id?: string;
 };
 
+export type SelectStageIdeasPayload = {
+  review_notes?: string;
+  selected_idea_ids: readonly string[];
+};
+
 export async function getQuests() {
   const response = await apiRequest<QuestsResponse>("/api/quests");
   return response.quests;
@@ -64,6 +69,13 @@ export function updateStage(stageId: string, payload: UpdateStagePayload) {
 
 export function runStage(stageId: string, payload: RunStagePayload = {}) {
   return apiRequest<StageCard>(`/api/stages/${stageId}/run`, {
+    body: payload,
+    method: "POST",
+  });
+}
+
+export function selectStageIdeas(stageId: string, payload: SelectStageIdeasPayload) {
+  return apiRequest<StageCard>(`/api/stages/${stageId}/select-ideas`, {
     body: payload,
     method: "POST",
   });

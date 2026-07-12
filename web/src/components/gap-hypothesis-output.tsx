@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { getErrorMessage } from "../api/client";
-import { updateStage } from "../api/quests";
+import { selectStageIdeas } from "../api/quests";
 import type { StageCard } from "../api/types";
 import { useI18n } from "../i18n/i18n-context";
 import { buildIdeaGeneratorView, type IdeaItem } from "../lib/gap-hypothesis-view";
@@ -64,14 +64,9 @@ export function GapHypothesisOutput({
       .join(" ");
 
     try {
-      const updatedStage = await updateStage(currentStage.id, {
-        human_approved: true,
-        output_payload: {
-          ...currentStage.output_payload,
-          selected_idea_ids: nextSelectedIdeaIds,
-          selection_status: "selected_for_experiment_design",
-        },
+      const updatedStage = await selectStageIdeas(currentStage.id, {
         review_notes: reviewNotes,
+        selected_idea_ids: nextSelectedIdeaIds,
       });
       if (!isCurrentStage()) {
         return;

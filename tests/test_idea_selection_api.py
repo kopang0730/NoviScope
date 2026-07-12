@@ -120,6 +120,42 @@ def test_select_ideas_marks_gap_stage_human_approved(
     assert body["evidence_payload"]["selected_idea_count"] == 1
 
 
+def test_select_ideas_deduplicates_ids_and_persists_selected_payloads(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'idea-selection-dedupe.db'}")
+    with TestClient(app) as client:
+        register_and_login(client, "IDEA-DEDUPE", "idea-dedupe@example.com")
+        idea_stage_id = create_quest_with_idea_stage(client)
+        complete_idea_stage(client, idea_stage_id)
+
+        response = client.post(
+            f"/stages/{idea_stage_id}/select-ideas",
+            json={
+                "selected_idea_ids": [
+                    "idea_trajectory_smoothing",
+                    "idea_temporal_cues",
+                    "idea_trajectory_smoothing",
+                ],
+            },
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["output_payload"]["selected_idea_ids"] == [
+        "idea_trajectory_smoothing",
+        "idea_temporal_cues",
+    ]
+    selected_ideas = body["output_payload"]["selected_ideas"]
+    assert [idea["idea_id"] for idea in selected_ideas] == [
+        "idea_trajectory_smoothing",
+        "idea_temporal_cues",
+    ]
+    assert selected_ideas[0]["idea_title"] == "Trajectory smoothing"
+    assert body["evidence_payload"]["selected_idea_count"] == 2
+
+
 def test_select_ideas_rejects_unknown_idea_id(
     tmp_path,
     dev_admin_header_enabled: None,
