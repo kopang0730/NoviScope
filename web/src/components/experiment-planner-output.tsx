@@ -181,6 +181,12 @@ export function ExperimentPlannerOutput({
               </Badge>
             </div>
             <p className="mt-3 text-sm text-amber-900">{view.summary}</p>
+            <div className="mt-3 rounded-md border border-amber-200 bg-white/70 px-3 py-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+                {t("experimentPlanBoundary")}
+              </p>
+              <p className="mt-1 text-sm text-amber-900">{t("experimentPlanBoundaryDescription")}</p>
+            </div>
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2">
