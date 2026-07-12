@@ -130,6 +130,14 @@ export function DemandValidationOutput({
             ? t("sourcePolicyModelOnlyDescription")
             : t("sourcePolicyReviewDescription")}
         </p>
+        {demandValidation.sourcePolicy === "model_only_no_external_source_verification" ? (
+          <div className="mt-3 rounded-md border border-amber-200 bg-white/70 px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+              {t("confidenceGuardrail")}
+            </p>
+            <p className="mt-1 text-sm text-amber-900">{t("confidenceGuardrailModelOnly")}</p>
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-3 grid gap-3 lg:grid-cols-2">

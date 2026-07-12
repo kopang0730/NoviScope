@@ -139,6 +139,9 @@ const en = {
   canvasWorkspaceMainDescription: "Run stages, review evidence, and track human gates in the main research workspace.",
   checkingSession: "Checking session",
   chineseResearchBrief: "Chinese research brief",
+  confidenceGuardrail: "Confidence guardrail",
+  confidenceGuardrailModelOnly:
+    "External demand evidence has not been verified, so NoviScope does not treat this stage as a high-confidence claim. Record human evidence before relying on it downstream.",
   computeRequirements: "Compute requirements",
   createAccount: "Create Account",
   created: "Created",
@@ -790,6 +793,9 @@ const zh: Record<keyof typeof en, string> = {
   canvasWorkspaceMainDescription: "在主工作台里运行阶段、查看证据，并追踪人工复核关卡。",
   checkingSession: "正在检查会话",
   chineseResearchBrief: "中文研究 Brief",
+  confidenceGuardrail: "置信度约束",
+  confidenceGuardrailModelOnly:
+    "外部需求证据尚未完成核验，因此 NoviScope 不会把该阶段视为高置信度结论。下游使用前请先记录人工核验证据。",
   computeRequirements: "算力需求",
   createAccount: "创建账号",
   created: "创建时间",
