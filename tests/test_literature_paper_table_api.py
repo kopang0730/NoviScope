@@ -44,6 +44,7 @@ def test_literature_paper_table_filters_and_sorts_saved_papers(
     ]
     paper = body["papers"][0]
     assert paper["paper_ref"] == "https://openalex.org/W2"
+    assert paper["arxiv_id"] == "2401.01234"
     assert paper["authors"] == ["Ada Chen", "Bo Lin"]
     assert paper["year"] == 2025
     assert paper["venue"] == "CVPR"

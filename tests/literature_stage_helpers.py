@@ -60,6 +60,7 @@ def complete_literature_stage(client: TestClient, stage_id: str) -> None:
                 "papers": [
                     {
                         "abstract_summary": "Badminton benchmark with shuttle and action labels.",
+                        "arxiv_id": "2401.01234",
                         "authors": ["Ada Chen", "Bo Lin"],
                         "doi": "https://doi.org/10.0000/recent",
                         "limitations": ["Verify full text before citing."],

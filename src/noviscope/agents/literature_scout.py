@@ -23,6 +23,10 @@ LITERATURE_SCOUT_AGENT_ID = "literature_scout"
 OPENALEX_SOURCE = "openalex_works_api"
 ABSTRACT_SUMMARY_CHARS = 420
 QUERY_CHARS = 240
+ARXIV_ID_PATTERN = re.compile(
+    r"(?:arxiv(?:\.org/(?:abs|pdf)/|[:./\s]))?([a-z-]+/\d{7}|\d{4}\.\d{4,5})(?:v\d+)?(?:\.pdf)?",
+    re.IGNORECASE,
+)
 
 QUERY_STOP_WORDS = frozenset(
     {"about", "and", "for", "from", "into", "noviscope", "quest", "research", "the", "with"}
@@ -108,6 +112,7 @@ def build_paper(work: OpenAlexWork, query_terms: list[str], current_year: int) -
     abstract = abstract_summary(work.abstract_inverted_index)
     return {
         "abstract_summary": abstract,
+        "arxiv_id": arxiv_id(work),
         "authors": work_authors(work),
         "doi": work.doi,
         "limitations": ["OpenAlex metadata only; verify the full paper before citing."],
@@ -145,6 +150,21 @@ def work_url(work: OpenAlexWork) -> str:
     if work.primary_location is not None and work.primary_location.landing_page_url:
         return work.primary_location.landing_page_url
     return work.doi or work.id
+
+
+def arxiv_id(work: OpenAlexWork) -> str:
+    candidates = [
+        work.doi or "",
+        work.primary_location.landing_page_url
+        if work.primary_location is not None and work.primary_location.landing_page_url
+        else "",
+        work.id,
+    ]
+    for candidate in candidates:
+        match = ARXIV_ID_PATTERN.search(candidate)
+        if match is not None:
+            return match.group(1).lower()
+    return ""
 
 
 def abstract_summary(abstract_index: dict[str, list[int]] | None) -> str:

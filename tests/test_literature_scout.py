@@ -150,6 +150,7 @@ def test_literature_scout_scores_recent_openalex_papers_first() -> None:
     ]
     assert set(papers[0]) == {
         "abstract_summary",
+        "arxiv_id",
         "authors",
         "doi",
         "limitations",
@@ -176,6 +177,31 @@ def test_literature_scout_returns_empty_papers_without_fabrication() -> None:
     assert result.output_payload["papers"] == []
     assert result.summary == "No papers found in OpenAlex for the Literature Scout query."
     assert result.confidence == "low"
+
+
+def test_literature_scout_extracts_arxiv_id_from_doi_and_url() -> None:
+    work = OpenAlexWork(
+        abstract_inverted_index={"preprint": [0]},
+        authorships=[OpenAlexAuthorship(author=OpenAlexAuthor(display_name="Ada Chen"))],
+        doi="https://doi.org/10.48550/arXiv.2401.01234",
+        id="https://openalex.org/W3",
+        primary_location=OpenAlexLocation(
+            landing_page_url="https://arxiv.org/pdf/2401.01234v2.pdf",
+            source=OpenAlexSource(display_name="arXiv", type="repository"),
+        ),
+        publication_year=2025,
+        relevance_score=70.0,
+        title="Badminton action preprint",
+        type="posted-content",
+    )
+    runner = LiteratureScoutStageRunner(FakeSearchClient([work]), current_year=2026)
+
+    result = runner.run(make_context())
+
+    papers = result.output_payload["papers"]
+    assert isinstance(papers, list)
+    assert papers[0]["arxiv_id"] == "2401.01234"
+    assert papers[0]["reliability_level"] == "arxiv_preprint"
 
 
 def test_openalex_client_uses_works_api_params_without_live_http() -> None:
