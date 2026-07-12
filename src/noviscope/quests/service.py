@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import timedelta
 
 from sqlmodel import Session, select
@@ -9,6 +10,7 @@ from noviscope.core.stage_policy import (
     EXPERIMENT_PLANNER_AGENT_ID,
     IDEA_GENERATOR_AGENT_ID,
     PAPER_MEETING_WRITER_AGENT_ID,
+    require_positive_human_demand_sources,
 )
 from noviscope.models.common import utc_now
 from noviscope.models.quest import Quest, QuestStatus, StageCard, StageStatus
@@ -20,6 +22,27 @@ ALLOWED_STAGE_TRANSITIONS: dict[StageStatus, set[StageStatus]] = {
     StageStatus.BLOCKED: {StageStatus.PENDING, StageStatus.RUNNING},
     StageStatus.COMPLETE: set(),
 }
+QUEST_STATUS_BY_STAGE_APPROVAL: dict[str, tuple[QuestStatus, QuestStatus]] = {
+    DEMAND_VALIDATOR_AGENT_ID: (QuestStatus.IDEA_SELECTION, QuestStatus.DEMAND_REVIEW),
+    IDEA_GENERATOR_AGENT_ID: (
+        QuestStatus.LIGHTWEIGHT_EXPERIMENT,
+        QuestStatus.IDEA_SELECTION,
+    ),
+    EXPERIMENT_PLANNER_AGENT_ID: (
+        QuestStatus.FULL_EXPERIMENT,
+        QuestStatus.LIGHTWEIGHT_EXPERIMENT,
+    ),
+    PAPER_MEETING_WRITER_AGENT_ID: (QuestStatus.WRITING, QuestStatus.FULL_EXPERIMENT),
+}
+
+
+@dataclass(frozen=True, slots=True)
+class InvalidStageTransitionError(ValueError):
+    current: StageStatus
+    target: StageStatus
+
+    def __str__(self) -> str:
+        return f"Cannot transition stage from {self.current.value} to {self.target.value}"
 
 
 class QuestService:
@@ -62,8 +85,7 @@ class QuestService:
             title="Gap & hypothesis generator",
             status=StageStatus.PENDING,
             summary=(
-                "Generate evidence-linked research gaps and hypotheses after literature "
-                "scouting."
+                "Generate evidence-linked research gaps and hypotheses after literature scouting."
             ),
         )
         experiment_stage = StageCard(
@@ -146,6 +168,8 @@ class QuestService:
         review_notes: str | None = None,
     ) -> StageCard:
         stage = self.get_stage_card(stage_id)
+        if evidence_payload is not None:
+            require_positive_human_demand_sources(stage.agent_id, evidence_payload)
         if status is not None:
             self._assert_transition_allowed(stage, status)
             stage.status = status
@@ -179,7 +203,7 @@ class QuestService:
         ):
             return
         if target not in ALLOWED_STAGE_TRANSITIONS[current]:
-            raise ValueError(f"Cannot transition stage from {current.value} to {target.value}")
+            raise InvalidStageTransitionError(current=current, target=target)
 
     def _sync_quest_after_stage_update(self, stage: StageCard) -> None:
         if stage.status != StageStatus.COMPLETE:
@@ -187,27 +211,10 @@ class QuestService:
         quest = self.session.get(Quest, stage.quest_id)
         if quest is None:
             return
-        if stage.agent_id == DEMAND_VALIDATOR_AGENT_ID:
-            quest.status = (
-                QuestStatus.IDEA_SELECTION if stage.human_approved else QuestStatus.DEMAND_REVIEW
-            )
-        elif stage.agent_id == IDEA_GENERATOR_AGENT_ID:
-            quest.status = (
-                QuestStatus.LIGHTWEIGHT_EXPERIMENT
-                if stage.human_approved
-                else QuestStatus.IDEA_SELECTION
-            )
-        elif stage.agent_id == EXPERIMENT_PLANNER_AGENT_ID:
-            quest.status = (
-                QuestStatus.FULL_EXPERIMENT
-                if stage.human_approved
-                else QuestStatus.LIGHTWEIGHT_EXPERIMENT
-            )
-        elif stage.agent_id == PAPER_MEETING_WRITER_AGENT_ID:
-            quest.status = (
-                QuestStatus.WRITING if stage.human_approved else QuestStatus.FULL_EXPERIMENT
-            )
-        else:
+        status_pair = QUEST_STATUS_BY_STAGE_APPROVAL.get(stage.agent_id)
+        if status_pair is None:
             return
+        approved_status, review_status = status_pair
+        quest.status = approved_status if stage.human_approved else review_status
         quest.updated_at = utc_now().isoformat()
         self.session.add(quest)

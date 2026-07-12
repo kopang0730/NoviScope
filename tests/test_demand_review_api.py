@@ -126,6 +126,58 @@ def test_review_demand_requires_source_when_approving(
     )
 
 
+def test_update_demand_stage_requires_source_when_marking_plausible(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'stage-demand-source.db'}")
+    with TestClient(app) as client:
+        register_and_login(client, "PATCH-DEMAND-SOURCE", "patch-source@example.com")
+        stage_id = create_quest_with_demand_stage(client)
+
+        response = client.patch(
+            f"/stages/{stage_id}",
+            json={
+                "evidence_payload": {
+                    "human_demand_sources": [],
+                    "human_demand_verdict": "plausible",
+                },
+            },
+        )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        "At least one demand evidence source is required to approve demand."
+    )
+
+
+def test_update_demand_stage_accepts_positive_verdict_with_source(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'stage-demand-source-ok.db'}")
+    with TestClient(app) as client:
+        register_and_login(client, "PATCH-DEMAND-OK", "patch-ok@example.com")
+        stage_id = create_quest_with_demand_stage(client)
+
+        response = client.patch(
+            f"/stages/{stage_id}",
+            json={
+                "evidence_payload": {
+                    "human_demand_sources": ["Partner worksheet restoration request"],
+                    "human_demand_verdict": "verified",
+                },
+            },
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["evidence_payload"]["human_demand_verdict"] == "verified"
+    assert body["evidence_payload"]["human_demand_sources"] == [
+        "Partner worksheet restoration request",
+    ]
+
+
 def test_review_demand_rejected_marks_stage_not_approved(
     tmp_path,
     dev_admin_header_enabled: None,
