@@ -84,3 +84,7 @@ export function buildStageArtifactDownloadPath(downloadUrl: string) {
 
   return `/api/${downloadUrl}`;
 }
+
+export function buildQuestReviewPacketDownloadPath(questId: string) {
+  return `/api/quests/${encodeURIComponent(questId)}/review-packet/download`;
+}
