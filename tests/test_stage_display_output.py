@@ -59,6 +59,9 @@ def complete_demand_stage_with_raw_response(client: TestClient, stage_id: str) -
                 "risks": ["Demand source still needs external verification."],
                 "summary": "Demand is plausible but requires human review.",
                 "trace": {
+                    "access_token": "nested-access-token",
+                    "api_key_ciphertext": "encrypted-provider-key",
+                    "provider_api_key": "nested-provider-api-key",
                     "raw_response": "nested provider details should also stay hidden",
                     "stage": "demand_validation",
                 },
@@ -97,10 +100,19 @@ def test_stage_display_output_hides_raw_model_responses(
     assert body["display_payload"]["evidence_for_demand"] == [
         "Court owners need repeatable badminton training feedback."
     ]
+    assert "nested-access-token" not in str(body)
+    assert "encrypted-provider-key" not in str(body)
+    assert "nested-provider-api-key" not in str(body)
     assert "raw_response" not in body["display_payload"]
+    assert "access_token" not in body["display_payload"]["trace"]
+    assert "api_key_ciphertext" not in body["display_payload"]["trace"]
+    assert "provider_api_key" not in body["display_payload"]["trace"]
     assert "raw_response" not in body["display_payload"]["trace"]
     assert body["hidden_fields"] == [
         "output_payload.raw_response",
+        "output_payload.trace.access_token",
+        "output_payload.trace.api_key_ciphertext",
+        "output_payload.trace.provider_api_key",
         "output_payload.trace.raw_response",
     ]
 

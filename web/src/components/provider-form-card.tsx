@@ -107,6 +107,7 @@ export function ProviderFormCard({
           value={formState.defaultModel}
         />
         <Input
+          hint={isEditing ? t("providerApiKeyEditHint") : t("providerApiKeyCreateHint")}
           label={t("providerApiKey")}
           onChange={(event) => updateField("apiKey", event.target.value)}
           placeholder={isEditing ? t("providerKeepKeyPlaceholder") : "sk-..."}
