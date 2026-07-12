@@ -9,6 +9,7 @@ from noviscope.agents.paper_meeting_writer import (
     OpenAICompatiblePaperMeetingWriterRunner,
     PaperMeetingWriterRequest,
     PaperMeetingWriterStageRunner,
+    build_chat_completion_payload,
     parse_paper_meeting_writer_output,
 )
 from noviscope.agents.provider_chat import DEFAULT_MAX_TOKENS, ProviderChatClient
@@ -84,6 +85,39 @@ def test_parse_paper_writer_output_fails_closed_on_invalid_json() -> None:
     assert "not valid structured JSON" in output.summary
     assert output.experiment_results_not_available == [NO_RESULTS_NOTICE]
     assert output.human_review_required == [HUMAN_REVIEW_NOTICE]
+
+
+def test_paper_writer_prompt_excludes_nested_raw_responses() -> None:
+    request = build_request().model_copy(
+        update={
+            "demand_validation": {
+                "evidence_for_demand": [
+                    {
+                        "summary": "Coaches need objective feedback.",
+                        "raw_response": "SECRET DEMAND RAW RESPONSE",
+                    }
+                ],
+                "summary": "Demand summary kept.",
+            },
+            "experiment_plan": {
+                "raw_response": "SECRET EXPERIMENT RAW RESPONSE",
+                "summary": "Experiment plan kept.",
+            },
+        }
+    )
+
+    payload = build_chat_completion_payload(request)
+
+    user_message = payload["messages"][1]
+    prompt_payload = json.loads(user_message["content"])
+    assert "SECRET DEMAND RAW RESPONSE" not in user_message["content"]
+    assert "SECRET EXPERIMENT RAW RESPONSE" not in user_message["content"]
+    assert prompt_payload["demand_validation"] == {
+        "evidence_for_demand": [{"summary": "Coaches need objective feedback."}],
+        "summary": "Demand summary kept.",
+    }
+    assert prompt_payload["experiment_plan"] == {"summary": "Experiment plan kept."}
+    assert prompt_payload["source_stage_ids"]["experiment_planner"] == "stage_experiment"
 
 
 def test_paper_writer_runner_executes_anthropic_messages_api() -> None:
