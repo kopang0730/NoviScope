@@ -5,10 +5,23 @@ import { labelFromEnum } from "../lib/format";
 import { literatureScoutAgentId } from "../lib/stages";
 import { Badge } from "./badge";
 import { Input, Select } from "./input";
-import { PaperDetail, type LiteraturePaper } from "./literature-paper-detail";
+import {
+  PaperDetail,
+  paperRecencyLabel,
+  type LiteraturePaper,
+  type LiteraturePaperRecencyBucket,
+} from "./literature-paper-detail";
 
 type ReliabilityLevel = "top_conference_or_journal" | "peer_reviewed" | "arxiv_preprint" | "unknown";
+type RecencyFilter = LiteraturePaperRecencyBucket | "all";
 type SortMode = "score_desc" | "year_desc" | "venue_asc";
+
+const recencyBucketOptions: readonly LiteraturePaperRecencyBucket[] = [
+  "recent_3_years",
+  "last_5_years",
+  "older_than_5_years",
+  "unknown_year",
+];
 
 type LiteratureScoutView = {
   readonly papers: readonly LiteraturePaper[];
@@ -49,8 +62,25 @@ function readReliabilityLevel(value: string): ReliabilityLevel {
   }
 }
 
+function readRecencyBucket(value: string): LiteraturePaperRecencyBucket {
+  switch (value) {
+    case "recent_3_years":
+      return "recent_3_years";
+    case "last_5_years":
+      return "last_5_years";
+    case "older_than_5_years":
+      return "older_than_5_years";
+    default:
+      return "unknown_year";
+  }
+}
+
 function parseReliabilityFilter(value: string): ReliabilityLevel | "all" {
   return value === "all" ? "all" : readReliabilityLevel(value);
+}
+
+function parseRecencyFilter(value: string): RecencyFilter {
+  return value === "all" ? "all" : readRecencyBucket(value);
 }
 
 function parseSortMode(value: string): SortMode {
@@ -72,7 +102,7 @@ function readPaper(value: unknown): LiteraturePaper | null {
     limitations: readStringArray(value, "limitations"),
     openalexId: readString(value, "openalex_id"),
     publicationType: readString(value, "publication_type"),
-    recencyBucket: readString(value, "recency_bucket"),
+    recencyBucket: readRecencyBucket(readString(value, "recency_bucket")),
     relevanceScore: readNumber(value, "relevance_score") ?? 0,
     reliabilityLevel: readReliabilityLevel(readString(value, "reliability_level")),
     sourceQualitySignals: readStringArray(value, "source_quality_signals"),
@@ -116,13 +146,15 @@ function filterAndSortPapers(
   papers: readonly LiteraturePaper[],
   query: string,
   reliability: ReliabilityLevel | "all",
+  recency: RecencyFilter,
   sortMode: SortMode,
 ) {
   const normalizedQuery = query.trim().toLowerCase();
   const filtered = papers.filter((paper) => {
     const matchesReliability = reliability === "all" || paper.reliabilityLevel === reliability;
+    const matchesRecency = recency === "all" || paper.recencyBucket === recency;
     const haystack = [paper.title, paper.venue, paper.authors.join(" "), paper.whyRelevant].join(" ").toLowerCase();
-    return matchesReliability && (!normalizedQuery || haystack.includes(normalizedQuery));
+    return matchesReliability && matchesRecency && (!normalizedQuery || haystack.includes(normalizedQuery));
   });
 
   return [...filtered].sort((left, right) => {
@@ -141,11 +173,12 @@ export function LiteratureScoutOutput({ stage }: { readonly stage: StageCard }) 
   const literatureScout = buildLiteratureScoutView(stage);
   const [query, setQuery] = useState("");
   const [reliability, setReliability] = useState<ReliabilityLevel | "all">("all");
+  const [recency, setRecency] = useState<RecencyFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("score_desc");
 
   const visiblePapers = useMemo(
-    () => filterAndSortPapers(literatureScout?.papers ?? [], query, reliability, sortMode),
-    [literatureScout?.papers, query, reliability, sortMode],
+    () => filterAndSortPapers(literatureScout?.papers ?? [], query, reliability, recency, sortMode),
+    [literatureScout?.papers, query, reliability, recency, sortMode],
   );
 
   if (!literatureScout) {
@@ -170,7 +203,7 @@ export function LiteratureScoutOutput({ stage }: { readonly stage: StageCard }) 
         </div>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-3">
+      <div className="grid gap-3 lg:grid-cols-4">
         <Input label={t("paperSearch")} onChange={(event) => setQuery(event.target.value)} value={query} />
         <Select label={t("reliability")} onChange={(event) => setReliability(parseReliabilityFilter(event.target.value))} value={reliability}>
           <option value="all">{t("allReliability")}</option>
@@ -178,6 +211,14 @@ export function LiteratureScoutOutput({ stage }: { readonly stage: StageCard }) 
           <option value="peer_reviewed">{labelFromEnum("peer_reviewed")}</option>
           <option value="arxiv_preprint">{labelFromEnum("arxiv_preprint")}</option>
           <option value="unknown">{labelFromEnum("unknown")}</option>
+        </Select>
+        <Select label={t("recencyBucket")} onChange={(event) => setRecency(parseRecencyFilter(event.target.value))} value={recency}>
+          <option value="all">{t("allRecencyBuckets")}</option>
+          {recencyBucketOptions.map((bucket) => (
+            <option key={bucket} value={bucket}>
+              {paperRecencyLabel(bucket, t)}
+            </option>
+          ))}
         </Select>
         <Select label={t("sortBy")} onChange={(event) => setSortMode(parseSortMode(event.target.value))} value={sortMode}>
           <option value="score_desc">{t("sortScore")}</option>
@@ -189,12 +230,13 @@ export function LiteratureScoutOutput({ stage }: { readonly stage: StageCard }) 
       {visiblePapers.length === 0 ? (
         <p className="rounded-lg border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-500">{t("noPapersFound")}</p>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-slate-200">
+        <div className="overflow-x-auto rounded-lg border border-slate-200">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-4 py-3">{t("tableTitle")}</th>
                 <th className="px-4 py-3">{t("year")}</th>
+                <th className="px-4 py-3">{t("recencyBucket")}</th>
                 <th className="px-4 py-3">{t("venue")}</th>
                 <th className="px-4 py-3">{t("reliability")}</th>
                 <th className="px-4 py-3">{t("relevanceScore")}</th>
@@ -208,6 +250,7 @@ export function LiteratureScoutOutput({ stage }: { readonly stage: StageCard }) 
                     <p className="mt-1 text-xs text-slate-500">{paper.authors.join(", ") || t("notAvailable")}</p>
                   </td>
                   <td className="px-4 py-3 text-slate-600">{paper.year ?? t("notAvailable")}</td>
+                  <td className="px-4 py-3 text-slate-600">{paperRecencyLabel(paper.recencyBucket, t)}</td>
                   <td className="px-4 py-3 text-slate-600">{paper.venue || t("notAvailable")}</td>
                   <td className="px-4 py-3">
                     <Badge tone={reliabilityTone(paper.reliabilityLevel)}>{labelFromEnum(paper.reliabilityLevel)}</Badge>

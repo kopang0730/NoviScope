@@ -1,4 +1,24 @@
-import { useI18n } from "../i18n/i18n-context";
+import { useI18n, type TranslationKey } from "../i18n/i18n-context";
+
+export type LiteraturePaperRecencyBucket =
+  | "last_5_years"
+  | "older_than_5_years"
+  | "recent_3_years"
+  | "unknown_year";
+
+const recencyBucketLabelKeys = {
+  last_5_years: "recencyLast5Years",
+  older_than_5_years: "recencyOlderThan5Years",
+  recent_3_years: "recencyRecent3Years",
+  unknown_year: "recencyUnknownYear",
+} as const satisfies Record<LiteraturePaperRecencyBucket, TranslationKey>;
+
+export function paperRecencyLabel(
+  bucket: LiteraturePaperRecencyBucket,
+  t: (key: TranslationKey) => string,
+) {
+  return t(recencyBucketLabelKeys[bucket]);
+}
 
 export type LiteraturePaper = {
   readonly abstractSummary: string;
@@ -7,7 +27,7 @@ export type LiteraturePaper = {
   readonly limitations: readonly string[];
   readonly openalexId: string;
   readonly publicationType: string;
-  readonly recencyBucket: string;
+  readonly recencyBucket: LiteraturePaperRecencyBucket;
   readonly relevanceScore: number;
   readonly reliabilityLevel: "top_conference_or_journal" | "peer_reviewed" | "arxiv_preprint" | "unknown";
   readonly sourceQualitySignals: readonly string[];
@@ -88,7 +108,7 @@ export function PaperDetail({ paper }: { readonly paper: LiteraturePaper }) {
           {paper.sourceType || t("notAvailable")}
           <br />
           <span className="font-medium text-slate-700">{t("recencyBucket")}:</span>{" "}
-          {paper.recencyBucket || t("notAvailable")}
+          {paperRecencyLabel(paper.recencyBucket, t)}
         </p>
         <p>
           <span className="font-medium text-slate-700">DOI:</span> {paper.doi || t("notAvailable")}
