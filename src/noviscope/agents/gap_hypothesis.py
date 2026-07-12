@@ -5,6 +5,7 @@ from typing import Literal, Protocol, assert_never
 from pydantic import BaseModel, ConfigDict, SecretStr, ValidationError, field_validator
 
 from noviscope.agents.literature_scout import LITERATURE_SCOUT_AGENT_ID
+from noviscope.agents.prompt_compaction import compact_prompt_payload
 from noviscope.agents.provider_chat import (
     ChatCompletionPayload,
     ProviderChatClient,
@@ -200,7 +201,7 @@ class GapHypothesisStageRunner(StageRunner):
 def build_chat_completion_payload(request: GapHypothesisRequest) -> ChatCompletionPayload:
     prompt_payload = {
         "demand_validation": compact_payload(request.demand_validation),
-        "papers": request.papers[:MAX_PAPERS_FOR_PROMPT],
+        "papers": [compact_payload(paper) for paper in request.papers[:MAX_PAPERS_FOR_PROMPT]],
         "quest": {
             "initial_direction": request.initial_direction,
             "title": request.quest_title,
@@ -293,9 +294,7 @@ def constrain_output_to_known_papers(
     gaps = [
         gap.model_copy(
             update={
-                "supporting_papers": [
-                    ref for ref in gap.supporting_papers if ref in known_refs
-                ],
+                "supporting_papers": [ref for ref in gap.supporting_papers if ref in known_refs],
             }
         )
         for gap in output.gaps
@@ -435,21 +434,11 @@ def known_paper_refs(papers: list[JsonObject]) -> set[str]:
 
 
 def compact_payload(payload: JsonObject) -> JsonObject:
-    compacted: JsonObject = {}
-    for key, value in payload.items():
-        if key == "raw_response":
-            continue
-        if isinstance(value, str):
-            compacted[key] = trim_text(value)
-        elif isinstance(value, list):
-            compacted[key] = [
-                trim_text(item) if isinstance(item, str) else item
-                for item in value[:8]
-                if isinstance(item, str | int | float | bool | dict)
-            ]
-        elif isinstance(value, int | float | bool | dict) or value is None:
-            compacted[key] = value
-    return compacted
+    return compact_prompt_payload(
+        payload,
+        max_list_items=MAX_PAPERS_FOR_PROMPT,
+        max_text_chars=MAX_TEXT_FIELD_CHARS,
+    )
 
 
 def trim_text(value: str) -> str:

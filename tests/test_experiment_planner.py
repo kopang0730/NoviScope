@@ -11,6 +11,9 @@ from noviscope.agents.experiment_planner import (
     has_selected_idea,
     parse_experiment_plan_output,
 )
+from noviscope.agents.experiment_planner import (
+    build_chat_completion_payload as build_experiment_chat_completion_payload,
+)
 from noviscope.agents.provider_chat import DEFAULT_MAX_TOKENS, ProviderChatClient
 from noviscope.models.provider import ProviderKind
 from noviscope.models.quest import StageCard, StageStatus
@@ -77,6 +80,53 @@ def test_parse_experiment_plan_output_fails_closed_on_invalid_json() -> None:
     assert output.first_runnable_script_plan == []
     assert "not valid structured JSON" in output.summary
     assert PLAN_ONLY_WARNING in output.warnings
+
+
+def test_experiment_prompt_excludes_nested_raw_responses() -> None:
+    request = build_request().model_copy(
+        update={
+            "idea_stage_output": {
+                "ideas": [
+                    {
+                        "idea_id": "idea_1",
+                        "raw_response": "SECRET IDEA STAGE RAW RESPONSE",
+                        "summary": "Idea stage summary.",
+                    }
+                ],
+                "selected_idea_ids": ["idea_1"],
+            },
+            "selected_ideas": [
+                {
+                    "evidence": [
+                        {
+                            "raw_response": "SECRET SELECTED IDEA RAW RESPONSE",
+                            "summary": "Paper-backed idea.",
+                        }
+                    ],
+                    "idea_id": "idea_1",
+                    "idea_title": "Temporal consistency",
+                }
+            ],
+        }
+    )
+
+    payload = build_experiment_chat_completion_payload(request)
+
+    user_message = payload["messages"][1]
+    prompt_payload = json.loads(user_message["content"])
+    assert "SECRET IDEA STAGE RAW RESPONSE" not in user_message["content"]
+    assert "SECRET SELECTED IDEA RAW RESPONSE" not in user_message["content"]
+    assert prompt_payload["idea_stage_output"]["ideas"] == [
+        {"idea_id": "idea_1", "summary": "Idea stage summary."}
+    ]
+    assert prompt_payload["selected_ideas"] == [
+        {
+            "evidence": [{"summary": "Paper-backed idea."}],
+            "idea_id": "idea_1",
+            "idea_title": "Temporal consistency",
+        }
+    ]
+    assert prompt_payload["source_stage_ids"]["idea_generator"] == "stage_idea"
 
 
 def test_experiment_runner_executes_anthropic_messages_api() -> None:
