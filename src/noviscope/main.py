@@ -17,6 +17,7 @@ from noviscope.api.quest_review_packets import router as quest_review_packets_ro
 from noviscope.api.routes import router
 from noviscope.api.stage_display_output import router as stage_display_output_router
 from noviscope.api.stage_literature_papers import router as stage_literature_papers_router
+from noviscope.api.stage_raw_response import router as stage_raw_response_router
 from noviscope.api.stage_readiness import router as stage_readiness_router
 from noviscope.api.stage_review_guidance import router as stage_review_guidance_router
 from noviscope.api.stage_runs import router as stage_runs_router
@@ -53,6 +54,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
     app.include_router(quest_review_packets_router)
     app.include_router(stage_display_output_router)
     app.include_router(stage_literature_papers_router)
+    app.include_router(stage_raw_response_router)
     app.include_router(stage_readiness_router)
     app.include_router(stage_review_guidance_router)
     app.include_router(stage_runs_router)
