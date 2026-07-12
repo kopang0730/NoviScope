@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import timedelta
 
 from sqlmodel import Session, select
@@ -13,6 +14,10 @@ from noviscope.core.stage_policy import (
 from noviscope.models.common import utc_now
 from noviscope.models.quest import Quest, QuestStatus, StageCard, StageStatus
 from noviscope.models.user import User, UserRole
+from noviscope.quests.stage_transition_events import (
+    StageTransitionRecord,
+    record_stage_transition,
+)
 
 ALLOWED_STAGE_TRANSITIONS: dict[StageStatus, set[StageStatus]] = {
     StageStatus.PENDING: {StageStatus.RUNNING, StageStatus.BLOCKED},
@@ -20,6 +25,15 @@ ALLOWED_STAGE_TRANSITIONS: dict[StageStatus, set[StageStatus]] = {
     StageStatus.BLOCKED: {StageStatus.PENDING, StageStatus.RUNNING},
     StageStatus.COMPLETE: set(),
 }
+
+
+@dataclass(frozen=True, slots=True)
+class StageTransitionNotAllowedError(ValueError):
+    current: StageStatus
+    target: StageStatus
+
+    def __str__(self) -> str:
+        return f"Cannot transition stage from {self.current.value} to {self.target.value}"
 
 
 class QuestService:
@@ -146,6 +160,7 @@ class QuestService:
         review_notes: str | None = None,
     ) -> StageCard:
         stage = self.get_stage_card(stage_id)
+        previous_status = stage.status
         if status is not None:
             self._assert_transition_allowed(stage, status)
             stage.status = status
@@ -162,6 +177,15 @@ class QuestService:
         if review_notes is not None:
             stage.review_notes = review_notes
         stage.updated_at = utc_now().isoformat()
+        if status is not None:
+            record_stage_transition(
+                self.session,
+                StageTransitionRecord(
+                    from_status=previous_status,
+                    stage=stage,
+                    to_status=status,
+                ),
+            )
         self._sync_quest_after_stage_update(stage)
         self.session.add(stage)
         self.session.commit()
@@ -179,7 +203,7 @@ class QuestService:
         ):
             return
         if target not in ALLOWED_STAGE_TRANSITIONS[current]:
-            raise ValueError(f"Cannot transition stage from {current.value} to {target.value}")
+            raise StageTransitionNotAllowedError(current=current, target=target)
 
     def _sync_quest_after_stage_update(self, stage: StageCard) -> None:
         if stage.status != StageStatus.COMPLETE:
@@ -187,27 +211,31 @@ class QuestService:
         quest = self.session.get(Quest, stage.quest_id)
         if quest is None:
             return
-        if stage.agent_id == DEMAND_VALIDATOR_AGENT_ID:
-            quest.status = (
-                QuestStatus.IDEA_SELECTION if stage.human_approved else QuestStatus.DEMAND_REVIEW
-            )
-        elif stage.agent_id == IDEA_GENERATOR_AGENT_ID:
-            quest.status = (
+        next_status_by_agent_id = {
+            DEMAND_VALIDATOR_AGENT_ID: (
+                QuestStatus.IDEA_SELECTION
+                if stage.human_approved
+                else QuestStatus.DEMAND_REVIEW
+            ),
+            IDEA_GENERATOR_AGENT_ID: (
                 QuestStatus.LIGHTWEIGHT_EXPERIMENT
                 if stage.human_approved
                 else QuestStatus.IDEA_SELECTION
-            )
-        elif stage.agent_id == EXPERIMENT_PLANNER_AGENT_ID:
-            quest.status = (
+            ),
+            EXPERIMENT_PLANNER_AGENT_ID: (
                 QuestStatus.FULL_EXPERIMENT
                 if stage.human_approved
                 else QuestStatus.LIGHTWEIGHT_EXPERIMENT
-            )
-        elif stage.agent_id == PAPER_MEETING_WRITER_AGENT_ID:
-            quest.status = (
-                QuestStatus.WRITING if stage.human_approved else QuestStatus.FULL_EXPERIMENT
-            )
-        else:
+            ),
+            PAPER_MEETING_WRITER_AGENT_ID: (
+                QuestStatus.WRITING
+                if stage.human_approved
+                else QuestStatus.FULL_EXPERIMENT
+            ),
+        }
+        next_status = next_status_by_agent_id.get(stage.agent_id)
+        if next_status is None:
             return
+        quest.status = next_status
         quest.updated_at = utc_now().isoformat()
         self.session.add(quest)
