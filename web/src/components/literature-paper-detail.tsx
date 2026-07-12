@@ -6,6 +6,7 @@ export type LiteraturePaper = {
   readonly doi: string;
   readonly limitations: readonly string[];
   readonly openalexId: string;
+  readonly paperRef: string;
   readonly publicationType: string;
   readonly recencyBucket: string;
   readonly relevanceScore: number;
@@ -91,6 +92,9 @@ export function PaperDetail({ paper }: { readonly paper: LiteraturePaper }) {
           {paper.recencyBucket || t("notAvailable")}
         </p>
         <p>
+          <span className="font-medium text-slate-700">{t("paperReference")}:</span>{" "}
+          {paper.paperRef || t("notAvailable")}
+          <br />
           <span className="font-medium text-slate-700">DOI:</span> {paper.doi || t("notAvailable")}
           <br />
           <span className="font-medium text-slate-700">{t("openalexId")}:</span>{" "}
