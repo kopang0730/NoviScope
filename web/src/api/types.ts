@@ -110,6 +110,18 @@ export interface StageCard {
   updated_at: string;
 }
 
+export interface StageDisplayOutputResponse {
+  readonly stage_id: string;
+  readonly agent_id: string;
+  readonly status: StageStatus;
+  readonly confidence: StageConfidence;
+  readonly summary: string;
+  readonly output_available: boolean;
+  readonly raw_response_available: boolean;
+  readonly display_payload: Record<string, unknown>;
+  readonly hidden_fields: readonly string[];
+}
+
 export interface QuestCreateResponse {
   id: string;
   owner_user_id: string | null;
