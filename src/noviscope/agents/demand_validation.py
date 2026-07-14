@@ -181,10 +181,13 @@ def parse_demand_validation_output(raw_content: str) -> DemandValidationOutput:
             {**parsed_content, "raw_response": raw_content}
         )
         if output.confidence == "high":
+            risks = output.risks
+            if NO_EXTERNAL_VERIFICATION_RISK not in risks:
+                risks = [*risks, NO_EXTERNAL_VERIFICATION_RISK]
             return output.model_copy(
                 update={
                     "confidence": "medium",
-                    "risks": [*output.risks, NO_EXTERNAL_VERIFICATION_RISK],
+                    "risks": risks,
                 }
             )
         return output
