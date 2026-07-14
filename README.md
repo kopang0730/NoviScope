@@ -5,7 +5,7 @@
 [Architecture](docs/architecture.md) · [Workflow](docs/workflow.md) ·
 [Agent Contracts](docs/agent-contracts.md) · [Deployment](docs/deployment.md) ·
 [Contributing](CONTRIBUTING.md) · [Collaboration Guide](docs/COLLABORATION.md) ·
-[License](LICENSE)
+[Source Policy](docs/source-policy.md) · [License](LICENSE)
 
 Evidence-driven research workflow for turning vague research directions into verified
 experiments and traceable paper drafts.
@@ -161,6 +161,8 @@ Not implemented yet:
   and trust boundaries.
 - [Workflow](docs/workflow.md): how a quest moves through demand validation,
   literature scouting, idea generation, experiment planning, and writing.
+- [Source Policy](docs/source-policy.md): evidence tiers, trusted venue policy,
+  recency windows, poisoning rules, and claim-admission rules.
 - [Agent Contracts](docs/agent-contracts.md): current executable stages,
   provider rules, output rules, and how to add a runner.
 - [Deployment](docs/deployment.md): single-server lab deployment, bootstrap admin,
