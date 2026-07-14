@@ -46,6 +46,73 @@ def create_quest_with_experiment_stage(client: TestClient) -> str:
     return experiment_stage["id"]
 
 
+def test_get_experiment_setup_status_reports_missing_inputs(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    # Given
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'experiment-setup-status.db'}")
+    with TestClient(app) as client:
+        register_and_login(client, "EXPERIMENT-STATUS", "experiment-status@example.com")
+        stage_id = create_quest_with_experiment_stage(client)
+
+        # When
+        response = client.get(f"/stages/{stage_id}/experiment-setup")
+
+    # Then
+    assert response.status_code == 200
+    body = response.json()
+    assert body["stage_id"] == stage_id
+    assert body["agent_id"] == EXPERIMENT_PLANNER_AGENT_ID
+    assert body["status"] == "pending"
+    assert body["required_fields"] == ["data_path", "code_repository", "environment_notes"]
+    assert body["missing_fields"] == ["data_path", "code_repository", "environment_notes"]
+    assert body["is_complete"] is False
+    assert body["can_edit"] is True
+    assert body["blocking_reason"] == (
+        "Record data_path, code_repository, and environment_notes before running "
+        "Experiment Planner."
+    )
+    assert body["data_path"] == ""
+    assert body["code_repository"] == ""
+    assert body["environment_notes"] == ""
+
+
+def test_get_experiment_setup_status_reports_saved_inputs(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    # Given
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'experiment-setup-saved.db'}")
+    with TestClient(app) as client:
+        register_and_login(client, "EXPERIMENT-SAVED", "experiment-saved@example.com")
+        stage_id = create_quest_with_experiment_stage(client)
+        save_response = client.post(
+            f"/stages/{stage_id}/experiment-setup",
+            json={
+                "code_repository": "https://github.com/lab/badminton-baseline",
+                "data_path": "/data/badminton/train-videos",
+                "environment_notes": "A800 server, CUDA 12.4, PyTorch prepared.",
+            },
+        )
+        assert save_response.status_code == 200
+
+        # When
+        response = client.get(f"/stages/{stage_id}/experiment-setup")
+
+    # Then
+    assert response.status_code == 200
+    body = response.json()
+    assert body["stage_id"] == stage_id
+    assert body["missing_fields"] == []
+    assert body["is_complete"] is True
+    assert body["can_edit"] is True
+    assert body["blocking_reason"] == ""
+    assert body["data_path"] == "/data/badminton/train-videos"
+    assert body["code_repository"] == "https://github.com/lab/badminton-baseline"
+    assert body["environment_notes"] == "A800 server, CUDA 12.4, PyTorch prepared."
+
+
 def test_save_experiment_setup_records_runner_inputs(
     tmp_path,
     dev_admin_header_enabled: None,
@@ -150,5 +217,36 @@ def test_save_experiment_setup_rejects_wrong_stage(
             },
         )
 
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Experiment setup is only available for Experiment Planner."
+
+
+def test_get_experiment_setup_status_rejects_wrong_stage(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    # Given
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'experiment-setup-get-wrong.db'}")
+    with TestClient(app) as client:
+        register_and_login(client, "EXPERIMENT-GET-WRONG", "experiment-get-wrong@example.com")
+        quest_response = client.post(
+            "/quests",
+            json={
+                "initial_direction": "Badminton action recognition.",
+                "title": "Badminton action recognition",
+            },
+        )
+        assert quest_response.status_code == 201
+        stages_response = client.get(f"/quests/{quest_response.json()['id']}/stages")
+        demand_stage = next(
+            stage
+            for stage in stages_response.json()["stages"]
+            if stage["agent_id"] == "demand_validator"
+        )
+
+        # When
+        response = client.get(f"/stages/{demand_stage['id']}/experiment-setup")
+
+    # Then
     assert response.status_code == 400
     assert response.json()["detail"] == "Experiment setup is only available for Experiment Planner."
