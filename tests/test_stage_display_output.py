@@ -59,6 +59,14 @@ def complete_demand_stage_with_raw_response(client: TestClient, stage_id: str) -
                 "risks": ["Demand source still needs external verification."],
                 "summary": "Demand is plausible but requires human review.",
                 "trace": {
+                    "access_token": "oauth-token-should-stay-hidden",
+                    "apiKey": "camel-api-key-should-stay-hidden",
+                    "authorization": "Bearer hidden-token",
+                    "authToken": "auth-token-should-stay-hidden",
+                    "client_secret": "client-secret-should-stay-hidden",
+                    "openai_api_key": "openai-api-key-should-stay-hidden",
+                    "password": "hidden-password",
+                    "providerRawResponse": "provider raw response should stay hidden",
                     "raw_response": "nested provider details should also stay hidden",
                     "stage": "demand_validation",
                 },
@@ -98,9 +106,25 @@ def test_stage_display_output_hides_raw_model_responses(
         "Court owners need repeatable badminton training feedback."
     ]
     assert "raw_response" not in body["display_payload"]
+    assert "access_token" not in body["display_payload"]["trace"]
+    assert "apiKey" not in body["display_payload"]["trace"]
+    assert "authorization" not in body["display_payload"]["trace"]
+    assert "authToken" not in body["display_payload"]["trace"]
+    assert "client_secret" not in body["display_payload"]["trace"]
+    assert "openai_api_key" not in body["display_payload"]["trace"]
+    assert "password" not in body["display_payload"]["trace"]
+    assert "providerRawResponse" not in body["display_payload"]["trace"]
     assert "raw_response" not in body["display_payload"]["trace"]
     assert body["hidden_fields"] == [
         "output_payload.raw_response",
+        "output_payload.trace.access_token",
+        "output_payload.trace.apiKey",
+        "output_payload.trace.authorization",
+        "output_payload.trace.authToken",
+        "output_payload.trace.client_secret",
+        "output_payload.trace.openai_api_key",
+        "output_payload.trace.password",
+        "output_payload.trace.providerRawResponse",
         "output_payload.trace.raw_response",
     ]
 

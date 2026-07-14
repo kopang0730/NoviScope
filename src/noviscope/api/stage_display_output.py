@@ -22,13 +22,29 @@ router = APIRouter()
 OUTPUT_PAYLOAD_ROOT: Final = "output_payload"
 HIDDEN_DISPLAY_KEYS: Final = frozenset(
     {
-        "api_key",
-        "encrypted_api_key",
-        "raw_response",
+        "accesstoken",
+        "apikey",
+        "authorization",
+        "clientsecret",
+        "encryptedapikey",
+        "password",
+        "rawresponse",
+        "refreshtoken",
         "secret",
         "token",
     }
 )
+HIDDEN_DISPLAY_KEY_MARKERS: Final = (
+    "accesstoken",
+    "apikey",
+    "authorization",
+    "clientsecret",
+    "password",
+    "rawresponse",
+    "refreshtoken",
+    "secret",
+)
+HIDDEN_DISPLAY_KEY_SUFFIXES: Final = ("token",)
 
 
 class StageDisplayOutputResponse(BaseModel):
@@ -68,6 +84,19 @@ def json_path(parent_path: str, child_name: str) -> str:
     return f"{parent_path}.{child_name}"
 
 
+def normalized_payload_key(field_name: str) -> str:
+    return "".join(char.lower() for char in field_name if char.isalnum())
+
+
+def is_hidden_display_key(field_name: str) -> bool:
+    normalized = normalized_payload_key(field_name)
+    return (
+        normalized in HIDDEN_DISPLAY_KEYS
+        or normalized.endswith(HIDDEN_DISPLAY_KEY_SUFFIXES)
+        or any(marker in normalized for marker in HIDDEN_DISPLAY_KEY_MARKERS)
+    )
+
+
 def sanitize_json_value(value: JsonValue, parent_path: str) -> SanitizedJsonValue:
     match value:
         case dict() as mapping:
@@ -75,7 +104,7 @@ def sanitize_json_value(value: JsonValue, parent_path: str) -> SanitizedJsonValu
             hidden_fields: list[str] = []
             for field_name, item in mapping.items():
                 child_path = json_path(parent_path, field_name)
-                if field_name in HIDDEN_DISPLAY_KEYS:
+                if is_hidden_display_key(field_name):
                     hidden_fields.append(child_path)
                     continue
                 child = sanitize_json_value(item, child_path)
