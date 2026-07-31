@@ -1,6 +1,7 @@
 import re
 from dataclasses import dataclass
 from datetime import date
+from typing import Final
 
 from noviscope.agents.literature_source_quality import (
     RECENT_YEAR_WINDOW,
@@ -23,6 +24,7 @@ LITERATURE_SCOUT_AGENT_ID = "literature_scout"
 OPENALEX_SOURCE = "openalex_works_api"
 ABSTRACT_SUMMARY_CHARS = 420
 QUERY_CHARS = 240
+RECENT_RELEVANCE_MULTIPLIER: Final = 1.25
 
 QUERY_STOP_WORDS = frozenset(
     {"about", "and", "for", "from", "into", "noviscope", "quest", "research", "the", "with"}
@@ -164,7 +166,7 @@ def relevance_score(work: OpenAlexWork, current_year: int) -> float:
     score = work.relevance_score or 0.0
     recent_start_year = current_year - RECENT_YEAR_WINDOW + 1
     if work.publication_year is not None and work.publication_year >= recent_start_year:
-        score *= 1.25
+        score *= RECENT_RELEVANCE_MULTIPLIER
     return round(score, 3)
 
 
