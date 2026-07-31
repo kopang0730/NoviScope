@@ -104,6 +104,38 @@ def test_stage_review_guidance_marks_completed_stage_ready_for_review(
     assert body["evidence_summary"] == ["Court owners need repeatable badminton training feedback."]
 
 
+def test_stage_review_guidance_downloads_markdown_checklist(
+    tmp_path,
+    dev_admin_header_enabled: None,
+) -> None:
+    app = create_app(database_url=f"sqlite:///{tmp_path / 'review-guidance-download.db'}")
+
+    with TestClient(app) as client:
+        # Given a completed Demand Validation stage that needs human review.
+        register_and_login(client, "GUIDANCE-DOWNLOAD", "guidance-download@example.com")
+        demand_stage_id = create_quest_with_demand_stage(client)
+        complete_demand_stage(client, demand_stage_id)
+
+        # When the owner downloads review guidance as Markdown.
+        response = client.get(f"/stages/{demand_stage_id}/review-guidance/download.md")
+
+    # Then the attachment preserves the actionable review checklist and evidence context.
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/markdown; charset=utf-8"
+    assert response.headers["content-disposition"] == (
+        f'attachment; filename="noviscope-stage-review-{demand_stage_id}.md"'
+    )
+    body = response.text
+    assert "# NoviScope Stage Review Guidance" in body
+    assert f"- Stage ID: `{demand_stage_id}`" in body
+    assert "- Approval state: `ready_for_review`" in body
+    assert "- Confidence: `medium`" in body
+    assert "Court owners need repeatable badminton training feedback." in body
+    assert "Call one badminton training customer before approving." in body
+    assert "Need an external customer proof point." in body
+    assert "The demand is still self-reported." in body
+
+
 def test_stage_review_guidance_blocks_approval_before_stage_completion(
     tmp_path,
     dev_admin_header_enabled: None,
