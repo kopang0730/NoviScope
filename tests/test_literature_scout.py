@@ -70,6 +70,7 @@ def make_work(
         authorships=[OpenAlexAuthorship(author=OpenAlexAuthor(display_name="Ada Chen"))],
         doi="https://doi.org/10.0000/example",
         id=openalex_id,
+        ids={"arxiv": "https://arxiv.org/abs/2401.01234"},
         primary_location=OpenAlexLocation(
             landing_page_url="https://example.org/paper",
             source=OpenAlexSource(display_name=venue, type="conference"),
@@ -133,7 +134,9 @@ def test_literature_scout_scores_recent_openalex_papers_first() -> None:
         "OpenAlex relevance_score with a 1.25x boost for papers from the last three years."
     )
     assert isinstance(papers, list)
+    assert papers[0]["arxiv_id"] == "2401.01234"
     assert papers[0]["openalex_id"] == "https://openalex.org/W2"
+    assert papers[0]["paper_ref"] == "https://openalex.org/W2"
     assert papers[0]["publication_type"] == "proceedings-article"
     assert papers[0]["recency_bucket"] == "recent_3_years"
     assert papers[0]["relevance_score"] == 112.5
@@ -151,9 +154,11 @@ def test_literature_scout_scores_recent_openalex_papers_first() -> None:
     assert set(papers[0]) == {
         "abstract_summary",
         "authors",
+        "arxiv_id",
         "doi",
         "limitations",
         "openalex_id",
+        "paper_ref",
         "publication_type",
         "recency_bucket",
         "relevance_score",
@@ -181,7 +186,15 @@ def test_literature_scout_returns_empty_papers_without_fabrication() -> None:
 def test_openalex_client_uses_works_api_params_without_live_http() -> None:
     response = httpx.Response(
         200,
-        json={"results": [{"id": "https://openalex.org/W1", "title": "A paper"}]},
+        json={
+            "results": [
+                {
+                    "id": "https://openalex.org/W1",
+                    "ids": {"arxiv": "https://arxiv.org/abs/2401.01234"},
+                    "title": "A paper",
+                }
+            ]
+        },
         request=httpx.Request("GET", "https://api.openalex.org/works"),
     )
     http_client = FakeHTTPClient(response)
@@ -196,6 +209,8 @@ def test_openalex_client_uses_works_api_params_without_live_http() -> None:
     works = client.search("badminton action recognition", current_year=2026)
 
     assert works[0].id == "https://openalex.org/W1"
+    assert works[0].ids is not None
+    assert works[0].ids.arxiv == "https://arxiv.org/abs/2401.01234"
     assert http_client.params["search"] == "badminton action recognition"
     assert http_client.params["filter"] == "from_publication_date:2021-01-01"
     assert http_client.params["per_page"] == 8

@@ -47,9 +47,15 @@ class OpenAlexLocation(BaseModel):
     source: OpenAlexSource | None = None
 
 
+class OpenAlexIds(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    arxiv: str | None = None
+
+
 class OpenAlexWork(BaseModel):
     model_config = ConfigDict(frozen=True)
     id: str
+    ids: OpenAlexIds | None = None
     title: str | None = None
     display_name: str | None = None
     publication_year: int | None = None
