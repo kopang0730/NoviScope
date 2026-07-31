@@ -5,7 +5,36 @@ from typing import Final, Literal, TypeAlias, assert_never
 from noviscope.agents.openalex_client import FIVE_YEAR_LOOKBACK, OpenAlexWork
 
 RECENT_YEAR_WINDOW: Final = 3
-TOP_VENUE_MARKERS: Final = tuple("acl cvpr eccv emnlp iccv iclr icml ijcai kdd neurips".split())
+TOP_VENUE_ALIASES: Final = (
+    (
+        "cvpr",
+        (
+            "cvpr",
+            "computer vision and pattern recognition",
+            "conference on computer vision and pattern recognition",
+        ),
+    ),
+    ("iccv", ("iccv", "international conference on computer vision")),
+    ("eccv", ("eccv", "european conference on computer vision")),
+    (
+        "tpami",
+        (
+            "tpami",
+            "t-pami",
+            "transactions on pattern analysis and machine intelligence",
+        ),
+    ),
+    ("ijcv", ("ijcv", "international journal of computer vision")),
+    ("tip", ("tip", "transactions on image processing")),
+    ("aaai", ("aaai", "association for the advancement of artificial intelligence")),
+    ("acl", ("acl", "annual meeting of the association for computational linguistics")),
+    ("emnlp", ("emnlp", "empirical methods in natural language processing")),
+    ("iclr", ("iclr", "international conference on learning representations")),
+    ("icml", ("icml", "international conference on machine learning")),
+    ("ijcai", ("ijcai", "international joint conference on artificial intelligence")),
+    ("kdd", ("kdd", "knowledge discovery and data mining")),
+    ("neurips", ("neurips", "neural information processing systems")),
+)
 PEER_REVIEWED_WORK_TYPES: Final = frozenset(
     "article book-chapter journal-article proceedings-article".split()
 )
@@ -59,10 +88,19 @@ def build_source_quality(
     )
 
 
+def normalize_venue_alias(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+
+
+def venue_alias_matches(normalized_venue: str, alias: str) -> bool:
+    normalized_alias = normalize_venue_alias(alias)
+    return bool(re.search(rf"(^| ){re.escape(normalized_alias)}($| )", normalized_venue))
+
+
 def top_venue_marker(venue: str) -> str:
-    normalized_venue = venue.lower()
-    for marker in TOP_VENUE_MARKERS:
-        if re.search(rf"(^|[^a-z0-9]){re.escape(marker)}([^a-z0-9]|$)", normalized_venue):
+    normalized_venue = normalize_venue_alias(venue)
+    for marker, aliases in TOP_VENUE_ALIASES:
+        if any(venue_alias_matches(normalized_venue, alias) for alias in aliases):
             return marker
     return ""
 
