@@ -1,10 +1,14 @@
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlmodel import Session
 
 from noviscope.api.dependencies import get_session
+from noviscope.api.literature_paper_csv import (
+    build_literature_paper_csv,
+    literature_paper_csv_filename,
+)
 from noviscope.api.literature_paper_detail import (
     LiteraturePaperDetailResponse,
     LiteraturePaperNotFoundError,
@@ -87,6 +91,35 @@ def list_literature_papers(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except PermissionError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+
+@router.get("/stages/{stage_id}/literature-papers/download.csv")
+def download_literature_papers_csv(
+    stage_id: str,
+    context: Annotated[
+        LiteraturePaperTableRouteContext,
+        Depends(get_literature_paper_table_route_context),
+    ],
+    options: Annotated[
+        LiteraturePaperTableOptions,
+        Depends(get_literature_paper_table_options),
+    ],
+) -> Response:
+    try:
+        table = read_literature_paper_table(stage_id, context, options)
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    return Response(
+        content=build_literature_paper_csv(table),
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{literature_paper_csv_filename(stage_id)}"'
+            ),
+        },
+        media_type="text/csv; charset=utf-8",
+    )
 
 
 @router.get(
