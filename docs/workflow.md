@@ -4,6 +4,10 @@ NoviScope is organized around a quest. A quest starts as a rough research
 direction and moves through explicit stage cards. Each stage must either produce
 structured evidence or explain why it is blocked.
 
+For the current implemented/partial/planned capability boundary, see
+[Feature Status and Trust Gates](feature-status.md). Planned stages must not be
+shown as runnable automation.
+
 ## User Flow
 
 1. Register with an invitation code.

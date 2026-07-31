@@ -5,7 +5,7 @@
 [Architecture](docs/architecture.md) · [Workflow](docs/workflow.md) ·
 [Agent Contracts](docs/agent-contracts.md) · [Deployment](docs/deployment.md) ·
 [Contributing](CONTRIBUTING.md) · [Collaboration Guide](docs/COLLABORATION.md) ·
-[License](LICENSE)
+[Feature Status](docs/feature-status.md) · [License](LICENSE)
 
 Evidence-driven research workflow for turning vague research directions into verified
 experiments and traceable paper drafts.
@@ -167,6 +167,8 @@ Not implemented yet:
   provider configuration, and update flow.
 - [Collaboration Guide](docs/COLLABORATION.md): team and AI-assisted contribution
   rules.
+- [Feature Status](docs/feature-status.md): implemented, partial, planned, and
+  blocked capabilities plus trust gates.
 
 ## Admin-Managed Lab Alpha
 

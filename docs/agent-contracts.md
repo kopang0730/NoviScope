@@ -4,6 +4,9 @@ NoviScope separates the long-term agent registry from the currently executable
 stage runners. The registry describes the intended research team. The stage
 runner registry describes what the Web MVP can actually execute now.
 
+When in doubt, treat [Feature Status and Trust Gates](feature-status.md) as the
+source of truth for what may be presented as implemented in the UI.
+
 ## Shared Stage Contract
 
 Every persisted stage card has:
