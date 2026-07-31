@@ -1,9 +1,23 @@
 import json
 from dataclasses import dataclass
-from typing import Literal, Protocol, assert_never
+from typing import Protocol, assert_never
 
-from pydantic import BaseModel, ConfigDict, SecretStr, ValidationError, field_validator
-
+from noviscope.agents.gap_hypothesis_contracts import (
+    GapEvidence,
+    GapHypothesisOutput,
+    GapHypothesisRequest,
+    HypothesisIdea,
+)
+from noviscope.agents.gap_hypothesis_outputs import (
+    build_no_paper_output,
+    build_stage_output_payload,
+    parse_gap_hypothesis_output,
+)
+from noviscope.agents.gap_hypothesis_payloads import (
+    MAX_PAPERS_FOR_PROMPT,
+    compact_payload,
+    read_literature_papers,
+)
 from noviscope.agents.literature_scout import LITERATURE_SCOUT_AGENT_ID
 from noviscope.agents.provider_chat import (
     ChatCompletionPayload,
@@ -17,77 +31,21 @@ from noviscope.core.stage_policy import DEMAND_VALIDATOR_AGENT_ID, IDEA_GENERATO
 from noviscope.models.provider import ProviderKind
 from noviscope.models.quest import StageCard, StageStatus
 
-MAX_PAPERS_FOR_PROMPT = 8
-MAX_TEXT_FIELD_CHARS = 500
-
-Confidence = Literal["high", "medium", "low"]
-EvidenceType = Literal["paper_limitations", "metadata_inference", "human_context"]
-Level = Literal["high", "medium", "low"]
-
-
-class GapHypothesisRequest(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    stage_id: str
-    quest_title: str
-    initial_direction: str
-    provider_id: str
-    provider_name: str
-    provider_kind: ProviderKind
-    base_url: str
-    model: str
-    api_key: SecretStr
-    demand_validation: JsonObject
-    papers: list[JsonObject]
-    source_stage_ids: JsonObject
-
-
-class GapEvidence(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    gap_title: str
-    description: str
-    supporting_papers: list[str]
-    severity: Level
-    evidence_type: EvidenceType
-
-
-class HypothesisIdea(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    idea_id: str
-    idea_title: str
-    core_hypothesis: str
-    based_on_which_papers: list[str]
-    expected_improvement: str
-    required_data: str
-    required_baseline: str
-    experiment_feasibility: Level
-    novelty_risk: Level
-    application_value: Level
-    confidence: Confidence
-
-    @field_validator("idea_id")
-    @classmethod
-    def validate_idea_id(cls, value: str) -> str:
-        normalized = value.strip()
-        if not normalized:
-            raise ValueError("idea_id cannot be empty")
-        return normalized
-
-
-class GapHypothesisOutput(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    summary: str
-    confidence: Confidence
-    gaps: list[GapEvidence]
-    ideas: list[HypothesisIdea]
-    selected_idea_ids: list[str] = []
-    selection_status: Literal["pending_human_selection", "selected_for_experiment_design"]
-    source_stage_ids: JsonObject
-    raw_response: str
-    warnings: list[str] = []
+__all__ = [
+    "GapEvidence",
+    "GapHypothesisOutput",
+    "GapHypothesisRequest",
+    "GapHypothesisRunError",
+    "GapHypothesisRunner",
+    "GapHypothesisStageRunner",
+    "HypothesisIdea",
+    "OpenAICompatibleGapHypothesisRunner",
+    "build_no_paper_output",
+    "build_stage_output_payload",
+    "get_gap_hypothesis_runner",
+    "parse_gap_hypothesis_output",
+    "read_literature_papers",
+]
 
 
 class GapHypothesisRunner(Protocol):
@@ -219,8 +177,9 @@ def build_chat_completion_payload(request: GapHypothesisRequest) -> ChatCompleti
                     "expected_improvement, required_data, required_baseline, "
                     "experiment_feasibility, novelty_risk, application_value, confidence. "
                     "Confidence values are high, medium, or low, but keep hypotheses cautious "
-                    "because no experiment has run. based_on_which_papers must use exact "
-                    "paper_ref values from the provided papers."
+                    "because no experiment has run. based_on_which_papers and gap "
+                    "supporting_papers must use exact paper_ref values from the provided "
+                    "papers."
                 ),
                 "role": "system",
             },
@@ -231,119 +190,6 @@ def build_chat_completion_payload(request: GapHypothesisRequest) -> ChatCompleti
         ],
         "model": request.model,
         "temperature": 0.3,
-    }
-
-
-def parse_gap_hypothesis_output(
-    raw_content: str,
-    request: GapHypothesisRequest,
-) -> GapHypothesisOutput:
-    try:
-        parsed_content = json.loads(raw_content)
-        output = GapHypothesisOutput.model_validate(
-            {
-                **parsed_content,
-                "raw_response": raw_content,
-                "selected_idea_ids": [],
-                "selection_status": "pending_human_selection",
-                "source_stage_ids": request.source_stage_ids,
-            }
-        )
-    except (json.JSONDecodeError, TypeError, ValidationError):
-        return GapHypothesisOutput(
-            confidence="low",
-            gaps=[],
-            ideas=[],
-            raw_response=raw_content,
-            selected_idea_ids=[],
-            selection_status="pending_human_selection",
-            source_stage_ids=request.source_stage_ids,
-            summary="The model response was not valid structured JSON.",
-            warnings=["The model response was not valid structured JSON."],
-        )
-    return constrain_output_to_known_papers(output, request.papers)
-
-
-def constrain_output_to_known_papers(
-    output: GapHypothesisOutput,
-    papers: list[JsonObject],
-) -> GapHypothesisOutput:
-    known_refs = known_paper_refs(papers)
-    warnings = list(output.warnings)
-    ideas: list[HypothesisIdea] = []
-    for idea in output.ideas:
-        valid_refs = [ref for ref in idea.based_on_which_papers if ref in known_refs]
-        if len(valid_refs) != len(idea.based_on_which_papers):
-            warnings.append(
-                f"Removed unrecognized paper references from {idea.idea_id}; verify citations."
-            )
-        confidence = cap_confidence(idea.confidence)
-        if not valid_refs:
-            confidence = "low"
-            warnings.append(f"{idea.idea_id} has no recognized paper reference.")
-        ideas.append(
-            idea.model_copy(
-                update={
-                    "based_on_which_papers": valid_refs,
-                    "confidence": confidence,
-                }
-            )
-        )
-
-    gaps = [
-        gap.model_copy(
-            update={
-                "supporting_papers": [
-                    ref for ref in gap.supporting_papers if ref in known_refs
-                ],
-            }
-        )
-        for gap in output.gaps
-    ]
-
-    return output.model_copy(
-        update={
-            "confidence": cap_confidence(output.confidence),
-            "gaps": gaps,
-            "ideas": ideas,
-            "warnings": warnings,
-        }
-    )
-
-
-def cap_confidence(confidence: str) -> Confidence:
-    if confidence == "high":
-        return "medium"
-    if confidence == "medium":
-        return "medium"
-    return "low"
-
-
-def build_no_paper_output(source_stage_ids: JsonObject) -> GapHypothesisOutput:
-    return GapHypothesisOutput(
-        confidence="low",
-        gaps=[],
-        ideas=[],
-        raw_response="",
-        selected_idea_ids=[],
-        selection_status="pending_human_selection",
-        source_stage_ids=source_stage_ids,
-        summary="No hypotheses generated because Literature Scout returned no papers.",
-        warnings=["Literature Scout returned no papers; NoviScope did not fabricate ideas."],
-    )
-
-
-def build_stage_output_payload(output: GapHypothesisOutput) -> JsonObject:
-    return {
-        "confidence": output.confidence,
-        "gaps": [gap.model_dump() for gap in output.gaps],
-        "ideas": [idea.model_dump() for idea in output.ideas],
-        "raw_response": output.raw_response,
-        "selected_idea_ids": output.selected_idea_ids,
-        "selection_status": output.selection_status,
-        "source_stage_ids": output.source_stage_ids,
-        "summary": output.summary,
-        "warnings": output.warnings,
     }
 
 
@@ -384,95 +230,6 @@ def build_source_stage_ids(
         "demand_validation": demand_stage.id if demand_stage is not None else "",
         "literature_scout": literature_stage.id if literature_stage is not None else "",
     }
-
-
-def read_literature_papers(stage: StageCard | None) -> list[JsonObject]:
-    if stage is None:
-        return []
-    paper_values = stage.output_payload.get("papers")
-    if not isinstance(paper_values, list):
-        return []
-    papers: list[JsonObject] = []
-    for value in paper_values[:MAX_PAPERS_FOR_PROMPT]:
-        if isinstance(value, dict):
-            paper = normalize_paper_payload(value)
-            if paper is not None:
-                papers.append(paper)
-    return papers
-
-
-def normalize_paper_payload(value: dict[object, object]) -> JsonObject | None:
-    title = string_value(value.get("title"))
-    paper_ref = first_present_string(
-        value.get("openalex_id"),
-        value.get("doi"),
-        value.get("url"),
-        title,
-    )
-    if not paper_ref:
-        return None
-    return {
-        "abstract_summary": trim_text(string_value(value.get("abstract_summary"))),
-        "limitations": string_list(value.get("limitations")),
-        "paper_ref": paper_ref,
-        "relevance_score": number_value(value.get("relevance_score")),
-        "reliability_level": string_value(value.get("reliability_level")),
-        "title": title or paper_ref,
-        "venue": string_value(value.get("venue")),
-        "why_relevant": trim_text(string_value(value.get("why_relevant"))),
-        "year": value.get("year") if isinstance(value.get("year"), int) else None,
-    }
-
-
-def known_paper_refs(papers: list[JsonObject]) -> set[str]:
-    refs: set[str] = set()
-    for paper in papers:
-        for key in ("paper_ref", "title"):
-            value = paper.get(key)
-            if isinstance(value, str) and value:
-                refs.add(value)
-    return refs
-
-
-def compact_payload(payload: JsonObject) -> JsonObject:
-    compacted: JsonObject = {}
-    for key, value in payload.items():
-        if key == "raw_response":
-            continue
-        if isinstance(value, str):
-            compacted[key] = trim_text(value)
-        elif isinstance(value, list):
-            compacted[key] = [
-                trim_text(item) if isinstance(item, str) else item
-                for item in value[:8]
-                if isinstance(item, str | int | float | bool | dict)
-            ]
-        elif isinstance(value, int | float | bool | dict) or value is None:
-            compacted[key] = value
-    return compacted
-
-
-def trim_text(value: str) -> str:
-    return " ".join(value.split())[:MAX_TEXT_FIELD_CHARS]
-
-
-def string_value(value: object) -> str:
-    return value if isinstance(value, str) else ""
-
-
-def first_present_string(*values: object) -> str:
-    for value in values:
-        if isinstance(value, str) and value:
-            return value
-    return ""
-
-
-def string_list(value: object) -> list[str]:
-    return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
-
-
-def number_value(value: object) -> float:
-    return float(value) if isinstance(value, int | float) else 0.0
 
 
 def get_gap_hypothesis_runner() -> GapHypothesisRunner:
