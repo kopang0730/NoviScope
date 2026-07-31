@@ -66,6 +66,7 @@ FastAPI route modules. `routes.py` owns auth, providers, agents, quests, and
 manual stage updates. `stage_runs.py` owns executable stage transitions and
 dependency gates. `stage_literature_papers.py` exposes saved Literature Scout
 rows as filtered, sorted table and detail contracts for the web workspace.
+`literature_exports.py` owns Literature Scout citation review downloads.
 `stage_display_output.py` owns the default stage-output payload for frontend
 views and hides raw model/secret-like fields from the main display path.
 `evidence_ledger.py` exposes saved per-stage source references, provider/model
@@ -186,6 +187,7 @@ Implemented now:
 - five-stage workflow creation;
 - demand validation through an OpenAI-compatible/custom provider;
 - literature scouting through OpenAlex;
+- Literature Scout Markdown citation review downloads;
 - evidence-linked idea generation through a model provider;
 - experiment planning through a model provider;
 - paper/meeting Markdown artifact generation through a model provider;

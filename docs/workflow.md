@@ -92,6 +92,11 @@ fabricated detail. Pending, running, or blocked stages return an empty detail
 with `unavailable_reason`. The response includes review warnings reminding the
 reader to verify metadata and full text before citing.
 
+`GET /stages/{stage_id}/literature-citations/download` returns a Markdown
+citation review list for a completed Literature Scout stage. It serializes saved
+metadata and reliability notes; users still need to verify primary papers before
+formal submission.
+
 ### Gap & Hypothesis Generator
 
 Purpose: generate candidate research ideas based on demand and literature

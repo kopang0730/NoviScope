@@ -11,6 +11,7 @@ from noviscope.api.dependencies import get_session
 from noviscope.api.evidence_ledger import router as evidence_ledger_router
 from noviscope.api.experiment_setup import router as experiment_setup_router
 from noviscope.api.idea_selection import router as idea_selection_router
+from noviscope.api.literature_exports import router as literature_exports_router
 from noviscope.api.provider_tests import router as provider_tests_router
 from noviscope.api.quest_exports import router as quest_exports_router
 from noviscope.api.quest_review_packets import router as quest_review_packets_router
@@ -48,6 +49,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
     app.include_router(evidence_ledger_router)
     app.include_router(experiment_setup_router)
     app.include_router(idea_selection_router)
+    app.include_router(literature_exports_router)
     app.include_router(provider_tests_router)
     app.include_router(quest_exports_router)
     app.include_router(quest_review_packets_router)
