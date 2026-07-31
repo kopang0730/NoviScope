@@ -31,6 +31,7 @@ class Quest(SQLModel, table=True):
     owner_user_id: str | None = Field(default=None, foreign_key="user.id", index=True)
     title: str
     initial_direction: str
+    intake_payload: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
     status: QuestStatus = Field(
         default=QuestStatus.DRAFT,
         index=True,

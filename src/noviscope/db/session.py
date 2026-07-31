@@ -1,9 +1,11 @@
 from collections.abc import Generator
 from sqlite3 import Connection as SQLiteConnection
+from sqlite3 import DatabaseError as SQLiteDatabaseError
+from typing import TypeAlias
 
 from sqlalchemy import event, inspect, text
 from sqlalchemy.engine import Engine
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import ConnectionPoolEntry, StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
 from noviscope.models.agent import AgentAssignment  # noqa: F401
@@ -11,17 +13,25 @@ from noviscope.models.provider import ModelProvider  # noqa: F401
 from noviscope.models.quest import Quest, StageCard  # noqa: F401
 from noviscope.models.user import InviteCode, User  # noqa: F401
 
+ConnectArgs: TypeAlias = dict[str, bool]
+EngineKwargs: TypeAlias = dict[str, ConnectArgs | type[StaticPool]]
+
 
 def create_db_engine(database_url: str) -> Engine:
-    connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
-    engine_kwargs: dict[str, object] = {"connect_args": connect_args}
+    connect_args: ConnectArgs = (
+        {"check_same_thread": False} if database_url.startswith("sqlite") else {}
+    )
+    engine_kwargs: EngineKwargs = {"connect_args": connect_args}
     if database_url in {"sqlite:///:memory:", "sqlite://"}:
         engine_kwargs["poolclass"] = StaticPool
     engine = create_engine(database_url, **engine_kwargs)
     if database_url.startswith("sqlite"):
 
         @event.listens_for(engine, "connect")
-        def enable_sqlite_foreign_keys(dbapi_connection: SQLiteConnection, _: object) -> None:
+        def enable_sqlite_foreign_keys(
+            dbapi_connection: SQLiteConnection,
+            _: ConnectionPoolEntry,
+        ) -> None:
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.close()
@@ -50,12 +60,10 @@ def _upgrade_modelprovider_schema(engine: Engine) -> None:
             "owner_user_id",
             "created_by_user_id",
         } - columns
-        legacy_unique_name_constraints, legacy_unique_name_indexes = (
-            _legacy_unique_name_artifacts(connection, inspector)
+        legacy_unique_name_constraints, legacy_unique_name_indexes = _legacy_unique_name_artifacts(
+            connection, inspector
         )
-        has_legacy_unique_name = bool(
-            legacy_unique_name_constraints or legacy_unique_name_indexes
-        )
+        has_legacy_unique_name = bool(legacy_unique_name_constraints or legacy_unique_name_indexes)
 
     if not missing_columns and not has_legacy_unique_name:
         return
@@ -106,9 +114,7 @@ def _legacy_unique_name_artifacts(connection, inspector) -> tuple[list[str], lis
     for row in rows:
         if row["unique"] != 1:
             continue
-        columns = connection.execute(
-            text(f"PRAGMA index_info('{row['name']}')")
-        ).mappings().all()
+        columns = connection.execute(text(f"PRAGMA index_info('{row['name']}')")).mappings().all()
         if [column["name"] for column in columns] == ["name"]:
             index_names.append(row["name"])
     return constraint_names, index_names
@@ -172,11 +178,9 @@ def _upgrade_sqlite_modelprovider_schema(engine: Engine, existing_columns: set[s
             """
         )
         cursor.execute("DROP TABLE modelprovider")
-        cursor.execute(
-            "ALTER TABLE modelprovider__noviscope_upgrade RENAME TO modelprovider"
-        )
+        cursor.execute("ALTER TABLE modelprovider__noviscope_upgrade RENAME TO modelprovider")
         raw_connection.commit()
-    except Exception:
+    except SQLiteDatabaseError:
         raw_connection.rollback()
         raise
     finally:
@@ -207,37 +211,40 @@ def _upgrade_quest_schema(engine: Engine) -> None:
 
         columns = {column["name"] for column in inspector.get_columns("quest")}
 
-    if "owner_user_id" in columns:
+    missing_columns = {"owner_user_id", "intake_payload"} - columns
+    if not missing_columns:
         return
 
     with engine.begin() as connection:
-        if engine.dialect.name == "sqlite":
+        if "owner_user_id" in missing_columns:
+            if engine.dialect.name == "sqlite":
+                connection.execute(
+                    text("ALTER TABLE quest ADD COLUMN owner_user_id VARCHAR REFERENCES user (id)")
+                )
+            else:
+                connection.execute(
+                    text(
+                        'ALTER TABLE quest ADD COLUMN owner_user_id VARCHAR REFERENCES "user" (id)'
+                    )
+                )
+        if "intake_payload" in missing_columns:
+            connection.execute(text("ALTER TABLE quest ADD COLUMN intake_payload JSON"))
             connection.execute(
-                text("ALTER TABLE quest ADD COLUMN owner_user_id VARCHAR REFERENCES user (id)")
-            )
-        else:
-            connection.execute(
-                text('ALTER TABLE quest ADD COLUMN owner_user_id VARCHAR REFERENCES "user" (id)')
+                text("UPDATE quest SET intake_payload = '{}' WHERE intake_payload IS NULL")
             )
 
 
 def _ensure_modelprovider_name_index(engine: Engine) -> None:
     with engine.begin() as connection:
         connection.execute(
-            text(
-                "CREATE INDEX IF NOT EXISTS ix_modelprovider_name "
-                "ON modelprovider (name)"
-            )
+            text("CREATE INDEX IF NOT EXISTS ix_modelprovider_name ON modelprovider (name)")
         )
 
 
 def _ensure_quest_owner_user_id_index(engine: Engine) -> None:
     with engine.begin() as connection:
         connection.execute(
-            text(
-                "CREATE INDEX IF NOT EXISTS ix_quest_owner_user_id "
-                "ON quest (owner_user_id)"
-            )
+            text("CREATE INDEX IF NOT EXISTS ix_quest_owner_user_id ON quest (owner_user_id)")
         )
 
 
