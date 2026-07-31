@@ -217,8 +217,7 @@ CANVAS_EDGES: Final[tuple[CanvasEdgeResponse, ...]] = tuple(
 )
 
 
-@router.get("/workflow/canvas-template")
-def get_workflow_canvas_template() -> WorkflowCanvasTemplateResponse:
+def build_workflow_canvas_template() -> WorkflowCanvasTemplateResponse:
     return WorkflowCanvasTemplateResponse(
         core_flow_agent_ids=CORE_FLOW_AGENT_IDS,
         edges=CANVAS_EDGES,
@@ -227,3 +226,8 @@ def get_workflow_canvas_template() -> WorkflowCanvasTemplateResponse:
         nodes=CANVAS_NODES,
         terminal_agent_id=PAPER_MEETING_WRITER_AGENT_ID,
     )
+
+
+@router.get("/workflow/canvas-template")
+def get_workflow_canvas_template() -> WorkflowCanvasTemplateResponse:
+    return build_workflow_canvas_template()
