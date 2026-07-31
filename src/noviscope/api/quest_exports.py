@@ -1,6 +1,6 @@
 from typing import Annotated, assert_never
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict
 from sqlmodel import Session
 
@@ -200,13 +200,11 @@ def build_trust_summary(stages: list[QuestExportStage]) -> QuestExportTrustSumma
     )
 
 
-@router.get("/quests/{quest_id}/export", response_model=QuestExportResponse)
-def export_quest(
+def build_quest_export_response(
     quest_id: str,
-    session: Annotated[Session, Depends(get_session)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    service: QuestService,
+    current_user: User,
 ) -> QuestExportResponse:
-    service = QuestService(session)
     try:
         quest = service.get_quest_for_user(quest_id, current_user)
         stages = [quest_export_stage(stage) for stage in service.list_stage_cards(quest.id)]
@@ -219,4 +217,39 @@ def export_quest(
         quest=quest_export_quest(quest),
         stages=stages,
         trust_summary=build_trust_summary(stages),
+    )
+
+
+@router.get("/quests/{quest_id}/export", response_model=QuestExportResponse)
+def export_quest(
+    quest_id: str,
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> QuestExportResponse:
+    return build_quest_export_response(
+        current_user=current_user,
+        quest_id=quest_id,
+        service=QuestService(session),
+    )
+
+
+@router.get("/quests/{quest_id}/export/download")
+def download_quest_export(
+    quest_id: str,
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> Response:
+    export = build_quest_export_response(
+        current_user=current_user,
+        quest_id=quest_id,
+        service=QuestService(session),
+    )
+    return Response(
+        content=export.model_dump_json(),
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="noviscope-quest-export-{quest_id}.json"'
+            ),
+        },
+        media_type="application/json; charset=utf-8",
     )
