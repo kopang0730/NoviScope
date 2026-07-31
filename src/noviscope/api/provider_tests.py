@@ -1,7 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from sqlmodel import Session
 
 from noviscope.api.dependencies import get_session
@@ -21,6 +21,15 @@ from noviscope.providers.service import ProviderService
 router = APIRouter()
 
 
+class ProviderPreviewTestRequest(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    kind: ProviderKind
+    base_url: str
+    default_model: str
+    api_key: SecretStr = Field(repr=False)
+
+
 def build_model_gateway() -> ModelGateway:
     gateway = ModelGateway()
     gateway.register_adapter(ProviderKind.OPENAI_COMPATIBLE.value, OpenAICompatibleAdapter())
@@ -32,6 +41,22 @@ def build_model_gateway() -> ModelGateway:
 def get_provider_service(session: Session) -> ProviderService:
     settings = get_settings()
     return ProviderService(session, SecretBox(settings.provider_secret_key))
+
+
+@router.post("/provider-tests/preview", response_model=ConnectionTestResult)
+def test_provider_preview_connection(
+    request: ProviderPreviewTestRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> ConnectionTestResult:
+    return build_model_gateway().test_connection(
+        ProviderProfile(
+            api_key=request.api_key,
+            base_url=request.base_url,
+            default_model=request.default_model,
+            kind=request.kind.value,
+            provider_id="preview",
+        )
+    )
 
 
 @router.post("/providers/{provider_id}/test", response_model=ConnectionTestResult)
